@@ -1,0 +1,52 @@
+[
+  {
+    "id": 1,
+    "prenom": "Amina",
+    "age": 26,
+    "ville": "Cotonou",
+    "nationalite": "Béninoise",
+    "interets": [
+      "Musique",
+      "Voyages",
+      "Cuisine"
+    ],
+    "statut": "Célibataire"
+  },
+  {
+    "id": 2,
+    "prenom": "Kofi",
+    "age": 30,
+    "ville": "Lomé",
+    "nationalite": "Togolaise",
+    "interets": [
+      "Entrepreneuriat",
+      "Sport",
+      "Voyages"
+    ],
+    "statut": "En couple"
+  },
+  {
+    "id": 3,
+    "prenom": "Sarah",
+    "age": 28,
+    "ville": "Cotonou",
+    "nationalite": "Française",
+    "interets": [
+      "Art",
+      "Cuisine",
+      "Lecture"
+    ],
+    "statut": "Célibataire"
+  },
+  {
+    "id": 1786303887840,
+    "prenom": "Hugue ",
+    "age": 19,
+    "ville": "calavi",
+    "nationalite": "béninoise ",
+    "interets": [
+      "musique internet"
+    ],
+    "statut": "Célibataire"
+  }
+]

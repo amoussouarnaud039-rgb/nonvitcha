@@ -75,8 +75,9 @@ app.get('/api/auth/me', (req, res) => {
 
 app.post('/api/auth/login', (req, res) => {
     const { email, password } = req.body;
+    const cleanEmail = (email || '').trim().toLowerCase();
     const db = readDB();
-    const user = db.users.find(u => u.email === email && u.password === password);
+    const user = db.users.find(u => u.email.toLowerCase() === cleanEmail && u.password === password);
     if (user) {
         activeSessions.user = user;
         res.json({ success: true });
@@ -87,11 +88,26 @@ app.post('/api/auth/login', (req, res) => {
 
 app.post('/api/auth/register', (req, res) => {
     const { email, password, nom, age, ville } = req.body;
+    const cleanEmail = (email || '').trim().toLowerCase();
     const db = readDB();
-    if (db.users.find(u => u.email === email)) {
+    
+    if (db.users.find(u => u.email.toLowerCase() === cleanEmail)) {
         return res.json({ success: false, message: 'Email déjà utilisé' });
     }
-    const newUser = { id: Date.now().toString(), email, password, nom, age, ville, photo: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=150', likes: 0, nonvicoins: 0, isVip: false };
+    
+    const newUser = { 
+        id: Date.now().toString(), 
+        email: cleanEmail, 
+        password, 
+        nom, 
+        age, 
+        ville, 
+        photo: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=150', 
+        likes: 0, 
+        nonvicoins: 0, 
+        isVip: false 
+    };
+    
     db.users.push(newUser);
     writeDB(db);
     activeSessions.user = newUser;
@@ -100,6 +116,11 @@ app.post('/api/auth/register', (req, res) => {
     io.emit('update-users', newUser); 
     
     res.json({ success: true, user: newUser });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+    activeSessions = {};
+    res.json({ success: true });
 });
 
 // Route de recherche par nom ou ville

@@ -114,7 +114,6 @@
           <option value="vip">Membres VIP ⭐</option>
           <option value="online">En ligne uniquement 🟢</option>
         </select>
-        <!-- Bouton de recherche dédié branché sur l'API backend -->
         <button onclick="lancerRechercheServeur()" style="margin: 0; padding: 0 15px;">🔍 Rechercher</button>
       </div>
       <div id="users-list" class="grid"></div>
@@ -190,9 +189,8 @@
       if (el) el.remove();
     });
 
-    // Actualisation automatique en temps réel des profils (lors d'une inscription ou d'un like)
     socket.off('update-users');
-    socket.on('update-users', (newUser) => {
+    socket.on('update-users', () => {
       loadUsersData();
     });
 
@@ -361,7 +359,6 @@
     filterAndRenderUsers();
   }
 
-  // Fonction de recherche connectée au Backend
   async function lancerRechercheServeur() {
     const query = document.getElementById('search-name').value.trim();
     try {

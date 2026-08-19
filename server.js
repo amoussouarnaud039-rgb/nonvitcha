@@ -109,7 +109,8 @@ app.post('/api/auth/login', async (req, res) => {
             res.json({ success: false, message: 'Email ou mot de passe incorrect' });
         }
     } catch (e) {
-        res.status(500).json({ success: false, message: 'Erreur serveur' });
+        console.error("Détail de l'erreur (Login) :", e);
+        res.status(500).json({ success: false, message: 'Erreur serveur : ' + e.message });
     }
 });
 
@@ -136,7 +137,8 @@ app.post('/api/auth/register', async (req, res) => {
         
         res.json({ success: true, user: newUser });
     } catch (e) {
-        res.status(500).json({ success: false, message: 'Erreur lors de l inscription' });
+        console.error("Détail de l'erreur (Register) :", e);
+        res.status(500).json({ success: false, message: 'Erreur lors de l inscription : ' + e.message });
     }
 });
 
@@ -150,6 +152,7 @@ app.get('/api/users', async (req, res) => {
         const users = await pool.query('SELECT id, email, nom, age, ville, photo, likes, nonvicoins, isVip FROM users');
         res.json(users.rows);
     } catch (e) {
+        console.error("Détail de l'erreur (Users) :", e);
         res.json([]);
     }
 });
@@ -162,6 +165,7 @@ app.get('/api/users/search', async (req, res) => {
         const filtered = users.rows.filter(u => (u.nom && u.nom.toLowerCase().includes(query)) || (u.ville && u.ville.toLowerCase().includes(query)));
         res.json(filtered);
     } catch (e) {
+        console.error("Détail de l'erreur (Search) :", e);
         res.json([]);
     }
 });
@@ -174,6 +178,7 @@ app.post('/api/users/upload-photo', upload.single('photo'), async (req, res) => 
         activeSessions.user.photo = photoPath;
         res.json({ success: true, user: activeSessions.user });
     } catch (e) {
+        console.error("Détail de l'erreur (Upload) :", e);
         res.json({ success: false });
     }
 });
@@ -183,6 +188,7 @@ app.get('/api/chat', async (req, res) => {
         const chat = await pool.query('SELECT * FROM chat ORDER BY date ASC LIMIT 50');
         res.json(chat.rows);
     } catch (e) {
+        console.error("Détail de l'erreur (Chat) :", e);
         res.json([]);
     }
 });
@@ -197,6 +203,7 @@ app.post('/api/users/:id/like', async (req, res) => {
         io.emit('update-users');
         res.json({ success: true });
     } catch (e) {
+        console.error("Détail de l'erreur (Like) :", e);
         res.json({ success: false });
     }
 });
@@ -209,6 +216,7 @@ app.post('/api/users/:id/buy-coins', async (req, res) => {
         activeSessions.user = updated.rows[0];
         res.json({ success: true });
     } catch (e) {
+        console.error("Détail de l'erreur (Buy Coins) :", e);
         res.json({ success: false });
     }
 });
@@ -226,6 +234,7 @@ app.post('/api/users/:id/become-vip', async (req, res) => {
             res.json({ success: false, message: 'Solde insuffisant' });
         }
     } catch (e) {
+        console.error("Détail de l'erreur (VIP) :", e);
         res.json({ success: false });
     }
 });
@@ -240,6 +249,7 @@ app.get('/api/private-messages/:targetId', async (req, res) => {
         );
         res.json(msgs.rows.map(m => ({ id: m.id, senderId: m.sender_id, senderName: m.sender_name, targetId: m.target_id, text: m.text, date: m.date })));
     } catch (e) {
+        console.error("Détail de l'erreur (Private Msgs) :", e);
         res.json([]);
     }
 });
@@ -252,6 +262,7 @@ app.get('/api/unread-messages', async (req, res) => {
         unread.rows.forEach(r => { counts[r.sender_id] = parseInt(r.count); });
         res.json(counts);
     } catch (e) {
+        console.error("Détail de l'erreur (Unread Msgs) :", e);
         res.json({});
     }
 });
@@ -268,6 +279,7 @@ app.get('/api/ressources', async (req, res) => {
         const results = await pool.query(query, params);
         res.json(results.rows);
     } catch (e) {
+        console.error("Détail de l'erreur (Ressources) :", e);
         res.json([]);
     }
 });
@@ -284,7 +296,8 @@ app.post('/api/ecoute', async (req, res) => {
         );
         res.status(201).json({ success: true, message: "Votre demande a été transmise en toute confidentialité." });
     } catch (e) {
-        res.status(500).json({ success: false, error: "Erreur serveur" });
+        console.error("Détail de l'erreur (Ecoute) :", e);
+        res.status(500).json({ success: false, error: "Erreur serveur : " + e.message });
     }
 });
 
@@ -297,6 +310,7 @@ app.get('/api/admin/ecoutes', async (req, res) => {
         `);
         res.json(result.rows);
     } catch (e) {
+        console.error("Détail de l'erreur (Admin Ecoutes) :", e);
         res.json([]);
     }
 });
@@ -306,6 +320,7 @@ app.delete('/api/admin/ecoutes/:id', async (req, res) => {
         await pool.query('DELETE FROM demandes_ecoute WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (e) {
+        console.error("Détail de l'erreur (Delete Ecoute) :", e);
         res.status(500).json({ success: false });
     }
 });
@@ -316,6 +331,7 @@ app.delete('/api/chat/:id', async (req, res) => {
         io.emit('delete-public-message', req.params.id);
         res.json({ success: true });
     } catch (e) {
+        console.error("Détail de l'erreur (Delete Chat) :", e);
         res.json({ success: false });
     }
 });
@@ -327,7 +343,9 @@ io.on('connection', (socket) => {
         try {
             await pool.query('INSERT INTO chat (id, sender, text, date) VALUES ($1, $2, $3, $4)', [id, data.sender, data.text, date]);
             io.emit('new-public-message', { id, sender: data.sender, text: data.text, date });
-        } catch (e) {}
+        } catch (e) {
+            console.error("Erreur Socket public message:", e);
+        }
     });
 
     socket.on('send-private-message', async (data) => {
@@ -341,7 +359,9 @@ io.on('connection', (socket) => {
             io.emit(`private-message-${data.targetId}`, { id, senderId: data.senderId, senderName: data.senderName, targetId: data.targetId, text: data.text, date });
             io.emit(`private-message-${data.senderId}`, { id, senderId: data.senderId, senderName: data.senderName, targetId: data.targetId, text: data.text, date });
             io.emit(`unread-update-${data.targetId}`);
-        } catch (e) {}
+        } catch (e) {
+            console.error("Erreur Socket private message:", e);
+        }
     });
 
     socket.on('typing', (data) => io.emit(`typing-${data.targetId}`, { senderName: data.senderName }));

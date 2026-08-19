@@ -1,352 +1,617 @@
-const express = require('express');
-const fs = require('fs');
-const http = require('http');
-const { Server } = require('socket.io');
-const multer = require('multer');
-const path = require('path');
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nonvitcha - Rencontres & Tchat</title>
+  <script src="https://cdn.fedapay.com/checkout.js?v=1.1.7"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root { --primary: #e91e63; --bg: #f5f5f5; --card-bg: #ffffff; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: center; background: var(--primary); color: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; }
+    .card { background: var(--card-bg); padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .hidden { display: none !important; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
+    .user-card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; text-align: center; background: #fff; position: relative; }
+    .user-card img { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; }
+    .badge-vip { background: #ffd700; color: #000; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; }
+    .badge-unread { background: #e91e63; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.75em; position: absolute; top: 10px; right: 10px; font-weight: bold; }
+    .status-dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-right: 5px; }
+    .status-online { background-color: #4CAF50; box-shadow: 0 0 5px #4CAF50; }
+    button { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-top: 5px; }
+    button:hover { opacity: 0.9; }
+    button.btn-alt { background: #333; }
+    button.btn-blue { background: #2196F3; }
+    button.btn-danger { background: #f44336; padding: 2px 6px; font-size: 0.7em; margin-left: 10px; }
+    input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 15px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    .chat-box { height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fafafa; margin-bottom: 10px; border-radius: 5px; }
+    .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
+    .filter-bar input, .filter-bar select { flex: 1; min-width: 150px; margin: 0; }
+  </style>
+</head>
+<body>
 
-const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
+<div class="container">
+  <header>
+    <h1>Nonvitcha 💕</h1>
+    <div id="header-auth"></div>
+  </header>
 
-const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'database.json');
-const UPLOAD_DIR = path.join(__dirname, 'public/uploads');
+  <!-- CONNEXION / INSCRIPTION -->
+  <div id="auth-section" class="card">
+    <h2>Connexion / Inscription</h2>
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+      <div style="flex: 1; min-width: 250px;">
+        <h3>Se connecter</h3>
+        <input type="email" id="login-email" placeholder="Email">
+        <input type="password" id="login-pass" placeholder="Mot de passe">
+        <button onclick="login()">Se connecter</button>
+      </div>
+      <div style="flex: 1; min-width: 250px;">
+        <h3>S'inscrire</h3>
+        <input type="email" id="reg-email" placeholder="Email (ex: mon@email.com)" required>
+        <input type="password" id="reg-pass" placeholder="Mot de passe" required>
+        <input type="text" id="reg-nom" placeholder="Nom" required>
+        <input type="number" id="reg-age" placeholder="Âge" required>
+        <input type="text" id="reg-ville" placeholder="Ville (ex: Cotonou)" required>
+        <button onclick="register()">Créer un compte</button>
+      </div>
+    </div>
+  </div>
 
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  <!-- APPLICATION -->
+  <div id="app-section" class="hidden">
+    
+    <!-- MON PROFIL -->
+    <div class="card" id="profile-card"></div>
 
-const storage = multer.diskStorage({
-    destination: UPLOAD_DIR,
-    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
-});
-const upload = multer({ storage });
+    <!-- ESPACE ADMIN -->
+    <div class="card hidden" id="admin-section" style="border: 2px solid #e91e63; background: #fff5f8;">
+      <h2>🔒 Espace Admin : Gestion des demandes d'écoute</h2>
+      <div id="admin-ecoutes-list" style="max-height: 250px; overflow-y: auto;">
+        <p>Chargement...</p>
+      </div>
+    </div>
 
-function readDB() {
-    if (!fs.existsSync(DB_FILE)) {
-        const defaultData = {
-            users: [
-                { id: "1", email: "alice@test.com", password: "123", nom: "Alice", age: 24, ville: "Cotonou", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150", likes: 5, nonvicoins: 100, isVip: true },
-                { id: "2", email: "kokou@test.com", password: "123", nom: "Kokou", age: 28, ville: "Porto-Novo", photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150", likes: 2, nonvicoins: 0, isVip: false },
-                { id: "3", email: "assiba@test.com", password: "123", nom: "Assiba", age: 22, ville: "Parakou", photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150", likes: 8, nonvicoins: 50, isVip: false }
-            ],
-            chat: [
-                { id: "c1", sender: "Alice", text: "Bienvenue sur Nonvitcha tout le monde ! 💕", date: "12:00" }
-            ],
-            privateMessages: [],
-            ressources: [
-                { id: "r1", titre: "Qu'est-ce que le Planning Familial ?", categorie: "SSR", contenu: "Le planning familial est un droit...", date_publication: new Date().toISOString() },
-                { id: "r2", titre: "Que faire en cas de violence ?", categorie: "VBG", contenu: "Si vous êtes victime...", date_publication: new Date().toISOString() },
-                { id: "r3", titre: "Comprendre et soutenir les minorités", categorie: "MINORITES", contenu: "Le respect des minorités est essentiel...", date_publication: new Date().toISOString() }
-            ],
-            demandes_ecoute: []
-        };
-        fs.writeFileSync(DB_FILE, JSON.stringify(defaultData, null, 2));
+    <!-- SALLE D'INFORMATION ET D'ÉCOUTE -->
+    <div class="card">
+      <h2>📚 Salle d'Information et d'Écoute</h2>
+      
+      <div style="margin-bottom: 15px; display: flex; gap: 5px; flex-wrap: wrap;">
+        <button onclick="chargerRessources()">Tous</button>
+        <button onclick="chargerRessources('SSR')" class="btn-blue">SSR</button>
+        <button onclick="chargerRessources('VBG')" style="background: #e91e63;">VBG</button>
+        <button onclick="chargerRessources('MINORITES')" class="btn-alt">Minorités</button>
+      </div>
+
+      <div id="liste-ressources" style="max-height: 250px; overflow-y: auto; margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fafafa;"></div>
+
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+
+      <h3>💬 Demande d'écoute confidentielle</h3>
+      <form id="form-ecoute" onsubmit="envoyerDemandeEcoute(event)">
+        <input type="text" id="sujet-ecoute" placeholder="Sujet (ex: Conseil, Soutien...)" required>
+        <textarea id="message-ecoute" placeholder="Exprimez-vous en toute sécurité..." style="height: 80px;" required></textarea>
+        <button type="submit" style="background-color: #4CAF50;">Envoyer en toute confidentialité</button>
+      </form>
+      <p id="feedback-ecoute" style="margin-top: 8px; font-weight: bold;"></p>
+    </div>
+
+    <!-- TCHAT PRIVÉ -->
+    <div id="private-chat-section" class="card hidden" style="border: 2px solid #2196F3;">
+      <h2>Discussion privée avec <span id="chat-target-name" style="color: #2196F3;"></span></h2>
+      <div id="private-chat-box" class="chat-box"></div>
+      <div id="typing-indicator" style="font-size: 0.85em; color: #666; font-style: italic; height: 20px; margin-bottom: 5px;"></div>
+      <div style="display: flex; gap: 10px;">
+        <input type="text" id="private-msg-input" placeholder="Écrivez votre message privé..." oninput="notifyTyping()" onkeypress="handlePrivateKeyPress(event)">
+        <button onclick="sendPrivateMessage()" class="btn-blue">Envoyer</button>
+        <button onclick="closePrivateChat()" class="btn-alt">Fermer</button>
+      </div>
+    </div>
+
+    <!-- LISTE DES MEMBRES & FILTRES / RECHERCHE -->
+    <div class="card">
+      <h2>Membres Nonvitcha</h2>
+      <div class="filter-bar">
+        <input type="text" id="search-name" placeholder="🔍 Rechercher par nom..." oninput="filterAndRenderUsers()">
+        <input type="text" id="search-ville" placeholder="📍 Filtrer par ville..." oninput="filterAndRenderUsers()">
+        <select id="filter-status" onchange="filterAndRenderUsers()">
+          <option value="all">Tous les statuts</option>
+          <option value="vip">Membres VIP ⭐</option>
+          <option value="online">En ligne uniquement 🟢</option>
+        </select>
+        <button onclick="lancerRechercheServeur()" style="margin: 0; padding: 0 15px;">🔍 Rechercher</button>
+      </div>
+      <div id="users-list" class="grid"></div>
+    </div>
+
+    <!-- TCHAT PUBLIC -->
+    <div class="card">
+      <h2>Tchat Public 💬</h2>
+      <div id="public-chat" class="chat-box"></div>
+      <div style="display: flex; gap: 10px;">
+        <input type="text" id="public-msg-input" placeholder="Écrivez un message public..." onkeypress="handlePublicKeyPress(event)">
+        <button onclick="sendPublicMessage()">Envoyer</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+  let currentUser = null;
+  let activeTargetId = null;
+  let allUsersCache = [];
+  let onlineIdsCache = [];
+  let unreadCountsCache = {};
+  let typingTimeout = null;
+  const socket = io();
+
+  async function checkAuth() {
+    const res = await fetch('/api/auth/me');
+    const data = await res.json();
+    if (data.loggedIn) {
+      currentUser = data.user;
+      showAppUI();
+      initSocketsListeners();
+      chargerRessources();
+    } else {
+      currentUser = null;
+      showAuthUI();
     }
+  }
+
+  function showAuthUI() {
+    document.getElementById('auth-section').classList.remove('hidden');
+    document.getElementById('app-section').classList.add('hidden');
+    document.getElementById('header-auth').innerHTML = '';
+  }
+
+  function showAppUI() {
+    document.getElementById('auth-section').classList.add('hidden');
+    document.getElementById('app-section').classList.remove('hidden');
+    document.getElementById('header-auth').innerHTML = `
+      <span>Bonjour, <strong>${currentUser.nom}</strong></span>
+      <button onclick="logout()" class="btn-alt">Déconnexion</button>
+    `;
+    renderProfile();
+    loadUsersData();
+    loadPublicChat();
+
+    if (currentUser.id === "1" || currentUser.email.includes("admin")) {
+      document.getElementById('admin-section').classList.remove('hidden');
+      chargerDemandesAdmin();
+    } else {
+      document.getElementById('admin-section').classList.add('hidden');
+    }
+  }
+
+  function initSocketsListeners() {
+    socket.off('new-public-message');
+    socket.on('new-public-message', (m) => {
+      const box = document.getElementById('public-chat');
+      const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
+      const canDelete = m.sender === currentUser.nom ? `<button class="btn-danger" onclick="deletePublicMessage('${m.id}')">Supprimer</button>` : '';
+      box.innerHTML += `<div id="pub-msg-${m.id}"><strong>[${m.date}] ${m.sender} :</strong> ${m.text} ${canDelete}</div>`;
+      if (isAtBottom) box.scrollTop = box.scrollHeight;
+    });
+
+    socket.off('delete-public-message');
+    socket.on('delete-public-message', (msgId) => {
+      const el = document.getElementById(`pub-msg-${msgId}`);
+      if (el) el.remove();
+    });
+
+    socket.off('update-users');
+    socket.on('update-users', () => {
+      loadUsersData();
+    });
+
+    socket.off(`private-message-${currentUser.id}`);
+    socket.on(`private-message-${currentUser.id}`, (m) => {
+      if (activeTargetId === m.senderId || activeTargetId === m.targetId) {
+        loadPrivateMessages();
+      }
+    });
+
+    socket.off(`unread-update-${currentUser.id}`);
+    socket.on(`unread-update-${currentUser.id}`, () => {
+      loadUsersData();
+    });
+
+    socket.off(`typing-${currentUser.id}`);
+    socket.on(`typing-${currentUser.id}`, (data) => {
+      if (activeTargetId) {
+        document.getElementById('typing-indicator').innerText = `${data.senderName} est en train d'écrire...`;
+      }
+    });
+
+    socket.off(`stop-typing-${currentUser.id}`);
+    socket.on(`stop-typing-${currentUser.id}`, () => {
+      document.getElementById('typing-indicator').innerText = '';
+    });
+  }
+
+  async function login() {
+    const email = document.getElementById('login-email').value;
+    const password = document.getElementById('login-pass').value;
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password })
+    });
+    const data = await res.json();
+    if (data.success) checkAuth();
+    else alert(data.message);
+  }
+
+  async function register() {
+    const email = document.getElementById('reg-email').value;
+    const password = document.getElementById('reg-pass').value;
+    const nom = document.getElementById('reg-nom').value;
+    const age = document.getElementById('reg-age').value;
+    const ville = document.getElementById('reg-ville').value;
+
+    if (!email || !password || !nom) {
+      alert('Veuillez remplir les champs obligatoires.');
+      return;
+    }
+
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password, nom, age, ville })
+    });
+    const data = await res.json();
+    if (data.success) {
+      document.getElementById('reg-email').value = '';
+      document.getElementById('reg-pass').value = '';
+      document.getElementById('reg-nom').value = '';
+      document.getElementById('reg-age').value = '';
+      document.getElementById('reg-ville').value = '';
+      checkAuth();
+    } else {
+      alert(data.message);
+    }
+  }
+
+  async function logout() {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    checkAuth();
+  }
+
+  function renderProfile() {
+    const card = document.getElementById('profile-card');
+    const vipBadge = currentUser.isVip ? '<span class="badge-vip">⭐ MEMBRE VIP</span>' : '<span>Statut Standard</span>';
+
+    card.innerHTML = `
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
+        <div style="text-align: center;">
+          <img src="${currentUser.photo}" alt="${currentUser.nom}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary);"><br>
+          <input type="file" id="photo-input" accept="image/*" style="margin-top: 10px; width: 180px; font-size: 0.8em;">
+          <button onclick="uploadPhoto()" style="padding: 4px 10px; font-size: 0.8em;">Changer photo</button>
+        </div>
+        <div style="flex: 1; min-width: 200px;">
+          <h2>Mon Profil ${vipBadge}</h2>
+          <p><strong>Nom :</strong> ${currentUser.nom} (${currentUser.age} ans)</p>
+          <p><strong>Ville :</strong> ${currentUser.ville}</p>
+          <p><strong>Mes Likes :</strong> ❤️ ${currentUser.likes || 0}</p>
+          <p style="font-size: 1.1em;"><strong>Solde :</strong> 💰 <strong>${currentUser.nonvicoins || 0}</strong> Nonvicoins</p>
+        </div>
+        <div>
+          <button onclick="buyCoins('${currentUser.id}')">Acheter +50 Coins</button><br>
+          ${!currentUser.isVip ? `<button onclick="becomeVip('${currentUser.id}')" style="background: #ffd700; color: #000;">Passer VIP (100 coins)</button>` : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  async function uploadPhoto() {
+    const fileInput = document.getElementById('photo-input');
+    if (fileInput.files.length === 0) return alert('Veuillez sélectionner une image.');
+    const formData = new FormData();
+    formData.append('photo', fileInput.files[0]);
+
+    const res = await fetch('/api/users/upload-photo', { method: 'POST', body: formData });
+    const data = await res.json();
+    if (data.success) {
+      currentUser = data.user;
+      renderProfile();
+      loadUsersData();
+      socket.emit('update-users');
+      alert('Photo mise à jour avec succès !');
+    } else {
+      alert('Erreur lors de l\'upload.');
+    }
+  }
+
+  function buyCoins(userId) {
+    FedaPay.init({
+      public_key: 'pk_live_nL75JBWaRG69V8iMo6-7mMor',
+      transaction: { amount: 500, description: 'Achat de 50 Nonvicoins sur Nonvitcha' },
+      customer: { email: currentUser.email, firstname: currentUser.nom, lastname: '' }
+    }).open().then(async (response) => {
+      const res = await fetch(`/api/users/${userId}/buy-coins`, { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transactionId: response.token })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Paiement réussi ! 50 Nonvicoins ajoutés.');
+        checkAuth();
+      } else {
+        alert(data.message || 'Erreur lors de la validation du paiement.');
+      }
+    }).catch((error) => {
+      console.log(error);
+      alert('Paiement annulé ou échoué.');
+    });
+  }
+
+  async function becomeVip(userId) {
+    const res = await fetch(`/api/users/${userId}/become-vip`, { method: 'POST' });
+    const data = await res.json();
+    if (data.success) {
+      alert('Félicitations ! Vous êtes désormais Membre VIP ⭐');
+      checkAuth();
+    } else {
+      alert(data.message);
+    }
+  }
+
+  async function loadUsersData() {
+    const [resUsers, resOnline, resUnread] = await Promise.all([
+      fetch('/api/users'),
+      fetch('/api/online-users'),
+      fetch('/api/unread-messages')
+    ]);
+    allUsersCache = await resUsers.json();
+    onlineIdsCache = await resOnline.json();
+    unreadCountsCache = await resUnread.json();
+    filterAndRenderUsers();
+  }
+
+  async function lancerRechercheServeur() {
+    const query = document.getElementById('search-name').value.trim();
     try {
-        const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
-        return {
-            users: data.users || [],
-            chat: data.chat || [],
-            privateMessages: data.privateMessages || [],
-            ressources: data.ressources || [],
-            demandes_ecoute: data.demandes_ecoute || []
-        };
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+      const users = await res.json();
+      allUsersCache = users;
+      filterAndRenderUsers();
     } catch (e) {
-        return { users: [], chat: [], privateMessages: [], ressources: [], demandes_ecoute: [] };
+      console.error("Erreur lors de la recherche :", e);
     }
-}
+  }
 
-function writeDB(data) {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-}
+  function filterAndRenderUsers() {
+    const searchName = document.getElementById('search-name').value.toLowerCase();
+    const searchVille = document.getElementById('search-ville').value.toLowerCase();
+    const filterStatus = document.getElementById('filter-status').value;
+    const list = document.getElementById('users-list');
 
-app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(UPLOAD_DIR));
+    const filtered = allUsersCache.filter(u => {
+      if (u.id === currentUser.id) return false;
+      const matchName = u.nom.toLowerCase().includes(searchName);
+      const matchVille = u.ville.toLowerCase().includes(searchVille);
+      const isOnline = onlineIdsCache.includes(String(u.id));
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-let activeSessions = {};
-
-app.get('/api/auth/me', (req, res) => {
-    res.json({ loggedIn: !!activeSessions.user, user: activeSessions.user });
-});
-
-app.post('/api/auth/login', (req, res) => {
-    const { email, password } = req.body;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const db = readDB();
-    const user = db.users.find(u => u.email.toLowerCase() === cleanEmail && u.password === password);
-    if (user) {
-        activeSessions.user = user;
-        res.json({ success: true });
-    } else {
-        res.json({ success: false, message: 'Email ou mot de passe incorrect' });
-    }
-});
-
-app.post('/api/auth/register', (req, res) => {
-    const { email, password, nom, age, ville } = req.body;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    const db = readDB();
-    
-    if (db.users.find(u => u.email.toLowerCase() === cleanEmail)) {
-        return res.json({ success: false, message: 'Email déjà utilisé' });
-    }
-    
-    const newUser = { 
-        id: Date.now().toString(), 
-        email: cleanEmail, 
-        password, 
-        nom, 
-        age, 
-        ville, 
-        photo: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=150', 
-        likes: 0, 
-        nonvicoins: 0, 
-        isVip: false 
-    };
-    
-    db.users.push(newUser);
-    writeDB(db);
-    activeSessions.user = newUser;
-    
-    io.emit('update-users', newUser); 
-    
-    res.json({ success: true, user: newUser });
-});
-
-app.post('/api/auth/logout', (req, res) => {
-    activeSessions = {};
-    res.json({ success: true });
-});
-
-app.get('/api/users/search', (req, res) => {
-    const query = (req.query.q || '').toLowerCase().trim();
-    const db = readDB();
-    if (!query) return res.json(db.users);
-    const filteredUsers = db.users.filter(user => 
-        (user.nom && user.nom.toLowerCase().includes(query)) ||
-        (user.ville && user.ville.toLowerCase().includes(query))
-    );
-    res.json(filteredUsers);
-});
-
-app.get('/api/users', (req, res) => {
-    const db = readDB();
-    res.json(db.users);
-});
-
-app.post('/api/users/upload-photo', upload.single('photo'), (req, res) => {
-    if (!activeSessions.user) return res.status(401).send();
-    const db = readDB();
-    const user = db.users.find(u => u.id === activeSessions.user.id);
-    if (user && req.file) {
-        user.photo = '/uploads/' + req.file.filename;
-        writeDB(db);
-        activeSessions.user = user;
-        res.json({ success: true, user });
-    } else {
-        res.json({ success: false });
-    }
-});
-
-app.get('/api/chat', (req, res) => {
-    const db = readDB();
-    res.json((db.chat || []).slice(-50));
-});
-
-app.get('/api/online-users', (req, res) => {
-    res.json(Object.keys(activeSessions).length ? [activeSessions.user.id] : []);
-});
-
-app.post('/api/users/:id/like', (req, res) => {
-    const db = readDB();
-    const target = db.users.find(u => u.id === req.params.id);
-    if (target) {
-        target.likes = (target.likes || 0) + 1;
-        writeDB(db);
-        io.emit('update-users');
-    }
-    res.json({ success: true });
-});
-
-app.post('/api/users/:id/buy-coins', (req, res) => {
-    if (!activeSessions.user) return res.status(401).send();
-    const db = readDB();
-    const user = db.users.find(u => u.id === activeSessions.user.id);
-    if (user) {
-        user.nonvicoins = (user.nonvicoins || 0) + 50;
-        writeDB(db);
-        activeSessions.user = user;
-        res.json({ success: true });
-    } else {
-        res.json({ success: false });
-    }
-});
-
-app.post('/api/users/:id/become-vip', (req, res) => {
-    if (!activeSessions.user) return res.status(401).send();
-    const db = readDB();
-    const user = db.users.find(u => u.id === activeSessions.user.id);
-    if (user && user.nonvicoins >= 100) {
-        user.nonvicoins -= 100;
-        user.isVip = true;
-        writeDB(db);
-        activeSessions.user = user;
-        io.emit('update-users');
-        res.json({ success: true });
-    } else {
-        res.json({ success: false, message: 'Solde insuffisant' });
-    }
-});
-
-app.get('/api/private-messages/:targetId', (req, res) => {
-    if (!activeSessions.user) return res.json([]);
-    const db = readDB();
-    const messages = db.privateMessages || [];
-    
-    let updated = false;
-    messages.forEach(m => {
-        if (m.senderId === req.params.targetId && m.targetId === activeSessions.user.id && !m.read) {
-            m.read = true;
-            updated = true;
-        }
-    });
-    if (updated) writeDB(db);
-
-    res.json(messages.filter(m => 
-        (m.senderId === activeSessions.user.id && m.targetId === req.params.targetId) ||
-        (m.senderId === req.params.targetId && m.targetId === activeSessions.user.id)
-    ));
-});
-
-app.get('/api/unread-messages', (req, res) => {
-    if (!activeSessions.user) return res.json({});
-    const db = readDB();
-    const unreadCounts = {};
-    (db.privateMessages || []).forEach(m => {
-        if (m.targetId === activeSessions.user.id && !m.read) {
-            unreadCounts[m.senderId] = (unreadCounts[m.senderId] || 0) + 1;
-        }
-    });
-    res.json(unreadCounts);
-});
-
-app.get('/api/ressources', (req, res) => {
-    const { categorie } = req.query;
-    const db = readDB();
-    let results = db.ressources || [];
-    
-    if (categorie) {
-        results = results.filter(r => r.categorie.toUpperCase() === categorie.toUpperCase());
-    }
-    res.json(results);
-});
-
-app.post('/api/ecoute', (req, res) => {
-    if (!activeSessions.user) {
-        return res.status(401).json({ success: false, error: "Vous devez être connecté pour envoyer une demande." });
-    }
-
-    const { sujet, message } = req.body;
-    if (!message) {
-        return res.status(400).json({ success: false, error: "Le message ne peut pas être vide." });
-    }
-
-    const db = readDB();
-    if (!db.demandes_ecoute) db.demandes_ecoute = [];
-
-    const nouvelleDemande = {
-        id: 'ecoute_' + Date.now(),
-        utilisateur_id: activeSessions.user.id,
-        nom_utilisateur: activeSessions.user.nom,
-        sujet: sujet || 'Demande générale',
-        message: message,
-        statut: 'en_attente',
-        date_creation: new Date().toISOString()
-    };
-
-    db.demandes_ecoute.push(nouvelleDemande);
-    writeDB(db);
-
-    res.status(201).json({ 
-        success: true, 
-        message: "Votre demande a été transmise en toute confidentialité à notre équipe." 
-    });
-});
-
-// Routes Administrateur pour gérer les demandes d'écoute
-app.get('/api/admin/ecoutes', (req, res) => {
-    const db = readDB();
-    res.json(db.demandes_ecoute || []);
-});
-
-app.delete('/api/admin/ecoutes/:id', (req, res) => {
-    const db = readDB();
-    db.demandes_ecoute = (db.demandes_ecoute || []).filter(d => d.id !== req.params.id);
-    writeDB(db);
-    res.json({ success: true });
-});
-
-app.delete('/api/chat/:id', (req, res) => {
-    if (!activeSessions.user) return res.status(401).send();
-    const db = readDB();
-    db.chat = (db.chat || []).filter(m => m.id !== req.params.id);
-    writeDB(db);
-    io.emit('delete-public-message', req.params.id);
-    res.json({ success: true });
-});
-
-app.delete('/api/private-messages/:id', (req, res) => {
-    if (!activeSessions.user) return res.status(401).send();
-    const db = readDB();
-    db.privateMessages = (db.privateMessages || []).filter(m => m.id !== req.params.id);
-    writeDB(db);
-    io.emit(`delete-private-message-${req.params.id}`);
-    res.json({ success: true });
-});
-
-io.on('connection', (socket) => {
-    socket.on('send-public-message', (data) => {
-        const db = readDB();
-        if (!db.chat) db.chat = [];
-        const newMessage = { id: 'msg_' + Date.now(), sender: data.sender, text: data.text, date: new Date().toLocaleTimeString() };
-        db.chat.push(newMessage);
-        writeDB(db);
-        io.emit('new-public-message', newMessage);
+      if (!matchName || !matchVille) return false;
+      if (filterStatus === 'vip' && !u.isVip) return false;
+      if (filterStatus === 'online' && !isOnline) return false;
+      return true;
     });
 
-    socket.on('send-private-message', (data) => {
-        const db = readDB();
-        if (!db.privateMessages) db.privateMessages = [];
-        const newMessage = { 
-            id: 'pmsg_' + Date.now(),
-            senderId: data.senderId, 
-            senderName: data.senderName, 
-            targetId: data.targetId, 
-            text: data.text, 
-            date: new Date().toLocaleTimeString(),
-            read: false 
-        };
-        db.privateMessages.push(newMessage);
-        writeDB(db);
-        io.emit(`private-message-${data.targetId}`, newMessage);
-        io.emit(`private-message-${data.senderId}`, newMessage);
-        io.emit(`unread-update-${data.targetId}`);
-    });
+    list.innerHTML = filtered.map(u => {
+      const isOnline = onlineIdsCache.includes(String(u.id));
+      const statusClass = isOnline ? 'status-dot status-online' : 'status-dot';
+      const statusText = isOnline ? 'En ligne 🟢' : 'Hors ligne';
+      const vipBadge = u.isVip ? '<span class="badge-vip">⭐ VIP</span>' : '';
+      const unreadBadge = unreadCountsCache[u.id] ? `<span class="badge-unread">${unreadCountsCache[u.id]}</span>` : '';
 
-    socket.on('typing', (data) => {
-        io.emit(`typing-${data.targetId}`, { senderName: data.senderName });
-    });
+      return `
+        <div class="user-card">
+          ${unreadBadge}
+          <img src="${u.photo}" alt="${u.nom}">
+          <h3>${u.nom} ${vipBadge}</h3>
+          <p><span class="${statusClass}" title="${statusText}"></span>${u.age} ans - ${u.ville}</p>
+          <button onclick="likeUser('${u.id}')">❤️ Like (${u.likes || 0})</button>
+          <button onclick="openPrivateChat('${u.id}', '${u.nom}')" class="btn-blue">💬 Discuter</button>
+        </div>
+      `;
+    }).join('');
+  }
 
-    socket.on('stop-typing', (data) => {
-        io.emit(`stop-typing-${data.targetId}`);
-    });
-});
+  async function likeUser(id) {
+    await fetch(`/api/users/${id}/like`, { method: 'POST' });
+    loadUsersData();
+  }
 
-server.listen(PORT, () => {
-    console.log(`Serveur Nonvitcha lancé sur le port ${PORT}`);
-});
+  async function chargerRessources(categorie = '') {
+    try {
+      let url = '/api/ressources';
+      if (categorie) url += `?categorie=${categorie}`;
+      
+      const response = await fetch(url);
+      const ressources = await response.json();
+      
+      const container = document.getElementById('liste-ressources');
+      container.innerHTML = '';
+      
+      if (ressources.length === 0) {
+        container.innerHTML = '<p style="color: #666; text-align: center;">Aucune ressource disponible pour cette catégorie.</p>';
+        return;
+      }
+
+      ressources.forEach(r => {
+        container.innerHTML += `
+          <div style="background: white; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #e0e0e0;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+              <strong style="color: var(--primary);">${r.titre}</strong>
+              <span style="font-size: 0.75em; background: #eee; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${r.categorie}</span>
+            </div>
+            <p style="margin: 0; font-size: 0.95em; color: #444; line-height: 1.4;">${r.contenu}</p>
+          </div>
+        `;
+      });
+    } catch (err) {
+      console.error("Erreur chargement ressources:", err);
+    }
+  }
+
+  async function envoyerDemandeEcoute(event) {
+    event.preventDefault();
+    const sujet = document.getElementById('sujet-ecoute').value;
+    const message = document.getElementById('message-ecoute').value;
+    const feedback = document.getElementById('feedback-ecoute');
+
+    try {
+      const response = await fetch('/api/ecoute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sujet, message })
+      });
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        feedback.style.color = 'green';
+        feedback.textContent = data.message;
+        document.getElementById('form-ecoute').reset();
+      } else {
+        feedback.style.color = 'red';
+        feedback.textContent = data.error || data.message || "Une erreur est survenue.";
+      }
+    } catch (err) {
+      feedback.style.color = 'red';
+      feedback.textContent = "Erreur de connexion au serveur.";
+    }
+  }
+
+  async function chargerDemandesAdmin() {
+    try {
+      const res = await fetch('/api/admin/ecoutes');
+      const demandes = await res.json();
+      const container = document.getElementById('admin-ecoutes-list');
+      
+      if (demandes.length === 0) {
+        container.innerHTML = '<p style="color: #666;">Aucune demande d\'écoute pour le moment.</p>';
+        return;
+      }
+
+      container.innerHTML = demandes.map(d => `
+        <div style="background: white; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #ddd;">
+          <small style="color: #666;">Par : <strong>${d.nom_utilisateur || 'Anonyme'}</strong> - ${new Date(d.date_creation).toLocaleString()}</small>
+          <p style="margin: 5px 0;"><strong>Sujet :</strong> ${d.sujet}</p>
+          <p style="margin: 5px 0;"><strong>Message :</strong> ${d.message}</p>
+          <button onclick="traiterDemandeAdmin('${d.id}')" class="btn-danger">Marquer comme traité / Supprimer</button>
+        </div>
+      `).join('');
+    } catch (e) {
+      console.error("Erreur chargement demandes admin", e);
+    }
+  }
+
+  async function traiterDemandeAdmin(id) {
+    if (!confirm("Voulez-vous archiver/supprimer cette demande ?")) return;
+    await fetch(`/api/admin/ecoutes/${id}`, { method: 'DELETE' });
+    chargerDemandesAdmin();
+  }
+
+  async function loadPublicChat() {
+    const res = await fetch('/api/chat');
+    const messages = await res.json();
+    const box = document.getElementById('public-chat');
+    box.innerHTML = messages.map(m => {
+      const canDelete = m.sender === currentUser.nom ? `<button class="btn-danger" onclick="deletePublicMessage('${m.id}')">Supprimer</button>` : '';
+      return `<div id="pub-msg-${m.id}"><strong>[${m.date}] ${m.sender} :</strong> ${m.text} ${canDelete}</div>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function deletePublicMessage(msgId) {
+    await fetch(`/api/chat/${msgId}`, { method: 'DELETE' });
+  }
+
+  function handlePublicKeyPress(e) {
+    if (e.key === 'Enter') sendPublicMessage();
+  }
+
+  function sendPublicMessage() {
+    const input = document.getElementById('public-msg-input');
+    const text = input.value.trim();
+    if (!text) return;
+
+    socket.emit('send-public-message', { sender: currentUser.nom, text });
+    input.value = '';
+  }
+
+  function openPrivateChat(targetId, targetName) {
+    activeTargetId = targetId;
+    document.getElementById('chat-target-name').innerText = targetName;
+    document.getElementById('private-chat-section').classList.remove('hidden');
+    loadPrivateMessages();
+    loadUsersData();
+  }
+
+  function closePrivateChat() {
+    if (activeTargetId) socket.emit('stop-typing', { targetId: activeTargetId });
+    activeTargetId = null;
+    document.getElementById('private-chat-section').classList.add('hidden');
+    document.getElementById('typing-indicator').innerText = '';
+    loadUsersData();
+  }
+
+  async function loadPrivateMessages() {
+    if (!activeTargetId) return;
+    const res = await fetch(`/api/private-messages/${activeTargetId}`);
+    const messages = await res.json();
+    const box = document.getElementById('private-chat-box');
+    
+    box.innerHTML = messages.map(m => {
+      const canDelete = m.senderId === currentUser.id ? `<button class="btn-danger" onclick="deletePrivateMessage('${m.id}')">Supprimer</button>` : '';
+      return `<div id="priv-msg-${m.id}"><strong>[${m.date}] ${m.senderName} :</strong> ${m.text} ${canDelete}</div>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  async function deletePrivateMessage(msgId) {
+    await fetch(`/api/private-messages/${msgId}`, { method: 'DELETE' });
+    const el = document.getElementById(`priv-msg-${msgId}`);
+    if (el) el.remove();
+  }
+
+  function notifyTyping() {
+    if (!activeTargetId) return;
+    socket.emit('typing', { targetId: activeTargetId, senderName: currentUser.nom });
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+      socket.emit('stop-typing', { targetId: activeTargetId });
+    }, 2000);
+  }
+
+  function handlePrivateKeyPress(e) {
+    if (e.key === 'Enter') sendPrivateMessage();
+  }
+
+  function sendPrivateMessage() {
+    const input = document.getElementById('private-msg-input');
+    const text = input.value.trim();
+    if (!text || !activeTargetId) return;
+
+    socket.emit('stop-typing', { targetId: activeTargetId });
+    socket.emit('send-private-message', {
+      senderId: currentUser.id,
+      senderName: currentUser.nom,
+      targetId: activeTargetId,
+      text
+    });
+    input.value = '';
+  }
+
+  checkAuth();
+</script>
+
+</body>
+</html>

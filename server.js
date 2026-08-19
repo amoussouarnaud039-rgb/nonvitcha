@@ -63,7 +63,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(UPLOAD_DIR));
 
-// CORRECTION ICI : Le fichier index.html est bien dans le dossier public
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -275,6 +274,28 @@ app.post('/api/ecoute', (req, res) => {
         success: true, 
         message: "Votre demande a été transmise en toute confidentialité à notre équipe." 
     });
+});
+
+// ROUTES ADMIN AJOUTÉES
+app.get('/api/admin/ecoutes', (req, res) => {
+    if (!activeSessions.user) return res.status(401).json({ success: false, error: "Non autorisé" });
+    const db = readDB();
+    const demandes = (db.demandes_ecoute || []).map(d => {
+        const u = db.users.find(user => user.id === d.utilisateur_id);
+        return {
+            ...d,
+            nom_utilisateur: u ? u.nom : 'Utilisateur inconnu'
+        };
+    });
+    res.json(demandes);
+});
+
+app.delete('/api/admin/ecoutes/:id', (req, res) => {
+    if (!activeSessions.user) return res.status(401).json({ success: false, error: "Non autorisé" });
+    const db = readDB();
+    db.demandes_ecoute = (db.demandes_ecoute || []).filter(d => d.id !== req.params.id);
+    writeDB(db);
+    res.json({ success: true });
 });
 
 app.delete('/api/chat/:id', (req, res) => {

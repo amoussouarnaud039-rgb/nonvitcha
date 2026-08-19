@@ -61,8 +61,13 @@ function writeDB(data) {
 }
 
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(UPLOAD_DIR));
+
+// Route explicite pour charger la page d'accueil index.html
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 let activeSessions = {};
 

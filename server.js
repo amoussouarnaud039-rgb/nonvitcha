@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const multer = require('multer');
 const path = require('path');
 const { Pool } = require('pg');
+const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
@@ -12,9 +13,12 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = path.join(__dirname, 'public/uploads');
 
+// CONFIGURATION CORRIGÉE POUR RENDER
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
 
 // Initialisation des tables PostgreSQL
@@ -64,7 +68,6 @@ async function initDB() {
         );
     `);
     
-    // Insérer des ressources par défaut si la table est vide
     const resCount = await pool.query('SELECT COUNT(*) FROM ressources');
     if (parseInt(resCount.rows[0].count) === 0) {
         await pool.query(`
@@ -76,7 +79,6 @@ async function initDB() {
 }
 initDB().catch(err => console.error("Erreur init DB:", err));
 
-const fs = require('fs');
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
 const storage = multer.diskStorage({
@@ -286,7 +288,6 @@ app.post('/api/ecoute', async (req, res) => {
     }
 });
 
-// Routes Admin API
 app.get('/api/admin/ecoutes', async (req, res) => {
     try {
         const result = await pool.query(`

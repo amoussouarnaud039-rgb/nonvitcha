@@ -34,9 +34,8 @@ function readDB() {
             ],
             privateMessages: [],
             ressources: [
-                { id: "r1", titre: "Qu'est-ce que le Planning Familial ?", categorie: "SSR", contenu: "Le planning familial est un droit qui permet à chacun de décider librement du nombre d'enfants qu'il souhaite avoir.", date_publication: new Date().toISOString() },
-                { id: "r2", titre: "Que faire en cas de violence ?", categorie: "VBG", contenu: "Si vous êtes victime ou témoin de violences, sachez qu'il existe des structures d'aide et d'écoute disponibles.", date_publication: new Date().toISOString() },
-                { id: "r3", titre: "Écoute des minorités", categorie: "MINORITES", contenu: "L'accès aux services de santé est un droit fondamental pour tous, sans discrimination.", date_publication: new Date().toISOString() }
+                { id: "r1", titre: "Qu'est-ce que le Planning Familial ?", categorie: "SSR", contenu: "Le planning familial est un droit...", date_publication: new Date().toISOString() },
+                { id: "r2", titre: "Que faire en cas de violence ?", categorie: "VBG", contenu: "Si vous êtes victime...", date_publication: new Date().toISOString() }
             ],
             demandes_ecoute: []
         };
@@ -64,7 +63,6 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(UPLOAD_DIR));
 
-// Route explicite pour charger la page d'accueil index.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -97,12 +95,23 @@ app.post('/api/auth/register', (req, res) => {
     db.users.push(newUser);
     writeDB(db);
     activeSessions.user = newUser;
-    res.json({ success: true });
+    
+    // Notifier tous les clients connectés qu'un utilisateur s'est inscrit
+    io.emit('update-users', newUser); 
+    
+    res.json({ success: true, user: newUser });
 });
 
-app.post('/api/auth/logout', (req, res) => {
-    activeSessions = {};
-    res.json({ success: true });
+// Route de recherche par nom ou ville
+app.get('/api/users/search', (req, res) => {
+    const query = (req.query.q || '').toLowerCase().trim();
+    const db = readDB();
+    if (!query) return res.json(db.users);
+    const filteredUsers = db.users.filter(user => 
+        (user.nom && user.nom.toLowerCase().includes(query)) ||
+        (user.ville && user.ville.toLowerCase().includes(query))
+    );
+    res.json(filteredUsers);
 });
 
 app.get('/api/users', (req, res) => {

@@ -103,7 +103,7 @@
       </div>
     </div>
 
-    <!-- LISTE DES MEMBRES & FILTRES -->
+    <!-- LISTE DES MEMBRES & FILTRES / RECHERCHE -->
     <div class="card">
       <h2>Membres Nonvitcha</h2>
       <div class="filter-bar">
@@ -114,6 +114,8 @@
           <option value="vip">Membres VIP ⭐</option>
           <option value="online">En ligne uniquement 🟢</option>
         </select>
+        <!-- Bouton de recherche dédié branché sur l'API backend -->
+        <button onclick="lancerRechercheServeur()" style="margin: 0; padding: 0 15px;">🔍 Rechercher</button>
       </div>
       <div id="users-list" class="grid"></div>
     </div>
@@ -188,8 +190,9 @@
       if (el) el.remove();
     });
 
+    // Actualisation automatique en temps réel des profils (lors d'une inscription ou d'un like)
     socket.off('update-users');
-    socket.on('update-users', () => {
+    socket.on('update-users', (newUser) => {
       loadUsersData();
     });
 
@@ -249,8 +252,16 @@
       body: JSON.stringify({ email, password, nom, age, ville })
     });
     const data = await res.json();
-    if (data.success) checkAuth();
-    else alert(data.message);
+    if (data.success) {
+      document.getElementById('reg-email').value = '';
+      document.getElementById('reg-pass').value = '';
+      document.getElementById('reg-nom').value = '';
+      document.getElementById('reg-age').value = '';
+      document.getElementById('reg-ville').value = '';
+      checkAuth();
+    } else {
+      alert(data.message);
+    }
   }
 
   async function logout() {
@@ -348,6 +359,19 @@
     onlineIdsCache = await resOnline.json();
     unreadCountsCache = await resUnread.json();
     filterAndRenderUsers();
+  }
+
+  // Fonction de recherche connectée au Backend
+  async function lancerRechercheServeur() {
+    const query = document.getElementById('search-name').value.trim();
+    try {
+      const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+      const users = await res.json();
+      allUsersCache = users;
+      filterAndRenderUsers();
+    } catch (e) {
+      console.error("Erreur lors de la recherche :", e);
+    }
   }
 
   function filterAndRenderUsers() {

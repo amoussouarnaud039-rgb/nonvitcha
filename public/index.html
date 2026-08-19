@@ -51,11 +51,11 @@
       </div>
       <div style="flex: 1; min-width: 250px;">
         <h3>S'inscrire</h3>
-        <input type="email" id="reg-email" placeholder="Email (ex: mon@email.com)" required>
+        <input type="email" id="reg-email" placeholder="Email" required>
         <input type="password" id="reg-pass" placeholder="Mot de passe" required>
         <input type="text" id="reg-nom" placeholder="Nom" required>
         <input type="number" id="reg-age" placeholder="Âge" required>
-        <input type="text" id="reg-ville" placeholder="Ville (ex: Cotonou)" required>
+        <input type="text" id="reg-ville" placeholder="Ville" required>
         <button onclick="register()">Créer un compte</button>
       </div>
     </div>
@@ -63,80 +63,62 @@
 
   <!-- APPLICATION -->
   <div id="app-section" class="hidden">
-    
-    <!-- MON PROFIL -->
     <div class="card" id="profile-card"></div>
 
-    <!-- ESPACE ADMIN -->
-    <div class="card hidden" id="admin-section" style="border: 2px solid #e91e63; background: #fff5f8;">
-      <h2>🔒 Espace Admin : Gestion des demandes d'écoute</h2>
-      <div id="admin-ecoutes-list" style="max-height: 250px; overflow-y: auto;">
-        <p>Chargement...</p>
-      </div>
-    </div>
-
-    <!-- SALLE D'INFORMATION ET D'ÉCOUTE -->
     <div class="card">
       <h2>📚 Salle d'Information et d'Écoute</h2>
-      
       <div style="margin-bottom: 15px; display: flex; gap: 5px; flex-wrap: wrap;">
         <button onclick="chargerRessources()">Tous</button>
         <button onclick="chargerRessources('SSR')" class="btn-blue">SSR</button>
         <button onclick="chargerRessources('VBG')" style="background: #e91e63;">VBG</button>
         <button onclick="chargerRessources('MINORITES')" class="btn-alt">Minorités</button>
       </div>
-
       <div id="liste-ressources" style="max-height: 250px; overflow-y: auto; margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fafafa;"></div>
 
       <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
 
       <h3>💬 Demande d'écoute confidentielle</h3>
       <form id="form-ecoute" onsubmit="envoyerDemandeEcoute(event)">
-        <input type="text" id="sujet-ecoute" placeholder="Sujet (ex: Conseil, Soutien...)" required>
-        <textarea id="message-ecoute" placeholder="Exprimez-vous en toute sécurité..." style="height: 80px;" required></textarea>
+        <input type="text" id="sujet-ecoute" placeholder="Sujet" required>
+        <textarea id="message-ecoute" placeholder="Exprimez-vous..." style="height: 80px;" required></textarea>
         <button type="submit" style="background-color: #4CAF50;">Envoyer en toute confidentialité</button>
       </form>
       <p id="feedback-ecoute" style="margin-top: 8px; font-weight: bold;"></p>
     </div>
 
-    <!-- TCHAT PRIVÉ -->
     <div id="private-chat-section" class="card hidden" style="border: 2px solid #2196F3;">
       <h2>Discussion privée avec <span id="chat-target-name" style="color: #2196F3;"></span></h2>
       <div id="private-chat-box" class="chat-box"></div>
       <div id="typing-indicator" style="font-size: 0.85em; color: #666; font-style: italic; height: 20px; margin-bottom: 5px;"></div>
       <div style="display: flex; gap: 10px;">
-        <input type="text" id="private-msg-input" placeholder="Écrivez votre message privé..." oninput="notifyTyping()" onkeypress="handlePrivateKeyPress(event)">
+        <input type="text" id="private-msg-input" placeholder="Message privé..." oninput="notifyTyping()" onkeypress="handlePrivateKeyPress(event)">
         <button onclick="sendPrivateMessage()" class="btn-blue">Envoyer</button>
         <button onclick="closePrivateChat()" class="btn-alt">Fermer</button>
       </div>
     </div>
 
-    <!-- LISTE DES MEMBRES & FILTRES / RECHERCHE -->
     <div class="card">
       <h2>Membres Nonvitcha</h2>
       <div class="filter-bar">
-        <input type="text" id="search-name" placeholder="🔍 Rechercher par nom..." oninput="filterAndRenderUsers()">
-        <input type="text" id="search-ville" placeholder="📍 Filtrer par ville..." oninput="filterAndRenderUsers()">
+        <input type="text" id="search-name" placeholder="🔍 Rechercher..." oninput="filterAndRenderUsers()">
+        <input type="text" id="search-ville" placeholder="📍 Ville..." oninput="filterAndRenderUsers()">
         <select id="filter-status" onchange="filterAndRenderUsers()">
-          <option value="all">Tous les statuts</option>
-          <option value="vip">Membres VIP ⭐</option>
-          <option value="online">En ligne uniquement 🟢</option>
+          <option value="all">Tous</option>
+          <option value="vip">VIP ⭐</option>
+          <option value="online">En ligne 🟢</option>
         </select>
-        <button onclick="lancerRechercheServeur()" style="margin: 0; padding: 0 15px;">🔍 Rechercher</button>
       </div>
       <div id="users-list" class="grid"></div>
     </div>
 
-    <!-- TCHAT PUBLIC -->
     <div class="card">
       <h2>Tchat Public 💬</h2>
       <div id="public-chat" class="chat-box"></div>
       <div style="display: flex; gap: 10px;">
-        <input type="text" id="public-msg-input" placeholder="Écrivez un message public..." onkeypress="handlePublicKeyPress(event)">
+        <input type="text" id="public-msg-input" placeholder="Message public..." onkeypress="handlePublicKeyPress(event)">
         <button onclick="sendPublicMessage()">Envoyer</button>
       </div>
     </div>
-
   </div>
 </div>
 
@@ -174,107 +156,54 @@
     document.getElementById('app-section').classList.remove('hidden');
     document.getElementById('header-auth').innerHTML = `
       <span>Bonjour, <strong>${currentUser.nom}</strong></span>
-      <button onclick="logout()" class="btn-alt">Déconnexion</button>
+      <a href="/admin.html" style="color:white; margin-left:15px; text-decoration:underline;">Admin</a>
+      <button onclick="logout()" class="btn-alt" style="margin-left:10px;">Déconnexion</button>
     `;
     renderProfile();
     loadUsersData();
     loadPublicChat();
-
-    if (currentUser.id === "1" || currentUser.email.includes("admin")) {
-      document.getElementById('admin-section').classList.remove('hidden');
-      chargerDemandesAdmin();
-    } else {
-      document.getElementById('admin-section').classList.add('hidden');
-    }
   }
 
   function initSocketsListeners() {
     socket.off('new-public-message');
     socket.on('new-public-message', (m) => {
       const box = document.getElementById('public-chat');
-      const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
       const canDelete = m.sender === currentUser.nom ? `<button class="btn-danger" onclick="deletePublicMessage('${m.id}')">Supprimer</button>` : '';
       box.innerHTML += `<div id="pub-msg-${m.id}"><strong>[${m.date}] ${m.sender} :</strong> ${m.text} ${canDelete}</div>`;
-      if (isAtBottom) box.scrollTop = box.scrollHeight;
+      box.scrollTop = box.scrollHeight;
     });
-
-    socket.off('delete-public-message');
-    socket.on('delete-public-message', (msgId) => {
-      const el = document.getElementById(`pub-msg-${msgId}`);
-      if (el) el.remove();
-    });
-
     socket.off('update-users');
-    socket.on('update-users', () => {
-      loadUsersData();
-    });
-
+    socket.on('update-users', loadUsersData);
     socket.off(`private-message-${currentUser.id}`);
-    socket.on(`private-message-${currentUser.id}`, (m) => {
-      if (activeTargetId === m.senderId || activeTargetId === m.targetId) {
-        loadPrivateMessages();
-      }
-    });
-
+    socket.on(`private-message-${currentUser.id}`, () => { if (activeTargetId) loadPrivateMessages(); });
     socket.off(`unread-update-${currentUser.id}`);
-    socket.on(`unread-update-${currentUser.id}`, () => {
-      loadUsersData();
-    });
-
-    socket.off(`typing-${currentUser.id}`);
-    socket.on(`typing-${currentUser.id}`, (data) => {
-      if (activeTargetId) {
-        document.getElementById('typing-indicator').innerText = `${data.senderName} est en train d'écrire...`;
-      }
-    });
-
-    socket.off(`stop-typing-${currentUser.id}`);
-    socket.on(`stop-typing-${currentUser.id}`, () => {
-      document.getElementById('typing-indicator').innerText = '';
-    });
+    socket.on(`unread-update-${currentUser.id}`, loadUsersData);
   }
 
   async function login() {
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-pass').value;
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email: document.getElementById('login-email').value, password: document.getElementById('login-pass').value })
     });
     const data = await res.json();
-    if (data.success) checkAuth();
-    else alert(data.message);
+    if (data.success) checkAuth(); else alert(data.message);
   }
 
   async function register() {
-    const email = document.getElementById('reg-email').value;
-    const password = document.getElementById('reg-pass').value;
-    const nom = document.getElementById('reg-nom').value;
-    const age = document.getElementById('reg-age').value;
-    const ville = document.getElementById('reg-ville').value;
-
-    if (!email || !password || !nom) {
-      alert('Veuillez remplir les champs obligatoires.');
-      return;
-    }
-
     const res = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, nom, age, ville })
+      body: JSON.stringify({
+        email: document.getElementById('reg-email').value,
+        password: document.getElementById('reg-pass').value,
+        nom: document.getElementById('reg-nom').value,
+        age: document.getElementById('reg-age').value,
+        ville: document.getElementById('reg-ville').value
+      })
     });
     const data = await res.json();
-    if (data.success) {
-      document.getElementById('reg-email').value = '';
-      document.getElementById('reg-pass').value = '';
-      document.getElementById('reg-nom').value = '';
-      document.getElementById('reg-age').value = '';
-      document.getElementById('reg-ville').value = '';
-      checkAuth();
-    } else {
-      alert(data.message);
-    }
+    if (data.success) checkAuth(); else alert(data.message);
   }
 
   async function logout() {
@@ -283,335 +212,147 @@
   }
 
   function renderProfile() {
-    const card = document.getElementById('profile-card');
-    const vipBadge = currentUser.isVip ? '<span class="badge-vip">⭐ MEMBRE VIP</span>' : '<span>Statut Standard</span>';
-
-    card.innerHTML = `
+    document.getElementById('profile-card').innerHTML = `
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
         <div style="text-align: center;">
-          <img src="${currentUser.photo}" alt="${currentUser.nom}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary);"><br>
-          <input type="file" id="photo-input" accept="image/*" style="margin-top: 10px; width: 180px; font-size: 0.8em;">
-          <button onclick="uploadPhoto()" style="padding: 4px 10px; font-size: 0.8em;">Changer photo</button>
+          <img src="${currentUser.photo}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover;"><br>
+          <input type="file" id="photo-input" accept="image/*" style="margin-top: 10px; width: 160px; font-size: 0.8em;">
+          <button onclick="uploadPhoto()" style="padding: 4px 8px; font-size: 0.8em;">Changer</button>
         </div>
-        <div style="flex: 1; min-width: 200px;">
-          <h2>Mon Profil ${vipBadge}</h2>
-          <p><strong>Nom :</strong> ${currentUser.nom} (${currentUser.age} ans)</p>
-          <p><strong>Ville :</strong> ${currentUser.ville}</p>
-          <p><strong>Mes Likes :</strong> ❤️ ${currentUser.likes || 0}</p>
-          <p style="font-size: 1.1em;"><strong>Solde :</strong> 💰 <strong>${currentUser.nonvicoins || 0}</strong> Nonvicoins</p>
+        <div style="flex: 1;">
+          <h2>Mon Profil ${currentUser.isVip ? '<span class="badge-vip">⭐ VIP</span>' : ''}</h2>
+          <p><strong>Nom :</strong> ${currentUser.nom} (${currentUser.age} ans) - ${currentUser.ville}</p>
+          <p><strong>Likes :</strong> ❤️ ${currentUser.likes || 0}</p>
+          <p><strong>Solde :</strong> 💰 <strong>${currentUser.nonvicoins || 0}</strong> Nonvicoins</p>
         </div>
         <div>
-          <button onclick="buyCoins('${currentUser.id}')">Acheter +50 Coins</button><br>
-          ${!currentUser.isVip ? `<button onclick="becomeVip('${currentUser.id}')" style="background: #ffd700; color: #000;">Passer VIP (100 coins)</button>` : ''}
+          <button onclick="buyCoins()">Acheter +50 Coins</button><br>
+          ${!currentUser.isVip ? '<button onclick="becomeVip()" style="background: #ffd700; color: #000;">Passer VIP (100c)</button>' : ''}
         </div>
       </div>
     `;
   }
 
   async function uploadPhoto() {
-    const fileInput = document.getElementById('photo-input');
-    if (fileInput.files.length === 0) return alert('Veuillez sélectionner une image.');
-    const formData = new FormData();
-    formData.append('photo', fileInput.files[0]);
-
-    const res = await fetch('/api/users/upload-photo', { method: 'POST', body: formData });
+    const file = document.getElementById('photo-input').files[0];
+    if (!file) return alert('Sélectionnez une image');
+    const fd = new FormData(); fd.append('photo', file);
+    const res = await fetch('/api/users/upload-photo', { method: 'POST', body: fd });
     const data = await res.json();
-    if (data.success) {
-      currentUser = data.user;
-      renderProfile();
-      loadUsersData();
-      socket.emit('update-users');
-      alert('Photo mise à jour avec succès !');
-    } else {
-      alert('Erreur lors de l\'upload.');
-    }
+    if (data.success) { currentUser = data.user; renderProfile(); loadUsersData(); alert('Photo mise à jour !'); }
   }
 
-  function buyCoins(userId) {
+  function buyCoins() {
     FedaPay.init({
       public_key: 'pk_live_nL75JBWaRG69V8iMo6-7mMor',
-      transaction: { amount: 500, description: 'Achat de 50 Nonvicoins sur Nonvitcha' },
-      customer: { email: currentUser.email, firstname: currentUser.nom, lastname: '' }
-    }).open().then(async (response) => {
-      const res = await fetch(`/api/users/${userId}/buy-coins`, { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionId: response.token })
-      });
-      const data = await res.json();
-      if (data.success) {
-        alert('Paiement réussi ! 50 Nonvicoins ajoutés.');
-        checkAuth();
-      } else {
-        alert(data.message || 'Erreur lors de la validation du paiement.');
-      }
-    }).catch((error) => {
-      console.log(error);
-      alert('Paiement annulé ou échoué.');
+      transaction: { amount: 500, description: '50 Nonvicoins' },
+      customer: { email: currentUser.email, firstname: currentUser.nom }
+    }).open().then(async () => {
+      await fetch(`/api/users/${currentUser.id}/buy-coins`, { method: 'POST' });
+      checkAuth();
+      alert('Paiement réussi !');
     });
   }
 
-  async function becomeVip(userId) {
-    const res = await fetch(`/api/users/${userId}/become-vip`, { method: 'POST' });
+  async function becomeVip() {
+    const res = await fetch(`/api/users/${currentUser.id}/become-vip`, { method: 'POST' });
     const data = await res.json();
-    if (data.success) {
-      alert('Félicitations ! Vous êtes désormais Membre VIP ⭐');
-      checkAuth();
-    } else {
-      alert(data.message);
-    }
+    if (data.success) { checkAuth(); alert('Bienvenue VIP ⭐'); } else alert(data.message);
   }
 
   async function loadUsersData() {
-    const [resUsers, resOnline, resUnread] = await Promise.all([
-      fetch('/api/users'),
-      fetch('/api/online-users'),
-      fetch('/api/unread-messages')
-    ]);
-    allUsersCache = await resUsers.json();
-    onlineIdsCache = await resOnline.json();
-    unreadCountsCache = await resUnread.json();
+    const [uRes, oRes, unRes] = await Promise.all([fetch('/api/users'), fetch('/api/online-users'), fetch('/api/unread-messages')]);
+    allUsersCache = await uRes.json();
+    onlineIdsCache = await oRes.json();
+    unreadCountsCache = await unRes.json();
     filterAndRenderUsers();
   }
 
-  async function lancerRechercheServeur() {
-    const query = document.getElementById('search-name').value.trim();
-    try {
-      const res = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
-      const users = await res.json();
-      allUsersCache = users;
-      filterAndRenderUsers();
-    } catch (e) {
-      console.error("Erreur lors de la recherche :", e);
-    }
-  }
-
   function filterAndRenderUsers() {
-    const searchName = document.getElementById('search-name').value.toLowerCase();
-    const searchVille = document.getElementById('search-ville').value.toLowerCase();
-    const filterStatus = document.getElementById('filter-status').value;
-    const list = document.getElementById('users-list');
+    const name = document.getElementById('search-name').value.toLowerCase();
+    const ville = document.getElementById('search-ville').value.toLowerCase();
+    const status = document.getElementById('filter-status').value;
 
-    const filtered = allUsersCache.filter(u => {
+    document.getElementById('users-list').innerHTML = allUsersCache.filter(u => {
       if (u.id === currentUser.id) return false;
-      const matchName = u.nom.toLowerCase().includes(searchName);
-      const matchVille = u.ville.toLowerCase().includes(searchVille);
-      const isOnline = onlineIdsCache.includes(String(u.id));
-
-      if (!matchName || !matchVille) return false;
-      if (filterStatus === 'vip' && !u.isVip) return false;
-      if (filterStatus === 'online' && !isOnline) return false;
+      if (!u.nom.toLowerCase().includes(name) || !u.ville.toLowerCase().includes(ville)) return false;
+      if (status === 'vip' && !u.isVip) return false;
+      if (status === 'online' && !onlineIdsCache.includes(String(u.id))) return false;
       return true;
+    }).map(u => `
+      <div class="user-card">
+        ${unreadCountsCache[u.id] ? `<span class="badge-unread">${unreadCountsCache[u.id]}</span>` : ''}
+        <img src="${u.photo}">
+        <h3>${u.nom} ${u.isVip ? '<span class="badge-vip">⭐</span>' : ''}</h3>
+        <p><span class="${onlineIdsCache.includes(String(u.id)) ? 'status-dot status-online' : 'status-dot'}"></span>${u.age} ans - ${u.ville}</p>
+        <button onclick="likeUser('${u.id}')">❤️ (${u.likes || 0})</button>
+        <button onclick="openPrivateChat('${u.id}', '${u.nom}')" class="btn-blue">💬 Discuter</button>
+      </div>
+    `).join('');
+  }
+
+  async function likeUser(id) { await fetch(`/api/users/${id}/like`, { method: 'POST' }); loadUsersData(); }
+
+  async function chargerRessources(cat = '') {
+    const res = await fetch(`/api/ressources${cat ? '?categorie=' + cat : ''}`);
+    const data = await res.json();
+    document.getElementById('liste-ressources').innerHTML = data.map(r => `
+      <div style="background: white; padding: 10px; margin-bottom: 8px; border-radius: 5px; border: 1px solid #ddd;">
+        <strong style="color: var(--primary);">${r.titre}</strong> (${r.categorie})<br>${r.contenu}
+      </div>
+    `).join('') || '<p>Aucune ressource.</p>';
+  }
+
+  async function envoyerDemandeEcoute(e) {
+    e.preventDefault();
+    const res = await fetch('/api/ecoute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sujet: document.getElementById('sujet-ecoute').value, message: document.getElementById('message-ecoute').value })
     });
-
-    list.innerHTML = filtered.map(u => {
-      const isOnline = onlineIdsCache.includes(String(u.id));
-      const statusClass = isOnline ? 'status-dot status-online' : 'status-dot';
-      const statusText = isOnline ? 'En ligne 🟢' : 'Hors ligne';
-      const vipBadge = u.isVip ? '<span class="badge-vip">⭐ VIP</span>' : '';
-      const unreadBadge = unreadCountsCache[u.id] ? `<span class="badge-unread">${unreadCountsCache[u.id]}</span>` : '';
-
-      return `
-        <div class="user-card">
-          ${unreadBadge}
-          <img src="${u.photo}" alt="${u.nom}">
-          <h3>${u.nom} ${vipBadge}</h3>
-          <p><span class="${statusClass}" title="${statusText}"></span>${u.age} ans - ${u.ville}</p>
-          <button onclick="likeUser('${u.id}')">❤️ Like (${u.likes || 0})</button>
-          <button onclick="openPrivateChat('${u.id}', '${u.nom}')" class="btn-blue">💬 Discuter</button>
-        </div>
-      `;
-    }).join('');
-  }
-
-  async function likeUser(id) {
-    await fetch(`/api/users/${id}/like`, { method: 'POST' });
-    loadUsersData();
-  }
-
-  async function chargerRessources(categorie = '') {
-    try {
-      let url = '/api/ressources';
-      if (categorie) url += `?categorie=${categorie}`;
-      
-      const response = await fetch(url);
-      const ressources = await response.json();
-      
-      const container = document.getElementById('liste-ressources');
-      container.innerHTML = '';
-      
-      if (ressources.length === 0) {
-        container.innerHTML = '<p style="color: #666; text-align: center;">Aucune ressource disponible pour cette catégorie.</p>';
-        return;
-      }
-
-      ressources.forEach(r => {
-        container.innerHTML += `
-          <div style="background: white; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #e0e0e0;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-              <strong style="color: var(--primary);">${r.titre}</strong>
-              <span style="font-size: 0.75em; background: #eee; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${r.categorie}</span>
-            </div>
-            <p style="margin: 0; font-size: 0.95em; color: #444; line-height: 1.4;">${r.contenu}</p>
-          </div>
-        `;
-      });
-    } catch (err) {
-      console.error("Erreur chargement ressources:", err);
-    }
-  }
-
-  async function envoyerDemandeEcoute(event) {
-    event.preventDefault();
-    const sujet = document.getElementById('sujet-ecoute').value;
-    const message = document.getElementById('message-ecoute').value;
-    const feedback = document.getElementById('feedback-ecoute');
-
-    try {
-      const response = await fetch('/api/ecoute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sujet, message })
-      });
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        feedback.style.color = 'green';
-        feedback.textContent = data.message;
-        document.getElementById('form-ecoute').reset();
-      } else {
-        feedback.style.color = 'red';
-        feedback.textContent = data.error || data.message || "Une erreur est survenue.";
-      }
-    } catch (err) {
-      feedback.style.color = 'red';
-      feedback.textContent = "Erreur de connexion au serveur.";
-    }
-  }
-
-  async function chargerDemandesAdmin() {
-    try {
-      const res = await fetch('/api/admin/ecoutes');
-      const demandes = await res.json();
-      const container = document.getElementById('admin-ecoutes-list');
-      
-      if (demandes.length === 0) {
-        container.innerHTML = '<p style="color: #666;">Aucune demande d\'écoute pour le moment.</p>';
-        return;
-      }
-
-      container.innerHTML = demandes.map(d => `
-        <div style="background: white; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #ddd;">
-          <small style="color: #666;">Par : <strong>${d.nom_utilisateur || 'Anonyme'}</strong> - ${new Date(d.date_creation).toLocaleString()}</small>
-          <p style="margin: 5px 0;"><strong>Sujet :</strong> ${d.sujet}</p>
-          <p style="margin: 5px 0;"><strong>Message :</strong> ${d.message}</p>
-          <button onclick="traiterDemandeAdmin('${d.id}')" class="btn-danger">Marquer comme traité / Supprimer</button>
-        </div>
-      `).join('');
-    } catch (e) {
-      console.error("Erreur chargement demandes admin", e);
-    }
-  }
-
-  async function traiterDemandeAdmin(id) {
-    if (!confirm("Voulez-vous archiver/supprimer cette demande ?")) return;
-    await fetch(`/api/admin/ecoutes/${id}`, { method: 'DELETE' });
-    chargerDemandesAdmin();
+    const data = await res.json();
+    document.getElementById('feedback-ecoute').textContent = data.message || data.error;
+    document.getElementById('form-ecoute').reset();
   }
 
   async function loadPublicChat() {
     const res = await fetch('/api/chat');
-    const messages = await res.json();
-    const box = document.getElementById('public-chat');
-    box.innerHTML = messages.map(m => {
-      const canDelete = m.sender === currentUser.nom ? `<button class="btn-danger" onclick="deletePublicMessage('${m.id}')">Supprimer</button>` : '';
-      return `<div id="pub-msg-${m.id}"><strong>[${m.date}] ${m.sender} :</strong> ${m.text} ${canDelete}</div>`;
-    }).join('');
-    box.scrollTop = box.scrollHeight;
+    const msgs = await res.json();
+    document.getElementById('public-chat').innerHTML = msgs.map(m => `
+      <div id="pub-msg-${m.id}"><strong>[${m.date}] ${m.sender} :</strong> ${m.text} ${m.sender === currentUser.nom ? `<button class="btn-danger" onclick="deletePublicMessage('${m.id}')">Suppr</button>` : ''}</div>
+    `).join('');
   }
 
-  async function deletePublicMessage(msgId) {
-    await fetch(`/api/chat/${msgId}`, { method: 'DELETE' });
-  }
-
-  function handlePublicKeyPress(e) {
-    if (e.key === 'Enter') sendPublicMessage();
-  }
-
+  async function deletePublicMessage(id) { await fetch(`/api/chat/${id}`, { method: 'DELETE' }); }
   function sendPublicMessage() {
-    const input = document.getElementById('public-msg-input');
-    const text = input.value.trim();
-    if (!text) return;
-
-    socket.emit('send-public-message', { sender: currentUser.nom, text });
-    input.value = '';
+    const i = document.getElementById('public-msg-input');
+    if (i.value.trim()) { socket.emit('send-public-message', { sender: currentUser.nom, text: i.value.trim() }); i.value = ''; }
   }
+  function handlePublicKeyPress(e) { if (e.key === 'Enter') sendPublicMessage(); }
 
-  function openPrivateChat(targetId, targetName) {
-    activeTargetId = targetId;
-    document.getElementById('chat-target-name').innerText = targetName;
+  function openPrivateChat(id, name) {
+    activeTargetId = id;
+    document.getElementById('chat-target-name').textContent = name;
     document.getElementById('private-chat-section').classList.remove('hidden');
     loadPrivateMessages();
-    loadUsersData();
   }
-
-  function closePrivateChat() {
-    if (activeTargetId) socket.emit('stop-typing', { targetId: activeTargetId });
-    activeTargetId = null;
-    document.getElementById('private-chat-section').classList.add('hidden');
-    document.getElementById('typing-indicator').innerText = '';
-    loadUsersData();
-  }
-
+  function closePrivateChat() { activeTargetId = null; document.getElementById('private-chat-section').classList.add('hidden'); }
   async function loadPrivateMessages() {
-    if (!activeTargetId) return;
     const res = await fetch(`/api/private-messages/${activeTargetId}`);
-    const messages = await res.json();
-    const box = document.getElementById('private-chat-box');
-    
-    box.innerHTML = messages.map(m => {
-      const canDelete = m.senderId === currentUser.id ? `<button class="btn-danger" onclick="deletePrivateMessage('${m.id}')">Supprimer</button>` : '';
-      return `<div id="priv-msg-${m.id}"><strong>[${m.date}] ${m.senderName} :</strong> ${m.text} ${canDelete}</div>`;
-    }).join('');
-    box.scrollTop = box.scrollHeight;
+    const msgs = await res.json();
+    document.getElementById('private-chat-box').innerHTML = msgs.map(m => `<div><strong>[${m.date}] ${m.senderName} :</strong> ${m.text}</div>`).join('');
   }
-
-  async function deletePrivateMessage(msgId) {
-    await fetch(`/api/private-messages/${msgId}`, { method: 'DELETE' });
-    const el = document.getElementById(`priv-msg-${msgId}`);
-    if (el) el.remove();
-  }
-
-  function notifyTyping() {
-    if (!activeTargetId) return;
-    socket.emit('typing', { targetId: activeTargetId, senderName: currentUser.nom });
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-      socket.emit('stop-typing', { targetId: activeTargetId });
-    }, 2000);
-  }
-
-  function handlePrivateKeyPress(e) {
-    if (e.key === 'Enter') sendPrivateMessage();
-  }
-
   function sendPrivateMessage() {
-    const input = document.getElementById('private-msg-input');
-    const text = input.value.trim();
-    if (!text || !activeTargetId) return;
-
-    socket.emit('stop-typing', { targetId: activeTargetId });
-    socket.emit('send-private-message', {
-      senderId: currentUser.id,
-      senderName: currentUser.nom,
-      targetId: activeTargetId,
-      text
-    });
-    input.value = '';
+    const i = document.getElementById('private-msg-input');
+    if (i.value.trim() && activeTargetId) {
+      socket.emit('send-private-message', { senderId: currentUser.id, senderName: currentUser.nom, targetId: activeTargetId, text: i.value.trim() });
+      i.value = '';
+    }
   }
+  function notifyTyping() { socket.emit('typing', { targetId: activeTargetId, senderName: currentUser.nom }); }
+  function handlePrivateKeyPress(e) { if (e.key === 'Enter') sendPrivateMessage(); }
 
   checkAuth();
 </script>
-
 </body>
 </html>

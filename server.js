@@ -35,8 +35,7 @@ function readDB() {
             privateMessages: [],
             ressources: [
                 { id: "r1", titre: "Qu'est-ce que le Planning Familial ?", categorie: "SSR", contenu: "Le planning familial est un droit...", date_publication: new Date().toISOString() },
-                { id: "r2", titre: "Que faire en cas de violence ?", categorie: "VBG", contenu: "Si vous êtes victime...", date_publication: new Date().toISOString() },
-                { id: "r3", titre: "Comprendre et soutenir les minorités", categorie: "MINORITES", contenu: "Le respect des minorités est essentiel...", date_publication: new Date().toISOString() }
+                { id: "r2", titre: "Que faire en cas de violence ?", categorie: "VBG", contenu: "Si vous êtes victime...", date_publication: new Date().toISOString() }
             ],
             demandes_ecoute: []
         };
@@ -64,8 +63,9 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(UPLOAD_DIR));
 
+// CORRECTION ICI : Le fichier index.html est bien dans le dossier public
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 let activeSessions = {};
@@ -262,7 +262,6 @@ app.post('/api/ecoute', (req, res) => {
     const nouvelleDemande = {
         id: 'ecoute_' + Date.now(),
         utilisateur_id: activeSessions.user.id,
-        nom_utilisateur: activeSessions.user.nom,
         sujet: sujet || 'Demande générale',
         message: message,
         statut: 'en_attente',
@@ -276,19 +275,6 @@ app.post('/api/ecoute', (req, res) => {
         success: true, 
         message: "Votre demande a été transmise en toute confidentialité à notre équipe." 
     });
-});
-
-// Routes Administrateur pour gérer les demandes d'écoute
-app.get('/api/admin/ecoutes', (req, res) => {
-    const db = readDB();
-    res.json(db.demandes_ecoute || []);
-});
-
-app.delete('/api/admin/ecoutes/:id', (req, res) => {
-    const db = readDB();
-    db.demandes_ecoute = (db.demandes_ecoute || []).filter(d => d.id !== req.params.id);
-    writeDB(db);
-    res.json({ success: true });
 });
 
 app.delete('/api/chat/:id', (req, res) => {

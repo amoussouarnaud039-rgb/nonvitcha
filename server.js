@@ -1,148 +1,304 @@
 const express = require('express');
+const fs = require('fs');
 const http = require('http');
 const { Server } = require('socket.io');
-const sqlite3 = require('sqlite3').verbose();
-const session = require('express-session');
-const bcrypt = require('bcrypt');
+const multer = require('multer');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Base de données SQLite
-const db = new sqlite3.Database('./nonvitcha.db', (err) => {
-  if (err) console.error("Erreur ouverture DB", err.message);
-  else console.log("Connecté à la base de données SQLite.");
-});
+const PORT = process.env.PORT || 3000;
+const DB_FILE = path.join(__dirname, 'database.json');
+const UPLOAD_DIR = path.join(__dirname, 'public/uploads');
 
-// Création des tables si elles n'existent pas
-db.serialize(() => {
-  db.run(`CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    prenom TEXT UNIQUE,
-    password TEXT,
-    age INTEGER,
-    ville TEXT,
-    credits INTEGER DEFAULT 10,
-    estVip INTEGER DEFAULT 0,
-    avatar TEXT
-  )`);
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-  db.run(`CREATE TABLE IF NOT EXISTS messages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    senderId INTEGER,
-    receiverId INTEGER,
-    text TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-  )`);
+const storage = multer.diskStorage({
+    destination: UPLOAD_DIR,
+    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
 });
+const upload = multer({ storage });
+
+function readDB() {
+    if (!fs.existsSync(DB_FILE)) {
+        const defaultData = {
+            users: [
+                { id: "1", email: "alice@test.com", password: "123", nom: "Alice", age: 24, ville: "Cotonou", photo: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150", likes: 5, nonvicoins: 100, isVip: true },
+                { id: "2", email: "kokou@test.com", password: "123", nom: "Kokou", age: 28, ville: "Porto-Novo", photo: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150", likes: 2, nonvicoins: 0, isVip: false },
+                { id: "3", email: "assiba@test.com", password: "123", nom: "Assiba", age: 22, ville: "Parakou", photo: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150", likes: 8, nonvicoins: 50, isVip: false }
+            ],
+            chat: [
+                { id: "c1", sender: "Alice", text: "Bienvenue sur Nonvitcha tout le monde ! 💕", date: "12:00" }
+            ],
+            privateMessages: [],
+            ressources: [
+                { id: "r1", titre: "Qu'est-ce que le Planning Familial ?", categorie: "SSR", contenu: "Le planning familial est un droit qui permet à chacun de décider librement du nombre d'enfants qu'il souhaite avoir.", date_publication: new Date().toISOString() },
+                { id: "r2", titre: "Que faire en cas de violence ?", categorie: "VBG", contenu: "Si vous êtes victime ou témoin de violences, sachez qu'il existe des structures d'aide et d'écoute disponibles.", date_publication: new Date().toISOString() },
+                { id: "r3", titre: "Écoute des minorités", categorie: "MINORITES", contenu: "L'accès aux services de santé est un droit fondamental pour tous, sans discrimination.", date_publication: new Date().toISOString() }
+            ],
+            demandes_ecoute: []
+        };
+        fs.writeFileSync(DB_FILE, JSON.stringify(defaultData, null, 2));
+    }
+    try {
+        const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+        return {
+            users: data.users || [],
+            chat: data.chat || [],
+            privateMessages: data.privateMessages || [],
+            ressources: data.ressources || [],
+            demandes_ecoute: data.demandes_ecoute || []
+        };
+    } catch (e) {
+        return { users: [], chat: [], privateMessages: [], ressources: [], demandes_ecoute: [] };
+    }
+}
+
+function writeDB(data) {
+    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+}
 
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(session({
-  secret: 'nonvitcha_secret_key',
-  resave: false,
-  saveUninitialized: false
-}));
+app.use(express.static('public'));
+app.use('/uploads', express.static(UPLOAD_DIR));
 
-// Route principale : sert le fichier index.html
-app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/index.html');
+let activeSessions = {};
+
+app.get('/api/auth/me', (req, res) => {
+    res.json({ loggedIn: !!activeSessions.user, user: activeSessions.user });
 });
 
-// API Session
-app.get('/api/me', (req, res) => {
-  if (req.session.user) {
-    db.get(`SELECT * FROM users WHERE id = ?`, [req.session.user.id], (err, row) => {
-      if (row) res.json({ loggedIn: true, user: row });
-      else res.json({ loggedIn: false });
-    });
-  } else {
-    res.json({ loggedIn: false });
-  }
-});
-
-// API Inscription
-app.post('/api/register', async (req, res) => {
-  const { prenom, password, age, ville } = req.body;
-  if (!prenom || !password) return res.json({ success: false, message: 'Champs requis' });
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const avatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(prenom)}`;
-
-  db.run(`INSERT INTO users (prenom, password, age, ville, avatar) VALUES (?, ?, ?, ?, ?)`,
-    [prenom, hashedPassword, age || 25, ville || 'Cotonou', avatar],
-    function(err) {
-      if (err) return res.json({ success: false, message: 'Ce prénom existe déjà.' });
-      req.session.user = { id: this.lastID, prenom };
-      res.json({ success: true });
+app.post('/api/auth/login', (req, res) => {
+    const { email, password } = req.body;
+    const db = readDB();
+    const user = db.users.find(u => u.email === email && u.password === password);
+    if (user) {
+        activeSessions.user = user;
+        res.json({ success: true });
+    } else {
+        res.json({ success: false, message: 'Email ou mot de passe incorrect' });
     }
-  );
 });
 
-// API Connexion
-app.post('/api/login', (req, res) => {
-  const { prenom, password } = req.body;
-  db.get(`SELECT * FROM users WHERE prenom = ?`, [prenom], async (err, user) => {
-    if (err || !user) return res.json({ success: false, message: 'Utilisateur introuvable.' });
-
-    const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.json({ success: false, message: 'Mot de passe incorrect.' });
-
-    req.session.user = { id: user.id, prenom: user.prenom };
+app.post('/api/auth/register', (req, res) => {
+    const { email, password, nom, age, ville } = req.body;
+    const db = readDB();
+    if (db.users.find(u => u.email === email)) {
+        return res.json({ success: false, message: 'Email déjà utilisé' });
+    }
+    const newUser = { id: Date.now().toString(), email, password, nom, age, ville, photo: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=150', likes: 0, nonvicoins: 0, isVip: false };
+    db.users.push(newUser);
+    writeDB(db);
+    activeSessions.user = newUser;
     res.json({ success: true });
-  });
 });
 
-// API Déconnexion
-app.post('/api/logout', (req, res) => {
-  req.session.destroy();
-  res.json({ success: true });
+app.post('/api/auth/logout', (req, res) => {
+    activeSessions = {};
+    res.json({ success: true });
 });
 
-// API Liste des profils
-app.get('/api/profils', (req, res) => {
-  db.all(`SELECT id, prenom, age, ville, credits, estVip, avatar FROM users`, [], (err, rows) => {
-    if (err) return res.json({ success: false, data: [] });
-    res.json({ success: true, data: rows });
-  });
+app.get('/api/users', (req, res) => {
+    const db = readDB();
+    res.json(db.users);
 });
 
-// API Récupérer l'historique des messages entre deux utilisateurs
-app.get('/api/messages/:destId', (req, res) => {
-  if (!req.session.user) return res.status(401).json({ success: false });
-  const myId = req.session.user.id;
-  const destId = req.params.destId;
-
-  db.all(
-    `SELECT * FROM messages WHERE (senderId = ? AND receiverId = ?) OR (senderId = ? AND receiverId = ?) ORDER BY timestamp ASC`,
-    [myId, destId, destId, myId],
-    (err, rows) => {
-      if (err) return res.json({ success: false, messages: [] });
-      res.json({ success: true, messages: rows });
+app.post('/api/users/upload-photo', upload.single('photo'), (req, res) => {
+    if (!activeSessions.user) return res.status(401).send();
+    const db = readDB();
+    const user = db.users.find(u => u.id === activeSessions.user.id);
+    if (user && req.file) {
+        user.photo = '/uploads/' + req.file.filename;
+        writeDB(db);
+        activeSessions.user = user;
+        res.json({ success: true, user });
+    } else {
+        res.json({ success: false });
     }
-  );
 });
 
-// Gestion du Temps Réel avec Socket.IO
-io.on('connection', (socket) => {
-  socket.on('private message', (data) => {
-    const { senderId, receiverId, text } = data;
-    // Enregistrement du message dans la base de données
-    db.run(
-      `INSERT INTO messages (senderId, receiverId, text) VALUES (?, ?, ?)`,
-      [senderId, receiverId, text],
-      (err) => {
-        if (!err) {
-          // Diffusion du message aux clients connectés
-          io.emit('private message', { senderId, receiverId, text });
+app.get('/api/chat', (req, res) => {
+    const db = readDB();
+    res.json((db.chat || []).slice(-50));
+});
+
+app.get('/api/online-users', (req, res) => {
+    res.json(Object.keys(activeSessions).length ? [activeSessions.user.id] : []);
+});
+
+app.post('/api/users/:id/like', (req, res) => {
+    const db = readDB();
+    const target = db.users.find(u => u.id === req.params.id);
+    if (target) {
+        target.likes = (target.likes || 0) + 1;
+        writeDB(db);
+        io.emit('update-users');
+    }
+    res.json({ success: true });
+});
+
+app.post('/api/users/:id/buy-coins', (req, res) => {
+    if (!activeSessions.user) return res.status(401).send();
+    const db = readDB();
+    const user = db.users.find(u => u.id === activeSessions.user.id);
+    if (user) {
+        user.nonvicoins = (user.nonvicoins || 0) + 50;
+        writeDB(db);
+        activeSessions.user = user;
+        res.json({ success: true });
+    } else {
+        res.json({ success: false });
+    }
+});
+
+app.post('/api/users/:id/become-vip', (req, res) => {
+    if (!activeSessions.user) return res.status(401).send();
+    const db = readDB();
+    const user = db.users.find(u => u.id === activeSessions.user.id);
+    if (user && user.nonvicoins >= 100) {
+        user.nonvicoins -= 100;
+        user.isVip = true;
+        writeDB(db);
+        activeSessions.user = user;
+        io.emit('update-users');
+        res.json({ success: true });
+    } else {
+        res.json({ success: false, message: 'Solde insuffisant' });
+    }
+});
+
+app.get('/api/private-messages/:targetId', (req, res) => {
+    if (!activeSessions.user) return res.json([]);
+    const db = readDB();
+    const messages = db.privateMessages || [];
+    
+    let updated = false;
+    messages.forEach(m => {
+        if (m.senderId === req.params.targetId && m.targetId === activeSessions.user.id && !m.read) {
+            m.read = true;
+            updated = true;
         }
-      }
-    );
-  });
+    });
+    if (updated) writeDB(db);
+
+    res.json(messages.filter(m => 
+        (m.senderId === activeSessions.user.id && m.targetId === req.params.targetId) ||
+        (m.senderId === req.params.targetId && m.targetId === activeSessions.user.id)
+    ));
 });
 
-const PORT = 3000;
+app.get('/api/unread-messages', (req, res) => {
+    if (!activeSessions.user) return res.json({});
+    const db = readDB();
+    const unreadCounts = {};
+    (db.privateMessages || []).forEach(m => {
+        if (m.targetId === activeSessions.user.id && !m.read) {
+            unreadCounts[m.senderId] = (unreadCounts[m.senderId] || 0) + 1;
+        }
+    });
+    res.json(unreadCounts);
+});
+
+app.get('/api/ressources', (req, res) => {
+    const { categorie } = req.query;
+    const db = readDB();
+    let results = db.ressources || [];
+    
+    if (categorie) {
+        results = results.filter(r => r.categorie.toUpperCase() === categorie.toUpperCase());
+    }
+    res.json(results);
+});
+
+app.post('/api/ecoute', (req, res) => {
+    if (!activeSessions.user) {
+        return res.status(401).json({ success: false, error: "Vous devez être connecté pour envoyer une demande." });
+    }
+
+    const { sujet, message } = req.body;
+    if (!message) {
+        return res.status(400).json({ success: false, error: "Le message ne peut pas être vide." });
+    }
+
+    const db = readDB();
+    if (!db.demandes_ecoute) db.demandes_ecoute = [];
+
+    const nouvelleDemande = {
+        id: 'ecoute_' + Date.now(),
+        utilisateur_id: activeSessions.user.id,
+        sujet: sujet || 'Demande générale',
+        message: message,
+        statut: 'en_attente',
+        date_creation: new Date().toISOString()
+    };
+
+    db.demandes_ecoute.push(nouvelleDemande);
+    writeDB(db);
+
+    res.status(201).json({ 
+        success: true, 
+        message: "Votre demande a été transmise en toute confidentialité à notre équipe." 
+    });
+});
+
+app.delete('/api/chat/:id', (req, res) => {
+    if (!activeSessions.user) return res.status(401).send();
+    const db = readDB();
+    db.chat = (db.chat || []).filter(m => m.id !== req.params.id);
+    writeDB(db);
+    io.emit('delete-public-message', req.params.id);
+    res.json({ success: true });
+});
+
+app.delete('/api/private-messages/:id', (req, res) => {
+    if (!activeSessions.user) return res.status(401).send();
+    const db = readDB();
+    db.privateMessages = (db.privateMessages || []).filter(m => m.id !== req.params.id);
+    writeDB(db);
+    io.emit(`delete-private-message-${req.params.id}`);
+    res.json({ success: true });
+});
+
+io.on('connection', (socket) => {
+    socket.on('send-public-message', (data) => {
+        const db = readDB();
+        if (!db.chat) db.chat = [];
+        const newMessage = { id: 'msg_' + Date.now(), sender: data.sender, text: data.text, date: new Date().toLocaleTimeString() };
+        db.chat.push(newMessage);
+        writeDB(db);
+        io.emit('new-public-message', newMessage);
+    });
+
+    socket.on('send-private-message', (data) => {
+        const db = readDB();
+        if (!db.privateMessages) db.privateMessages = [];
+        const newMessage = { 
+            id: 'pmsg_' + Date.now(),
+            senderId: data.senderId, 
+            senderName: data.senderName, 
+            targetId: data.targetId, 
+            text: data.text, 
+            date: new Date().toLocaleTimeString(),
+            read: false 
+        };
+        db.privateMessages.push(newMessage);
+        writeDB(db);
+        io.emit(`private-message-${data.targetId}`, newMessage);
+        io.emit(`private-message-${data.senderId}`, newMessage);
+        io.emit(`unread-update-${data.targetId}`);
+    });
+
+    socket.on('typing', (data) => {
+        io.emit(`typing-${data.targetId}`, { senderName: data.senderName });
+    });
+
+    socket.on('stop-typing', (data) => {
+        io.emit(`stop-typing-${data.targetId}`);
+    });
+});
+
 server.listen(PORT, () => {
-  console.log(`Serveur démarré sur http://localhost:${PORT}`);
+    console.log(`Serveur Nonvitcha lancé sur le port ${PORT}`);
 });

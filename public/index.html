@@ -3,449 +3,153 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nonvitcha - Rencontres & Communauté</title>
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Nonvitcha - Rencontres & Entraide</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- SDK Kkiapay pour le rechargement des Nonvicoins -->
+    <script src="https://cdn.kkiapay.me/k.js"></script>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
+<body>
 
-    <!-- HEADER / NAVIGATION -->
-    <header class="bg-white shadow-sm sticky top-0 z-50">
-        <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-2">
-                <span class="text-2xl font-black text-rose-600 tracking-wider">NONVITCHA</span>
-            </div>
-            <nav id="nav-menu" class="hidden md:flex items-center space-x-6 text-sm font-medium">
-                <button onclick="switchTab('accueil')" class="hover:text-rose-600 transition">Accueil</button>
-                <button onclick="switchTab('decouvrir')" class="hover:text-rose-600 transition">Découvrir</button>
-                <button onclick="switchTab('chat')" class="hover:text-rose-600 transition">Salon</button>
-                <button onclick="switchTab('annonces')" class="hover:text-rose-600 transition">Annonces</button>
-                <button onclick="switchTab('ecoute')" class="hover:text-rose-600 transition">Écoute & VBG</button>
-                <button onclick="switchTab('admin')" class="text-rose-600 font-semibold hover:underline">Admin</button>
-            </nav>
-            <div id="user-badge" class="flex items-center space-x-3">
-                <!-- Chargé dynamiquement selon la connexion -->
-                <button onclick="openModal('login-modal')" class="text-sm px-4 py-2 bg-rose-600 text-white rounded-full font-medium hover:bg-rose-700 transition">Connexion</button>
-            </div>
-        </div>
+    <!-- ENTÊTE -->
+    <header>
+        <div class="logo">Nonvitcha</div>
+        <nav id="user-nav" style="display:none;">
+            <span id="nav-coins">🪙 0 Nonvicoins</span>
+            <button onclick="ouvrirModalKkiapay()">Recharger</button>
+            <button onclick="afficherSection('decouverte')">Découverte</button>
+            <button onclick="afficherSection('chat')">Chat Public</button>
+            <button onclick="afficherSection('messages')">Messages Privés</button>
+            <button onclick="afficherSection('ecoutes')">Écoute / SOS</button>
+            <button onclick="afficherSection('publicites')">Annonces</button>
+            <button onclick="deconnexion()">Déconnexion</button>
+        </nav>
     </header>
 
-    <!-- CONTENU PRINCIPAL -->
-    <main class="flex-grow max-w-6xl mx-auto px-4 py-6 w-full">
+    <main class="container">
 
-        <!-- ONGLET ACCUEIL -->
-        <section id="tab-accueil" class="space-y-8">
-            <div class="bg-gradient-to-r from-rose-500 to-pink-600 rounded-3xl p-8 md:p-12 text-white shadow-xl flex flex-col md:flex-row items-center justify-between">
-                <div class="max-w-xl space-y-4">
-                    <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight">Trouvez l'amour et partagez votre culture</h1>
-                    <p class="text-rose-100 text-base md:text-lg">La plateforme de découverte sociale pensée pour connecter les célibataires, échanger en toute sécurité et faire grandir notre communauté.</p>
-                    <div class="flex space-x-4 pt-2">
-                        <button onclick="switchTab('decouvrir')" class="px-6 py-3 bg-white text-rose-600 font-bold rounded-xl shadow-md hover:bg-rose-50 transition">Commencer</button>
-                        <button onclick="openModal('register-modal')" class="px-6 py-3 border-2 border-white text-white font-bold rounded-xl hover:bg-white/10 transition">Créer un compte</button>
-                    </div>
+        <!-- SECTION AUTHENTIFICATION -->
+        <section id="auth-section">
+            <div class="form-container">
+                <h2>Connexion</h2>
+                <form id="form-login">
+                    <input type="email" id="login-email" placeholder="Email" required>
+                    <input type="password" id="login-password" placeholder="Mot de passe" required>
+                    <button type="submit">Se connecter</button>
+                </form>
+            </div>
+
+            <div class="form-container">
+                <h2>Inscription</h2>
+                <form id="form-register" enctype="multipart/form-data">
+                    <input type="text" id="reg-nom" placeholder="Nom complet" required>
+                    <input type="number" id="reg-age" placeholder="Âge" required>
+                    <input type="email" id="reg-email" placeholder="Email" required>
+                    <input type="password" id="reg-password" placeholder="Mot de passe" required>
+                    <select id="reg-genre" required>
+                        <option value="">Sélectionner votre genre</option>
+                        <option value="Homme">Homme</option>
+                        <option value="Femme">Femme</option>
+                    </select>
+                    <input type="text" id="reg-ville" placeholder="Ville" required>
+                    <label>Photo de profil :</label>
+                    <input type="file" id="reg-photo" accept="image/*">
+                    <button type="submit">S'inscrire</button>
+                </form>
+            </div>
+        </section>
+
+        <!-- SECTION DÉCOUVERTE / PROFILS -->
+        <section id="decouverte-section" style="display:none;">
+            <h2>Découvrir des membres</h2>
+            <div id="users-grid" class="cards-grid"></div>
+        </section>
+
+        <!-- SECTION MESSAGERIE PRIVÉE (1-à-1) -->
+        <section id="messages-section" style="display:none;">
+            <h2>Messagerie Privée</h2>
+            <div class="chat-container">
+                <div id="private-conversations-list" class="conversations-sidebar"></div>
+                <div class="chat-main">
+                    <div id="private-chat-header">Sélectionnez un membre pour discuter</div>
+                    <div id="private-chat-messages" class="chat-box"></div>
+                    <form id="form-private-chat" style="display:none;">
+                        <input type="text" id="private-message-input" placeholder="Écrire un message privé..." required>
+                        <button type="submit">Envoyer</button>
+                    </form>
                 </div>
             </div>
         </section>
 
-        <!-- ONGLET DÉCOUVRIR (Profils) -->
-        <section id="tab-decouvrir" class="hidden space-y-6">
-            <h2 class="text-2xl font-bold text-slate-800">Profils récents</h2>
-            <div id="profiles-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                <!-- Injecté par JavaScript -->
-            </div>
-        </section>
-
-        <!-- ONGLET SALON (Chat) -->
-        <section id="tab-chat" class="hidden flex flex-col h-[70vh] bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-            <div class="bg-slate-100 px-6 py-3 border-b border-slate-200 font-bold text-slate-700">Salon de discussion public</div>
-            <div id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4">
-                <!-- Messages injectés ici -->
-            </div>
-            <form id="chat-form" onsubmit="sendChatMessage(event)" class="p-3 bg-slate-50 border-t border-slate-200 flex gap-2">
-                <input type="text" id="chat-input" placeholder="Écrivez votre message..." required class="flex-grow px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500">
-                <button type="submit" class="px-6 py-2 bg-rose-600 text-white font-medium rounded-xl hover:bg-rose-700 transition">Envoyer</button>
+        <!-- SECTION CHAT PUBLIC -->
+        <section id="chat-section" style="display:none;">
+            <h2>Chat Public Nonvitcha</h2>
+            <div id="chat-messages" class="chat-box"></div>
+            <form id="form-chat">
+                <input type="text" id="chat-input" placeholder="Partagez un message avec la communauté..." required>
+                <button type="submit">Envoyer</button>
             </form>
         </section>
 
-        <!-- ONGLET ANNONCES -->
-        <section id="tab-annonces" class="hidden space-y-6">
-            <div class="flex justify-between items-center">
-                <h2 class="text-2xl font-bold text-slate-800">Annonces & Publicités</h2>
-                <button onclick="openModal('annonce-modal')" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700">Publier une annonce</button>
-            </div>
-            <div id="annonces-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <!-- Injecté par JavaScript -->
-            </div>
-        </section>
-
-        <!-- ONGLET ÉCOUTE & VBG -->
-        <section id="tab-ecoute" class="hidden space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-                <h2 class="text-xl font-bold text-slate-800">Espace Écoute & Assistance</h2>
-                <p class="text-sm text-slate-600">Un espace sécurisé et confidentiel pour poser vos questions ou signaler une situation.</p>
-                <form onsubmit="submitEcoute(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Catégorie</label>
-                        <select id="ecoute-cat" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-rose-500">
-                            <option value="Conseil relationnel">Conseil relationnel</option>
-                            <option value="Assistance VBG">Assistance VBG</option>
-                            <option value="Autre">Autre</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Votre message / Demande</label>
-                        <textarea id="ecoute-msg" rows="4" required class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-rose-500" placeholder="Exprimez-vous en toute sécurité..."></textarea>
-                    </div>
-                    <button type="submit" class="px-6 py-2 bg-rose-600 text-white font-medium rounded-xl hover:bg-rose-700">Envoyer la demande</button>
+        <!-- SECTION ÉCOUTE ET SOUTIEN (SOS / VBG) -->
+        <section id="ecoutes-section" style="display:none;">
+            <h2>Espace d'Écoute et de Soutien</h2>
+            <div class="form-container">
+                <h3>Besoin d'aide ou d'écoute ?</h3>
+                <form id="form-ecoute">
+                    <select id="ecoute-categorie" required>
+                        <option value="Violence Basée sur le Genre (VBG)">Violence Basée sur le Genre (VBG)</option>
+                        <option value="Santé Sexuelle et Reproductive (SSR)">Santé Sexuelle et Reproductive (SSR)</option>
+                        <option value="Conseil / Orientation">Conseil / Orientation</option>
+                    </select>
+                    <textarea id="ecoute-message" placeholder="Expliquez votre situation en toute confidentialité..." required></textarea>
+                    <button type="submit">Envoyer la demande</button>
                 </form>
             </div>
-            <div class="space-y-4">
-                <h3 class="font-bold text-lg text-slate-800">Mes requêtes et réponses reçues</h3>
-                <div id="my-ecoutes-list" class="space-y-3"></div>
-            </div>
+            <h3>Mes demandes d'écoute</h3>
+            <div id="ecoutes-list"></div>
         </section>
 
-        <!-- ONGLET ADMIN -->
-        <section id="tab-admin" class="hidden space-y-6 max-w-xl mx-auto">
-            <div id="admin-login-box" class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 space-y-4">
-                <h2 class="text-2xl font-bold text-slate-800 text-center">Accès Administrateur</h2>
-                <form onsubmit="adminLogin(event)" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Mot de passe admin</label>
-                        <input type="password" id="admin-pwd-input" required class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-rose-500">
-                    </div>
-                    <button type="submit" class="w-full py-3 bg-slate-900 text-white font-medium rounded-xl hover:bg-slate-800 transition">Se connecter</button>
+        <!-- SECTION ANNONCES ET PUBLICITÉS -->
+        <section id="publicites-section" style="display:none;">
+            <h2>Annonces & Publicités</h2>
+            <div class="form-container">
+                <h3>Publier une annonce (50 Nonvicoins / 25 pour VIP)</h3>
+                <form id="form-publicite">
+                    <input type="text" id="pub-titre" placeholder="Titre de l'annonce" required>
+                    <textarea id="pub-description" placeholder="Description de l'annonce..." required></textarea>
+                    <input type="text" id="pub-contact" placeholder="Numéro de téléphone / WhatsApp" required>
+                    <button type="submit">Publier l'annonce</button>
                 </form>
             </div>
-            <div id="admin-panel" class="hidden space-y-6">
-                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
-                    <span class="font-bold text-rose-600">Panneau Administrateur Actif</span>
-                    <button onclick="adminLogout()" class="text-sm px-3 py-1 bg-slate-200 rounded-lg hover:bg-slate-300">Déconnexion</button>
-                </div>
-                <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
-                    <h3 class="font-bold text-lg">Gestion des requêtes d'écoute / réponses</h3>
-                    <div id="admin-ecoutes-list" class="space-y-4"></div>
-                </div>
+            <h3>Annonces récentes</h3>
+            <div id="publicites-list" class="cards-grid"></div>
+        </section>
+
+        <!-- SECTION ADMINISTRATION -->
+        <section id="admin-section" style="display:none;">
+            <h2>Espace Administrateur</h2>
+            <div id="admin-login-box" class="form-container">
+                <h3>Connexion Administration</h3>
+                <form id="form-admin-login">
+                    <input type="password" id="admin-password" placeholder="Mot de passe administrateur" required>
+                    <button type="submit">Accéder</button>
+                </form>
+            </div>
+            <div id="admin-dashboard" style="display:none;">
+                <h3>Demandes d'Écoute / SOS à traiter</h3>
+                <div id="admin-ecoutes-list"></div>
             </div>
         </section>
 
     </main>
 
-    <!-- MODALS (Connexion, Inscription, Annonce) -->
-    <div id="login-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white w-full max-w-md rounded-2xl p-6 space-y-4 relative">
-            <button onclick="closeModal('login-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            <h3 class="text-xl font-bold">Connexion</h3>
-            <form onsubmit="handleLogin(event)" class="space-y-3">
-                <input type="email" id="login-email" placeholder="Email" required class="w-full px-4 py-2 border rounded-xl">
-                <input type="password" id="login-password" placeholder="Mot de passe" required class="w-full px-4 py-2 border rounded-xl">
-                <button type="submit" class="w-full py-2 bg-rose-600 text-white font-medium rounded-xl">Se connecter</button>
-            </form>
-        </div>
-    </div>
+    <!-- INTÉGRATION BOUTON KKIAPAY (CACHÉ) -->
+    <kkiapay-widget
+        amount="1000"
+        key="VOTRE_CLE_PUBLIQUE_KKIAPAY"
+        callback="/api/kkiapay/verify"
+        sandbox="true">
+    </kkiapay-widget>
 
-    <div id="register-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white w-full max-w-md rounded-2xl p-6 space-y-4 relative max-h-[90vh] overflow-y-auto">
-            <button onclick="closeModal('register-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            <h3 class="text-xl font-bold">Créer un compte</h3>
-            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-3">
-                <input type="text" name="nom" placeholder="Nom complet" required class="w-full px-4 py-2 border rounded-xl">
-                <input type="number" name="age" placeholder="Âge" required class="w-full px-4 py-2 border rounded-xl">
-                <input type="email" name="email" placeholder="Email" required class="w-full px-4 py-2 border rounded-xl">
-                <input type="password" name="password" placeholder="Mot de passe" required class="w-full px-4 py-2 border rounded-xl">
-                <select name="genre" class="w-full px-4 py-2 border rounded-xl">
-                    <option value="Homme">Homme</option>
-                    <option value="Femme">Femme</option>
-                </select>
-                <input type="text" name="ville" placeholder="Ville" required class="w-full px-4 py-2 border rounded-xl">
-                <div>
-                    <label class="block text-xs text-slate-500 mb-1">Photo de profil</label>
-                    <input type="file" name="photo" accept="image/*" class="w-full text-sm">
-                </div>
-                <button type="submit" class="w-full py-2 bg-rose-600 text-white font-medium rounded-xl">S'inscrire</button>
-            </form>
-        </div>
-    </div>
-
-    <div id="annonce-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white w-full max-w-md rounded-2xl p-6 space-y-4 relative">
-            <button onclick="closeModal('annonce-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
-            <h3 class="text-xl font-bold">Publier une annonce</h3>
-            <form onsubmit="submitAnnonce(event)" class="space-y-3">
-                <input type="text" id="annonce-titre" placeholder="Titre de l'annonce" required class="w-full px-4 py-2 border rounded-xl">
-                <textarea id="annonce-desc" placeholder="Description..." required rows="3" class="w-full px-4 py-2 border rounded-xl"></textarea>
-                <input type="text" id="annonce-contact" placeholder="Contact (Téléphone / Email)" required class="w-full px-4 py-2 border rounded-xl">
-                <button type="submit" class="w-full py-2 bg-rose-600 text-white font-medium rounded-xl">Publier (50 Nonvicoins)</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- SCRIPT FRONT-END -->
-    <script>
-        let currentUser = null;
-
-        function switchTab(tabId) {
-            ['accueil', 'decouvrir', 'chat', 'annonces', 'ecoute', 'admin'].forEach(t => {
-                document.getElementById(`tab-${t}`).classList.add('hidden');
-            });
-            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
-            if (tabId === 'decouvrir') loadProfiles();
-            if (tabId === 'chat') loadChat();
-            if (tabId === 'annonces') loadAnnonces();
-            if (tabId === 'ecoute') loadEcoutes();
-            if (tabId === 'admin') checkAdminStatus();
-        }
-
-        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
-        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
-
-        async function checkAuth() {
-            try {
-                const res = await fetch('/api/me');
-                const data = await res.json();
-                if (data.success) {
-                    currentUser = data.user;
-                    updateUserBadge();
-                }
-            } catch (e) { console.log('Non connecté'); }
-        }
-
-        function updateUserBadge() {
-            const badge = document.getElementById('user-badge');
-            if (currentUser) {
-                badge.innerHTML = `
-                    <div class="flex items-center space-x-2">
-                        <span class="text-xs font-bold px-2 py-1 bg-amber-100 text-amber-700 rounded-lg"><i class="fa-solid fa-coins"></i> ${currentUser.nonvicoins} NC</span>
-                        <img src="${currentUser.photo || '/uploads/default.png'}" class="w-8 h-8 rounded-full object-cover border">
-                        <button onclick="logout()" class="text-xs text-slate-500 hover:text-rose-600"><i class="fa-solid fa-right-from-bracket"></i></button>
-                    </div>
-                `;
-            }
-        }
-
-        async function handleRegister(e) {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            const res = await fetch('/api/register', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) {
-                currentUser = data.user;
-                updateUserBadge();
-                closeModal('register-modal');
-                switchTab('decouvrir');
-            } else {
-                alert(data.message || 'Erreur lors de l\'inscription');
-            }
-        }
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password })
-            });
-            const data = await res.json();
-            if (data.success) {
-                currentUser = data.user;
-                updateUserBadge();
-                closeModal('login-modal');
-                switchTab('decouvrir');
-            } else {
-                alert(data.message || 'Erreur de connexion');
-            }
-        }
-
-        async function logout() {
-            await fetch('/api/logout', { method: 'POST' });
-            currentUser = null;
-            location.reload();
-        }
-
-        async function loadProfiles() {
-            const res = await fetch('/api/users');
-            if (res.status === 401) { alert('Veuillez vous connecter pour voir les profils.'); openModal('login-modal'); return; }
-            const users = await res.json();
-            const grid = document.getElementById('profiles-grid');
-            grid.innerHTML = users.map(u => `
-                <div class="bg-white rounded-2xl shadow-sm border p-4 flex flex-col items-center text-center space-y-3">
-                    <img src="${u.photo || '/uploads/default.png'}" class="w-24 h-24 rounded-full object-cover shadow-md">
-                    <div>
-                        <h3 class="font-bold text-lg">${u.nom}, ${u.age || ''}</h3>
-                        <p class="text-xs text-slate-500"><i class="fa-solid fa-location-dot"></i> ${u.ville || 'Non renseignée'}</p>
-                    </div>
-                    <p class="text-sm text-slate-600 line-clamp-2">${u.bio || 'Membre de Nonvitcha'}</p>
-                </div>
-            `).join('');
-        }
-
-        async function loadChat() {
-            const res = await fetch('/api/chat');
-            if (res.status === 401) return;
-            const msgs = await res.json();
-            const box = document.getElementById('chat-messages');
-            box.innerHTML = msgs.map(m => `
-                <div class="flex items-start space-x-2">
-                    <img src="${m.userPhoto || '/uploads/default.png'}" class="w-8 h-8 rounded-full object-cover">
-                    <div>
-                        <div class="flex items-center space-x-2">
-                            <span class="font-bold text-sm">${m.userName}</span>
-                            <span class="text-[10px] text-slate-400">${m.time}</span>
-                        </div>
-                        <p class="text-sm bg-slate-100 px-3 py-2 rounded-xl mt-1">${m.message}</p>
-                    </div>
-                </div>
-            `).join('');
-            box.scrollTop = box.scrollHeight;
-        }
-
-        async function sendChatMessage(e) {
-            e.preventDefault();
-            const input = document.getElementById('chat-input');
-            await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: input.value })
-            });
-            input.value = '';
-            loadChat();
-        }
-
-        async function loadAnnonces() {
-            const res = await fetch('/api/publicites');
-            const pubs = await res.json();
-            document.getElementById('annonces-list').innerHTML = pubs.map(p => `
-                <div class="bg-white p-5 rounded-2xl shadow-sm border space-y-2">
-                    <div class="flex justify-between items-start">
-                        <h3 class="font-bold text-base text-rose-600">${p.titre}</h3>
-                        <span class="text-xs text-slate-400">${p.date}</span>
-                    </div>
-                    <p class="text-sm text-slate-600">${p.description}</p>
-                    <div class="text-xs font-semibold text-slate-700 pt-2 border-t">Contact : ${p.contact} (Par ${p.annonceur})</div>
-                </div>
-            `).join('');
-        }
-
-        async function submitAnnonce(e) {
-            e.preventDefault();
-            const titre = document.getElementById('annonce-titre').value;
-            const description = document.getElementById('annonce-desc').value;
-            const contact = document.getElementById('annonce-contact').value;
-            const res = await fetch('/api/publicites', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ titre, description, contact })
-            });
-            const data = await res.json();
-            if (data.success) {
-                currentUser = data.user;
-                updateUserBadge();
-                closeModal('annonce-modal');
-                loadAnnonces();
-                alert('Annonce publiée avec succès !');
-            } else {
-                alert(data.message);
-            }
-        }
-
-        async function loadEcoutes() {
-            const res = await fetch('/api/ecoutes');
-            if (res.status === 401) return;
-            const list = await res.json();
-            document.getElementById('my-ecoutes-list').innerHTML = list.map(e => `
-                <div class="bg-white p-4 rounded-xl border space-y-2">
-                    <div class="text-xs font-bold text-rose-600">${e.categorie} - ${e.date}</div>
-                    <p class="text-sm text-slate-700"><strong>Ma requête :</strong> ${e.message}</p>
-                    ${e.reponse ? `<p class="text-sm bg-emerald-50 text-emerald-800 p-2 rounded-lg"><strong>Réponse admin :</strong> ${e.reponse}</p>` : `<p class="text-xs text-amber-600 italic">En attente de réponse...</p>`}
-                </div>
-            `).join('');
-        }
-
-        async function submitEcoute(e) {
-            e.preventDefault();
-            const categorie = document.getElementById('ecoute-cat').value;
-            const message = document.getElementById('ecoute-msg').value;
-            const res = await fetch('/api/ecoutes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ categorie, message })
-            });
-            if (res.ok) {
-                document.getElementById('ecoute-msg').value = '';
-                loadEcoutes();
-                alert('Votre requête a été transmise en toute confidentialité.');
-            }
-        }
-
-        async function adminLogin(e) {
-            e.preventDefault();
-            const password = document.getElementById('admin-pwd-input').value;
-            const res = await fetch('/api/admin/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password })
-            });
-            const data = await res.json();
-            if (data.success) {
-                checkAdminStatus();
-            } else {
-                alert(data.message);
-            }
-        }
-
-        async function checkAdminStatus() {
-            const res = await fetch('/api/admin/check');
-            const data = await res.json();
-            if (data.isAdmin) {
-                document.getElementById('admin-login-box').classList.add('hidden');
-                document.getElementById('admin-panel').classList.remove('hidden');
-                loadAdminEcoutes();
-            } else {
-                document.getElementById('admin-login-box').classList.remove('hidden');
-                document.getElementById('admin-panel').classList.add('hidden');
-            }
-        }
-
-        async function adminLogout() {
-            await fetch('/api/admin/logout', { method: 'POST' });
-            checkAdminStatus();
-        }
-
-        async function loadAdminEcoutes() {
-            // Utilise l'endpoint général ou équivalent admin pour lister
-            const res = await fetch('/api/ecoutes');
-            // Pour l'admin, on peut adapter pour récupérer toutes les écoutes si besoin dans le serveur, ou afficher
-            const list = await res.json();
-            document.getElementById('admin-ecoutes-list').innerHTML = list.map(e => `
-                <div class="bg-slate-50 p-4 rounded-xl border space-y-2">
-                    <div class="text-xs font-bold">${e.userName} (${e.categorie})</div>
-                    <p class="text-sm">${e.message}</p>
-                    <div class="flex gap-2">
-                        <input type="text" id="rep-${e.id}" placeholder="Écrire une réponse..." class="flex-grow px-3 py-1 border rounded-lg text-sm" value="${e.reponse || ''}">
-                        <button onclick="sendAdminReply(${e.id})" class="px-4 py-1 bg-rose-600 text-white rounded-lg text-sm">Envoyer</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        async function sendAdminReply(id) {
-            const reponse = document.getElementById(`rep-${id}`).value;
-            const res = await fetch(`/api/admin/ecoutes/${id}/repondre`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ reponse })
-            });
-            if (res.ok) {
-                alert('Réponse envoyée !');
-                loadAdminEcoutes();
-            }
-        }
-
-        // Initialisation au chargement
-        checkAuth();
-    </script>
 </body>
 </html>

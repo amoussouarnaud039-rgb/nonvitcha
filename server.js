@@ -10,7 +10,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Code secret pour devenir admin (modifiez-le si besoin)
+// Code secret pour devenir admin
 const SECRET_ADMIN_CODE = "NONVITCHA2026";
 
 // Configuration de la base de données JSON locale
@@ -61,11 +61,11 @@ app.use(session({
   secret: 'nonvitcha-secret-key-2026',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false } // Mettre à true si HTTPS strict, false par défaut sur Render/Dev
+  cookie: { secure: false }
 }));
 
 // Stockage des sockets connectés
-const onlineUsers = new Map(); // userId -> socketId
+const onlineUsers = new Map();
 
 // --- ROUTES AUTHENTIFICATION ---
 
@@ -74,7 +74,7 @@ app.post('/api/auth/register', (req, res) => {
   const db = readDb();
 
   if (db.users.find(u => u.email === email)) {
-    return.status(400).json({ success: false, message: 'Cet email est déjà utilisé.' });
+    return res.status(400).json({ success: false, message: 'Cet email est déjà utilisé.' });
   }
 
   // Vérification du code secret admin
@@ -86,7 +86,7 @@ app.post('/api/auth/register', (req, res) => {
   const newUser = {
     id: Date.now().toString(),
     email,
-    password, // (Note: en production, pensez à hasher le mot de passe avec bcrypt)
+    password,
     nom,
     age: parseInt(age) || 18,
     ville: ville || 'Inconnue',
@@ -131,7 +131,6 @@ app.get('/api/auth/me', (req, res) => {
   if (!user) {
     return res.json({ loggedIn: false });
   }
-  // On renvoie l'objet utilisateur (sans le mot de passe)
   const { password, ...safeUser } = user;
   res.json({ loggedIn: true, user: safeUser });
 });
@@ -182,7 +181,6 @@ app.get('/api/admin/ecoutes', (req, res) => {
   const db = readDb();
   const user = db.users.find(u => u.id === req.session.userId);
   
-  // Vérification stricte des droits admin
   if (!user || !user.isAdmin) {
     return res.status(403).json({ success: false, error: "Accès refusé. Réservé aux administrateurs." });
   }
@@ -252,10 +250,7 @@ app.get('/api/private-messages/:targetId', (req, res) => {
 app.get('/api/unread-messages', (req, res) => {
   if (!req.session.userId) return res.json({});
   const db = readDb();
-  const currentId = req.session.userId;
   const unreadCounts = {};
-
-  // Exemple simplifié de comptage
   res.json(unreadCounts);
 });
 

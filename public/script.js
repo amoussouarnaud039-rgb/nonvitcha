@@ -1,433 +1,204 @@
-let currentUser = null;
-let activeChatUserId = null;
-let selectedRechargeAmount = 1000;
-let selectedCoinsToCredit = 100;
+let currentUserId = null;
 
-// ==========================================
-// NAVIGATION ET ÉTATS DU SITE
-// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    verifierSession();
 
-function afficherSection(sectionId) {
-    const sections = [
-        'auth-section', 
-        'decouverte-section', 
-        'messages-section', 
-        'chat-section', 
-        'ecoutes-section', 
-        'publicites-section', 
-        'recharge-section',
-        'admin-section'
-    ];
-    
-    sections.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.style.display = (id === sectionId + '-section') ? 'block' : 'none';
-    });
+    // Gestion Inscription
+    const formRegister = document.getElementById('form-register');
+    if (formRegister) {
+        formRegister.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(formRegister);
 
-    if (sectionId === 'decouverte') chargerUtilisateurs();
-    if (sectionId === 'chat') chargerChatPublic();
-    if (sectionId === 'ecoutes') chargerEcoutes();
-    if (sectionId === 'publicites') chargerPublicites();
-}
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    alert('Inscription réussie !');
+                    window.location.reload(); // Force le rafraîchissement complet
+                } else {
+                    alert(data.message || 'Erreur lors de l\'inscription');
+                }
+            } catch (err) {
+                alert('Erreur de connexion avec le serveur.');
+            }
+        });
+    }
+
+    // Gestion Connexion
+    const formLogin = document.getElementById('form-login');
+    if (formLogin) {
+        formLogin.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+
+                if (data.success) {
+                    window.location.reload();
+                } else {
+                    alert(data.message || 'Identifiants incorrects');
+                }
+            } catch (err) {
+                alert('Erreur de connexion');
+            }
+        });
+    }
+});
 
 async function verifierSession() {
     try {
         const res = await fetch('/api/me');
         const data = await res.json();
-        if (data.success) {
-            currentUser = data.user;
-            const nav = document.getElementById('user-nav');
-            if (nav) nav.style.display = 'flex';
-            const coinsEl = document.getElementById('nav-coins');
-            if (coinsEl) coinsEl.innerText = `🪙 ${currentUser.nonvicoins} Nonvicoins`;
-            afficherSection('decouverte');
+
+        const authSection = document.getElementById('auth-section');
+        const navBar = document.getElementById('nav-bar');
+        const userCoins = document.getElementById('user-coins');
+
+        if (data.loggedIn && data.user) {
+            currentUserId = data.user.id;
+            if (userCoins) userCoins.innerText = data.user.nonvicoins || 0;
+            if (authSection) authSection.style.display = 'none';
+            if (navBar) navBar.style.display = 'flex';
+            
+            naviguerVers('decouverte');
         } else {
-            afficherSection('auth');
+            if (authSection) authSection.style.display = 'block';
+            if (navBar) navBar.style.display = 'none';
+            cacherToutesSections();
         }
     } catch (err) {
-        afficherSection('auth');
+        console.error("Erreur session:", err);
     }
 }
 
-// ==========================================
-// AUTHENTIFICATION
-// ==========================================
+function naviguerVers(sectionId) {
+    cacherToutesSections();
+    const target = document.getElementById(`${sectionId}-section`);
+    if (target) target.style.display = 'block';
 
-document.getElementById('form-register')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-    const res = await fetch('/api/register', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (data.success) {
-        alert('Inscription réussie !');
-        verifierSession();
-    } else {
-        alert(data.message || 'Erreur lors de l\'inscription');
-    }
-});
-
-document.getElementById('form-login')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-
-    const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (data.success) {
-        verifierSession();
-    } else {
-        alert(data.message || 'Identifiants incorrects');
-    }
-});
-
-async function deconnexion() {
-    await fetch('/api/logout', { method: 'POST' });
-    location.reload();
+    if (sectionId === 'decouverte') chargerMembres();
+    if (sectionId === 'chat') chargerChatPublic();
+    if (sectionId === 'publicites') chargerPublicites();
+    if (sectionId === 'ecoutes') chargerMesEcoutes();
 }
 
-// ==========================================
-// DÉCOUVERTE, LIKES & COUPS DE CŒUR
-// ==========================================
-
-async function chargerUtilisateurs() {
-    const res = await fetch('/api/users');
-    const users = await res.json();
-    const grid = document.getElementById('users-grid');
-    if (!grid) return;
-    grid.innerHTML = '';
-
-    users.forEach(u => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-            <img src="${u.photo}" alt="${u.nom}" class="profile-img">
-            <h3>${u.nom}, ${u.age} ans ${u.is_vip ? '⭐ VIP' : ''}</h3>
-            <p>📍 ${u.ville} ${u.is_online ? '🟢 En ligne' : '🔴 Hors ligne'}</p>
-            <div class="actions">
-                <button onclick="envoyerLike(${u.id}, false)">❤️ Like</button>
-                <button onclick="envoyerLike(${u.id}, true)">💘 Coup de Cœur</button>
-                <button onclick="ouvrirDiscussion(${u.id}, '${u.nom}')">💬 Message</button>
-            </div>
-        `;
-        grid.appendChild(card);
+function cacherToutesSections() {
+    const sections = ['decouverte', 'messages', 'chat', 'ecoutes', 'publicites', 'recharge', 'admin'];
+    sections.forEach(id => {
+        const elem = document.getElementById(`${id}-section`);
+        if (elem) elem.style.display = 'none';
     });
 }
 
-async function envoyerLike(receiverId, isCoupDeCoeur) {
-    const res = await fetch('/api/likes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receiverId, isCoupDeCoeur })
-    });
-    const data = await res.json();
-    if (data.isMatch) {
-        alert('🎉 C\'est un MATCH ! Vous vous plaisez mutuellement !');
-    } else {
-        alert(isCoupDeCoeur ? '💘 Coup de cœur envoyé !' : '❤️ Like envoyé !');
-    }
-}
-
-// ==========================================
-// RECHARGING & PAIEMENT KKIAPAY
-// ==========================================
-
-function lancerPaiementKkiapay(amount, coins) {
-    selectedRechargeAmount = amount;
-    selectedCoinsToCredit = coins;
-
-    if (typeof openKkiapayWidget === 'function') {
-        openKkiapayWidget({
-            amount: amount,
-            key: 'VOTRE_CLE_PUBLIQUE_KKIAPAY', // Remplacez avec votre vraie clé Kkiapay
-            sandbox: true,
-            email: currentUser ? currentUser.email : ''
-        });
-    } else {
-        alert('Module Kkiapay indisponible pour le moment.');
-    }
-}
-
-window.addEventListener('kkiapay:success', async (response) => {
+async function chargerMembres() {
     try {
-        const res = await fetch('/api/kkiapay/verify', {
+        const res = await fetch('/api/users');
+        if (!res.ok) return;
+        const users = await res.json();
+        const container = document.getElementById('membres-list');
+        if (!container) return;
+
+        container.innerHTML = users.map(u => `
+            <div class="card">
+                <img src="${u.photo}" alt="${u.nom}" style="width:100%; border-radius:8px;">
+                <h3>${u.nom}, ${u.age} ans ${u.is_vip ? '⭐ VIP' : ''}</h3>
+                <p>📍 ${u.ville}</p>
+                <p>${u.is_online ? '🟢 En ligne' : '🔴 Hors ligne'}</p>
+                <button onclick="ouvrirDiscussion(${u.id}, '${u.nom}')">💬 Discuter</button>
+                <button onclick="likerUser(${u.id}, false)">❤️ Like</button>
+                <button onclick="likerUser(${u.id}, true)">💘 Coup de Cœur (10 coins)</button>
+            </div>
+        `).join('');
+    } catch (err) {
+        console.error(err);
+    }
+}
+
+async function likerUser(receiverId, isCoupDeCoeur) {
+    try {
+        const res = await fetch('/api/like', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                transactionId: response.transactionId,
-                coinsToCredit: selectedCoinsToCredit
-            })
+            body: JSON.stringify({ receiver_id: receiverId, is_coup_de_coeur: isCoupDeCoeur })
         });
         const data = await res.json();
         if (data.success) {
-            alert(`🪙 Bravo ! Votre compte a été crédité de ${selectedCoinsToCredit} Nonvicoins !`);
+            alert(isCoupDeCoeur ? 'Coup de cœur envoyé !' : 'Like envoyé !');
             verifierSession();
+        } else {
+            alert(data.message || 'Erreur');
         }
     } catch (err) {
-        alert('Erreur lors de la validation du paiement.');
+        alert('Erreur réseau');
     }
-});
-
-// ==========================================
-// MESSAGERIE PRIVÉE (1-À-1)
-// ==========================================
-
-async function ouvrirDiscussion(userId, userName) {
-    activeChatUserId = userId;
-    afficherSection('messages');
-    const header = document.getElementById('private-chat-header');
-    if (header) header.innerText = `Discussion avec ${userName}`;
-    chargerMessagesPrives();
 }
-
-async function chargerMessagesPrives() {
-    if (!activeChatUserId) return;
-    const res = await fetch(`/api/messages/${activeChatUserId}`);
-    const msgs = await res.json();
-    const box = document.getElementById('private-chat-messages');
-    if (!box) return;
-    box.innerHTML = msgs.map(m => `
-        <div class="msg ${m.sender_id === currentUser.id ? 'sent' : 'received'}">
-            <p>${m.message}</p>
-        </div>
-    `).join('');
-}
-
-document.getElementById('form-private-chat')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const input = document.getElementById('private-message-input');
-    await fetch('/api/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receiverId: activeChatUserId, message: input.value })
-    });
-    input.value = '';
-    chargerMessagesPrives();
-});
-
-// ==========================================
-// CHAT PUBLIC
-// ==========================================
 
 async function chargerChatPublic() {
-    const res = await fetch('/api/chat');
-    const msgs = await res.json();
-    const box = document.getElementById('chat-messages');
-    if (!box) return;
-    box.innerHTML = msgs.map(m => `
-        <div class="msg">
-            <strong>${m.username || 'Membre'} ${m.uservip ? '⭐ VIP' : ''} :</strong> ${m.message}
-        </div>
-    `).join('');
-}
-
-document.getElementById('form-chat')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const input = document.getElementById('chat-input');
-    await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: input.value })
-    });
-    input.value = '';
-    chargerChatPublic();
-});
-
-// ==========================================
-// ÉCOUTE ET SOUTIEN (SOS / VBG)
-// ==========================================
-
-async function chargerEcoutes() {
-    const res = await fetch('/api/ecoutes');
-    const list = await res.json();
-    const container = document.getElementById('ecoutes-list');
-    if (!container) return;
-    container.innerHTML = list.map(e => `
-        <div class="card" style="text-align:left;">
-            <h4>${e.categorie}</h4>
-            <p><strong>Message envoyé :</strong> ${e.message}</p>
-            <p><strong>Réponse :</strong> ${e.reponse || '<em>En attente d\'une réponse...</em>'}</p>
-        </div>
-    `).join('');
-}
-
-document.getElementById('form-ecoute')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const categorie = document.getElementById('ecoute-categorie').value;
-    const message = document.getElementById('ecoute-message').value;
-
-    const res = await fetch('/api/ecoutes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ categorie, message })
-    });
-    const data = await res.json();
-    if (data.success) {
-        alert('Transmis confidentiellement.');
-        document.getElementById('ecoute-message').value = '';
-        chargerEcoutes();
+    try {
+        const res = await fetch('/api/chat');
+        const messages = await res.json();
+        const container = document.getElementById('chat-box');
+        if (container) {
+            container.innerHTML = messages.map(m => `<p><strong>${m.nom}:</strong> ${m.content}</p>`).join('');
+        }
+    } catch (err) {
+        console.error(err);
     }
-});
-
-// ==========================================
-// PUBLICITÉS & ANNONCES
-// ==========================================
+}
 
 async function chargerPublicites() {
-    const res = await fetch('/api/publicites');
-    const pubs = await res.json();
-    const grid = document.getElementById('publicites-list');
-    if (!grid) return;
-    grid.innerHTML = pubs.map(p => `
-        <div class="card">
-            <h3>${p.titre}</h3>
-            <p>${p.description}</p>
-            <p><strong>Contact :</strong> ${p.contact}</p>
-            <small>Auteur : ${p.annonceur}</small>
-        </div>
-    `).join('');
-}
-
-document.getElementById('form-publicite')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const titre = document.getElementById('pub-titre').value;
-    const description = document.getElementById('pub-description').value;
-    const contact = document.getElementById('pub-contact').value;
-
-    const res = await fetch('/api/publicites', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ titre, description, contact })
-    });
-    const data = await res.json();
-    if (data.success) {
-        alert('Annonce publiée !');
-        document.getElementById('pub-titre').value = '';
-        document.getElementById('pub-description').value = '';
-        document.getElementById('pub-contact').value = '';
-        verifierSession();
-        chargerPublicites();
-    } else {
-        alert(data.message || 'Erreur lors de la publication.');
-    }
-});
-
-// ==========================================
-// ADMINISTRATION (GESTION VIP, SOLDE ET MODÉRATION)
-// ==========================================
-
-async function connexionAdmin() {
-    const password = document.getElementById('admin-password-input').value;
-    const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password })
-    });
-    const data = await res.json();
-    if (data.success) {
-        document.getElementById('admin-login-box').style.display = 'none';
-        document.getElementById('admin-dashboard').style.display = 'block';
-        chargerGestionUtilisateursAdmin();
-        chargerEcoutesAdmin();
-    } else {
-        alert(data.message);
+    try {
+        const res = await fetch('/api/publicites');
+        const pubs = await res.json();
+        const container = document.getElementById('publicites-list');
+        if (container) {
+            container.innerHTML = pubs.map(p => `
+                <div class="pub-card">
+                    <h3>${p.titre}</h3>
+                    <p>${p.description}</p>
+                    ${p.image ? `<img src="${p.image}" style="max-width:100%;">` : ''}
+                    <small>Publié par ${p.nom}</small>
+                </div>
+            `).join('');
+        }
+    } catch (err) {
+        console.error(err);
     }
 }
 
-async function chargerGestionUtilisateursAdmin() {
-    const res = await fetch('/api/admin/users');
-    const users = await res.json();
-    const container = document.getElementById('admin-users-list');
-    if (!container) return;
-
-    container.innerHTML = users.map(u => `
-        <div class="card" style="text-align:left;">
-            <p><strong>${u.nom}</strong> (${u.email}) ${u.is_suspended ? '🔴 [SUSPENDU]' : ''}</p>
-            <p>Solde : 🪙 ${u.nonvicoins} Nonvicoins | Statut VIP : ${u.is_vip ? '⭐ OUI' : 'NON'}</p>
-            <div class="actions" style="justify-content:flex-start;">
-                <button onclick="changerStatutVIP(${u.id}, ${!u.is_vip})">
-                    ${u.is_vip ? 'Retirer VIP' : 'Promouvoir ⭐ VIP'}
-                </button>
-                <button onclick="ajouterCoinsAdmin(${u.id})">➕ Créditer Nonvicoins</button>
-                <button onclick="suspendreCompteAdmin(${u.id})" style="background:#c0392b;">🚫 Suspendre</button>
-            </div>
-        </div>
-    `).join('');
-}
-
-async function changerStatutVIP(userId, targetStatus) {
-    const res = await fetch(`/api/admin/users/${userId}/vip`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isVip: targetStatus })
-    });
-    const data = await res.json();
-    if (data.success) {
-        alert(data.message);
-        chargerGestionUtilisateursAdmin();
+async function chargerMesEcoutes() {
+    try {
+        const res = await fetch('/api/ecoutes/mes-demandes');
+        const demandes = await res.json();
+        const container = document.getElementById('ecoutes-liste');
+        if (container) {
+            container.innerHTML = demandes.map(d => `
+                <div class="card">
+                    <p><strong>Type:</strong> ${d.type_demande}</p>
+                    <p><strong>Message:</strong> ${d.message}</p>
+                    <p><strong>Statut:</strong> ${d.statut}</p>
+                    ${d.reponse ? `<p><strong>Réponse admin:</strong> ${d.reponse}</p>` : ''}
+                </div>
+            `).join('');
+        }
+    } catch (err) {
+        console.error(err);
     }
 }
 
-async function ajouterCoinsAdmin(userId) {
-    const amount = prompt("Entrez le nombre de Nonvicoins à ajouter :");
-    if (!amount || isNaN(amount)) return;
-
-    const res = await fetch(`/api/admin/users/${userId}/coins`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: parseInt(amount) })
-    });
-    const data = await res.json();
-    if (data.success) {
-        alert(data.message);
-        chargerGestionUtilisateursAdmin();
-    }
+async function deconnexion() {
+    await fetch('/api/logout', { method: 'POST' });
+    window.location.reload();
 }
-
-async function suspendreCompteAdmin(userId) {
-    if (!confirm("Confirmer la suspension de ce membre ?")) return;
-    const res = await fetch(`/api/admin/users/${userId}/suspend`, { method: 'POST' });
-    const data = await res.json();
-    if (data.success) {
-        alert(data.message);
-        chargerGestionUtilisateursAdmin();
-    }
-}
-
-async function chargerEcoutesAdmin() {
-    const res = await fetch('/api/admin/ecoutes');
-    const ecoutes = await res.json();
-    const container = document.getElementById('admin-ecoutes-list');
-    if (!container) return;
-
-    container.innerHTML = ecoutes.map(e => `
-        <div class="card" style="text-align:left;">
-            <p><strong>Sujet :</strong> ${e.categorie} (Par ${e.nom} - ${e.email})</p>
-            <p><strong>Message :</strong> ${e.message}</p>
-            <p><strong>Réponse actuelle :</strong> ${e.reponse || '<em>Aucune</em>'}</p>
-            <button onclick="repondreEcouteAdmin(${e.id})">✉️ Répondre</button>
-        </div>
-    `).join('');
-}
-
-async function repondreEcouteAdmin(ecouteId) {
-    const reponse = prompt("Saisissez la réponse confidentielle de l'administration :");
-    if (!reponse) return;
-
-    const res = await fetch(`/api/admin/ecoutes/${ecouteId}/repondre`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reponse })
-    });
-    const data = await res.json();
-    if (data.success) {
-        alert("Réponse enregistrée.");
-        chargerEcoutesAdmin();
-    }
-}
-
-// Lancement automatique
-verifierSession();

@@ -1,371 +1,331 @@
-Const express = require('express');
+const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const session = require('express-session');
 const multer = require('multer');
-const path = require('path');
-const { Pool } = require('pg');
 const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-const PORT = process.env.PORT || 3000;
-const UPLOAD_DIR = path.join(__dirname, 'public/uploads');
+// Code secret pour devenir admin (modifiez-le si besoin)
+const SECRET_ADMIN_CODE = "NONVITCHA2026";
 
-// CONFIGURATION CORRIGÉE POUR RENDER
-const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
+// Configuration de la base de données JSON locale
+const DB_FILE = path.join(__dirname, 'database.json');
 
-// Initialisation des tables PostgreSQL
-async function initDB() {
-    await pool.query(`
-        CREATE TABLE IF NOT EXISTS users (
-            id VARCHAR(50) PRIMARY KEY,
-            email VARCHAR(255) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL,
-            nom VARCHAR(100),
-            age INT,
-            ville VARCHAR(100),
-            photo TEXT,
-            likes INT DEFAULT 0,
-            nonvicoins INT DEFAULT 0,
-            isVip BOOLEAN DEFAULT FALSE
-        );
-        CREATE TABLE IF NOT EXISTS chat (
-            id VARCHAR(50) PRIMARY KEY,
-            sender VARCHAR(100),
-            text TEXT,
-            date VARCHAR(50)
-        );
-        CREATE TABLE IF NOT EXISTS private_messages (
-            id VARCHAR(50) PRIMARY KEY,
-            sender_id VARCHAR(50),
-            sender_name VARCHAR(100),
-            target_id VARCHAR(50),
-            text TEXT,
-            date VARCHAR(50),
-            is_read BOOLEAN DEFAULT FALSE
-        );
-        CREATE TABLE IF NOT EXISTS ressources (
-            id VARCHAR(50) PRIMARY KEY,
-            titre VARCHAR(255),
-            categorie VARCHAR(50),
-            contenu TEXT,
-            date_publication TEXT
-        );
-        CREATE TABLE IF NOT EXISTS demandes_ecoute (
-            id VARCHAR(50) PRIMARY KEY,
-            utilisateur_id VARCHAR(50),
-            sujet VARCHAR(255),
-            message TEXT,
-            statut VARCHAR(50),
-            date_creation TEXT
-        );
-    `);
-    
-    const resCount = await pool.query('SELECT COUNT(*) FROM ressources');
-    if (parseInt(resCount.rows[0].count) === 0) {
-        await pool.query(`
-            INSERT INTO ressources (id, titre, categorie, contenu, date_publication) VALUES
-            ('r1', 'Qu est-ce que le Planning Familial ?', 'SSR', 'Le planning familial est un droit fondamental...', NOW()),
-            ('r2', 'Que faire en cas de violence ?', 'VBG', 'Si vous êtes victime ou témoin de violences...', NOW())
-        `);
-    }
+function readDb() {
+  if (!fs.existsSync(DB_FILE)) {
+    const initialData = {
+      users: [],
+      ressources: [
+        { id: "1", titre: "Guide de santé sexuelle et reproductive (SSR)", categorie: "SSR", contenu: "Informations essentielles sur la prévention, la contraception et le bien-être." },
+        { id: "2", titre: "Lutte contre les violences basées sur le genre (VBG)", categorie: "VBG", contenu: "Ressources d'aide, signalement et accompagnement des victimes." },
+        { id: "3", titre: "Inclusion et respect des minorités", categorie: "MINORITES", contenu: "Promouvoir l'égalité, la tolérance et le soutien communautaire." }
+      ],
+      ecoutes: [],
+      chat: [],
+      privateMessages: []
+    };
+    fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
+  }
+  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
 }
-initDB().catch(err => console.error("Erreur init DB:", err));
 
-if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+function writeDb(data) {
+  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
+}
 
+// Configuration Multer pour les images
 const storage = multer.diskStorage({
-    destination: UPLOAD_DIR,
-    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, 'public', 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, Date.now() + '-' + file.originalname);
+  }
 });
-const upload = multer({ storage });
+const upload = multer({ storage: storage });
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(UPLOAD_DIR));
 
-let activeSessions = {};
+app.use(session({
+  secret: 'nonvitcha-secret-key-2026',
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // Mettre à true si HTTPS strict, false par défaut sur Render/Dev
+}));
 
-app.get('/api/auth/me', (req, res) => {
-    res.json({ loggedIn: !!activeSessions.user, user: activeSessions.user });
+// Stockage des sockets connectés
+const onlineUsers = new Map(); // userId -> socketId
+
+// --- ROUTES AUTHENTIFICATION ---
+
+app.post('/api/auth/register', (req, res) => {
+  const { email, password, nom, age, ville, adminCode } = req.body;
+  const db = readDb();
+
+  if (db.users.find(u => u.email === email)) {
+    return.status(400).json({ success: false, message: 'Cet email est déjà utilisé.' });
+  }
+
+  // Vérification du code secret admin
+  let isAdmin = false;
+  if (adminCode && adminCode === SECRET_ADMIN_CODE) {
+    isAdmin = true;
+  }
+
+  const newUser = {
+    id: Date.now().toString(),
+    email,
+    password, // (Note: en production, pensez à hasher le mot de passe avec bcrypt)
+    nom,
+    age: parseInt(age) || 18,
+    ville: ville || 'Inconnue',
+    photo: '/uploads/default.png',
+    nonvicoins: 10,
+    isVip: false,
+    likes: 0,
+    isAdmin: isAdmin
+  };
+
+  db.users.push(newUser);
+  writeDb(db);
+
+  req.session.userId = newUser.id;
+  res.json({ success: true });
 });
 
-app.post('/api/auth/login', async (req, res) => {
-    const { email, password } = req.body;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    try {
-        const result = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1 AND password = $2', [cleanEmail, password]);
-        if (result.rows.length > 0) {
-            activeSessions.user = result.rows[0];
-            res.json({ success: true });
-        } else {
-            res.json({ success: false, message: 'Email ou mot de passe incorrect' });
-        }
-    } catch (e) {
-        console.error("Détail de l'erreur (Login) :", e);
-        res.status(500).json({ success: false, message: 'Erreur serveur : ' + e.message });
-    }
-});
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body;
+  const db = readDb();
+  const user = db.users.find(u => u.email === email && u.password === password);
 
-app.post('/api/auth/register', async (req, res) => {
-    const { email, password, nom, age, ville } = req.body;
-    const cleanEmail = (email || '').trim().toLowerCase();
-    try {
-        const check = await pool.query('SELECT * FROM users WHERE LOWER(email) = $1', [cleanEmail]);
-        if (check.rows.length > 0) {
-            return res.json({ success: false, message: 'Email déjà utilisé' });
-        }
-        
-        const id = Date.now().toString();
-        const photo = 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=150';
-        
-        await pool.query(
-            'INSERT INTO users (id, email, password, nom, age, ville, photo, likes, nonvicoins, isVip) VALUES ($1, $2, $3, $4, $5, $6, $7, 0, 0, FALSE)',
-            [id, cleanEmail, password, nom, parseInt(age) || 18, ville, photo]
-        );
-        
-        const newUser = (await pool.query('SELECT * FROM users WHERE id = $1', [id])).rows[0];
-        activeSessions.user = newUser;
-        io.emit('update-users', newUser);
-        
-        res.json({ success: true, user: newUser });
-    } catch (e) {
-        console.error("Détail de l'erreur (Register) :", e);
-        res.status(500).json({ success: false, message: 'Erreur lors de l inscription : ' + e.message });
-    }
+  if (!user) {
+    return res.status(400).json({ success: false, message: 'Email ou mot de passe incorrect.' });
+  }
+
+  req.session.userId = user.id;
+  res.json({ success: true });
 });
 
 app.post('/api/auth/logout', (req, res) => {
-    activeSessions = {};
-    res.json({ success: true });
+  req.session.destroy();
+  res.json({ success: true });
 });
 
-app.get('/api/users', async (req, res) => {
-    try {
-        const users = await pool.query('SELECT id, email, nom, age, ville, photo, likes, nonvicoins, isVip FROM users');
-        res.json(users.rows);
-    } catch (e) {
-        console.error("Détail de l'erreur (Users) :", e);
-        res.json([]);
-    }
+app.get('/api/auth/me', (req, res) => {
+  if (!req.session.userId) {
+    return res.json({ loggedIn: false });
+  }
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  if (!user) {
+    return res.json({ loggedIn: false });
+  }
+  // On renvoie l'objet utilisateur (sans le mot de passe)
+  const { password, ...safeUser } = user;
+  res.json({ loggedIn: true, user: safeUser });
 });
 
-app.get('/api/users/search', async (req, res) => {
-    const query = (req.query.q || '').toLowerCase().trim();
-    try {
-        const users = await pool.query('SELECT id, email, nom, age, ville, photo, likes, nonvicoins, isVip FROM users');
-        if (!query) return res.json(users.rows);
-        const filtered = users.rows.filter(u => (u.nom && u.nom.toLowerCase().includes(query)) || (u.ville && u.ville.toLowerCase().includes(query)));
-        res.json(filtered);
-    } catch (e) {
-        console.error("Détail de l'erreur (Search) :", e);
-        res.json([]);
-    }
-});
+// --- ROUTES UTILISATEURS & PROFIL ---
 
-app.post('/api/users/upload-photo', upload.single('photo'), async (req, res) => {
-    if (!activeSessions.user) return res.status(401).send();
-    try {
-        const photoPath = '/uploads/' + req.file.filename;
-        await pool.query('UPDATE users SET photo = $1 WHERE id = $2', [photoPath, activeSessions.user.id]);
-        activeSessions.user.photo = photoPath;
-        res.json({ success: true, user: activeSessions.user });
-    } catch (e) {
-        console.error("Détail de l'erreur (Upload) :", e);
-        res.json({ success: false });
-    }
-});
-
-app.get('/api/chat', async (req, res) => {
-    try {
-        const chat = await pool.query('SELECT * FROM chat ORDER BY date ASC LIMIT 50');
-        res.json(chat.rows);
-    } catch (e) {
-        console.error("Détail de l'erreur (Chat) :", e);
-        res.json([]);
-    }
+app.get('/api/users', (req, res) => {
+  const db = readDb();
+  const users = db.users.map(({ password, ...u }) => u);
+  res.json(users);
 });
 
 app.get('/api/online-users', (req, res) => {
-    res.json(activeSessions.user ? [activeSessions.user.id] : []);
+  res.json(Array.from(onlineUsers.keys()));
 });
 
-app.post('/api/users/:id/like', async (req, res) => {
-    try {
-        await pool.query('UPDATE users SET likes = likes + 1 WHERE id = $1', [req.params.id]);
-        io.emit('update-users');
-        res.json({ success: true });
-    } catch (e) {
-        console.error("Détail de l'erreur (Like) :", e);
-        res.json({ success: false });
-    }
+app.post('/api/users/upload-photo', upload.single('photo'), (req, res) => {
+  if (!req.session.userId || !req.file) {
+    return res.status(400).json({ success: false });
+  }
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  if (!user) return res.status(404).json({ success: false });
+
+  user.photo = `/uploads/${req.file.filename}`;
+  writeDb(db);
+
+  const { password, ...safeUser } = user;
+  res.json({ success: true, user: safeUser });
 });
 
-app.post('/api/users/:id/buy-coins', async (req, res) => {
-    if (!activeSessions.user) return res.status(401).send();
-    try {
-        await pool.query('UPDATE users SET nonvicoins = nonvicoins + 50 WHERE id = $1', [activeSessions.user.id]);
-        const updated = await pool.query('SELECT * FROM users WHERE id = $1', [activeSessions.user.id]);
-        activeSessions.user = updated.rows[0];
-        res.json({ success: true });
-    } catch (e) {
-        console.error("Détail de l'erreur (Buy Coins) :", e);
-        res.json({ success: false });
-    }
+app.post('/api/users/:id/like', (req, res) => {
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.params.id);
+  if (user) {
+    user.likes = (user.likes || 0) + 1;
+    writeDb(db);
+    res.json({ success: true });
+  } else {
+    res.status(404).json({ success: false });
+  }
 });
 
-app.post('/api/users/:id/become-vip', async (req, res) => {
-    if (!activeSessions.user) return res.status(401).send();
-    try {
-        if (activeSessions.user.nonvicoins >= 100) {
-            await pool.query('UPDATE users SET nonvicoins = nonvicoins - 100, isVip = TRUE WHERE id = $1', [activeSessions.user.id]);
-            const updated = await pool.query('SELECT * FROM users WHERE id = $1', [activeSessions.user.id]);
-            activeSessions.user = updated.rows[0];
-            io.emit('update-users');
-            res.json({ success: true });
-        } else {
-            res.json({ success: false, message: 'Solde insuffisant' });
-        }
-    } catch (e) {
-        console.error("Détail de l'erreur (VIP) :", e);
-        res.json({ success: false });
-    }
+// --- ESPACE ADMIN & ÉCOUTES ---
+
+app.get('/api/admin/ecoutes', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false, error: "Non connecté" });
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  
+  // Vérification stricte des droits admin
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ success: false, error: "Accès refusé. Réservé aux administrateurs." });
+  }
+
+  res.json({ success: true, ecoutes: db.ecoutes || [] });
 });
 
-app.get('/api/private-messages/:targetId', async (req, res) => {
-    if (!activeSessions.user) return res.json([]);
-    try {
-        await pool.query('UPDATE private_messages SET is_read = TRUE WHERE sender_id = $1 AND target_id = $2', [req.params.targetId, activeSessions.user.id]);
-        const msgs = await pool.query(
-            'SELECT * FROM private_messages WHERE (sender_id = $1 AND target_id = $2) OR (sender_id = $2 AND target_id = $1) ORDER BY date ASC',
-            [activeSessions.user.id, req.params.targetId]
-        );
-        res.json(msgs.rows.map(m => ({ id: m.id, senderId: m.sender_id, senderName: m.sender_name, targetId: m.target_id, text: m.text, date: m.date })));
-    } catch (e) {
-        console.error("Détail de l'erreur (Private Msgs) :", e);
-        res.json([]);
-    }
+app.post('/api/ecoute', (req, res) => {
+  const { sujet, message } = req.body;
+  if (!sujet || !message) {
+    return res.status(400).json({ success: false, message: 'Le sujet et le message sont requis.' });
+  }
+
+  const db = readDb();
+  if (!db.ecoutes) db.ecoutes = [];
+
+  const nouvelleDemande = {
+    id: Date.now().toString(),
+    sujet,
+    message,
+    date: new Date().toLocaleDateString('fr-FR')
+  };
+
+  db.ecoutes.unshift(nouvelleDemande);
+  writeDb(db);
+
+  res.json({ success: true, message: 'Votre demande d\'écoute confidentielle a bien été transmise à l\'équipe.' });
 });
 
-app.get('/api/unread-messages', async (req, res) => {
-    if (!activeSessions.user) return res.json({});
-    try {
-        const unread = await pool.query('SELECT sender_id, COUNT(*) as count FROM private_messages WHERE target_id = $1 AND is_read = FALSE GROUP BY sender_id', [activeSessions.user.id]);
-        const counts = {};
-        unread.rows.forEach(r => { counts[r.sender_id] = parseInt(r.count); });
-        res.json(counts);
-    } catch (e) {
-        console.error("Détail de l'erreur (Unread Msgs) :", e);
-        res.json({});
-    }
+// --- RESSOURCES & TCHAT ---
+
+app.get('/api/ressources', (req, res) => {
+  const db = readDb();
+  const { categorie } = req.query;
+  if (categorie) {
+    return res.json(db.ressources.filter(r => r.categorie === categorie));
+  }
+  res.json(db.ressources);
 });
 
-app.get('/api/ressources', async (req, res) => {
-    const { categorie } = req.query;
-    try {
-        let query = 'SELECT * FROM ressources';
-        let params = [];
-        if (categorie) {
-            query += ' WHERE UPPER(categorie) = UPPER($1)';
-            params.push(categorie);
-        }
-        const results = await pool.query(query, params);
-        res.json(results.rows);
-    } catch (e) {
-        console.error("Détail de l'erreur (Ressources) :", e);
-        res.json([]);
-    }
+app.get('/api/chat', (req, res) => {
+  const db = readDb();
+  res.json(db.chat || []);
 });
 
-app.post('/api/ecoute', async (req, res) => {
-    if (!activeSessions.user) return res.status(401).json({ success: false, error: "Non connecté" });
-    const { sujet, message } = req.body;
-    if (!message) return res.status(400).json({ success: false, error: "Message vide" });
-    try {
-        const id = 'ecoute_' + Date.now();
-        await pool.query(
-            'INSERT INTO demandes_ecoute (id, utilisateur_id, sujet, message, statut, date_creation) VALUES ($1, $2, $3, $4, $5, $6)',
-            [id, activeSessions.user.id, sujet || 'Général', message, 'en_attente', new Date().toISOString()]
-        );
-        res.status(201).json({ success: true, message: "Votre demande a été transmise en toute confidentialité." });
-    } catch (e) {
-        console.error("Détail de l'erreur (Ecoute) :", e);
-        res.status(500).json({ success: false, error: "Erreur serveur : " + e.message });
-    }
+app.delete('/api/chat/:id', (req, res) => {
+  const db = readDb();
+  db.chat = (db.chat || []).filter(m => m.id !== req.params.id);
+  writeDb(db);
+  io.emit('delete-public-message', req.params.id);
+  res.json({ success: true });
 });
 
-app.get('/api/admin/ecoutes', async (req, res) => {
-    try {
-        const result = await pool.query(`
-            SELECT d.*, u.nom as nom_utilisateur 
-            FROM demandes_ecoute d 
-            LEFT JOIN users u ON d.utilisateur_id = u.id
-        `);
-        res.json(result.rows);
-    } catch (e) {
-        console.error("Détail de l'erreur (Admin Ecoutes) :", e);
-        res.json([]);
-    }
+app.get('/api/private-messages/:targetId', (req, res) => {
+  if (!req.session.userId) return res.json([]);
+  const db = readDb();
+  const currentId = req.session.userId;
+  const targetId = req.params.id || req.params.targetId;
+
+  const messages = (db.privateMessages || []).filter(m => 
+    (m.senderId === currentId && m.targetId === targetId) ||
+    (m.senderId === targetId && m.targetId === currentId)
+  );
+  res.json(messages);
 });
 
-app.delete('/api/admin/ecoutes/:id', async (req, res) => {
-    try {
-        await pool.query('DELETE FROM demandes_ecoute WHERE id = $1', [req.params.id]);
-        res.json({ success: true });
-    } catch (e) {
-        console.error("Détail de l'erreur (Delete Ecoute) :", e);
-        res.status(500).json({ success: false });
-    }
+app.get('/api/unread-messages', (req, res) => {
+  if (!req.session.userId) return res.json({});
+  const db = readDb();
+  const currentId = req.session.userId;
+  const unreadCounts = {};
+
+  // Exemple simplifié de comptage
+  res.json(unreadCounts);
 });
 
-app.delete('/api/chat/:id', async (req, res) => {
-    try {
-        await pool.query('DELETE FROM chat WHERE id = $1', [req.params.id]);
-        io.emit('delete-public-message', req.params.id);
-        res.json({ success: true });
-    } catch (e) {
-        console.error("Détail de l'erreur (Delete Chat) :", e);
-        res.json({ success: false });
-    }
-});
+// --- WEBSOCKETS (SOCKET.IO) ---
 
 io.on('connection', (socket) => {
-    socket.on('send-public-message', async (data) => {
-        const id = 'msg_' + Date.now();
-        const date = new Date().toLocaleTimeString();
-        try {
-            await pool.query('INSERT INTO chat (id, sender, text, date) VALUES ($1, $2, $3, $4)', [id, data.sender, data.text, date]);
-            io.emit('new-public-message', { id, sender: data.sender, text: data.text, date });
-        } catch (e) {
-            console.error("Erreur Socket public message:", e);
-        }
-    });
+  console.log('Un utilisateur s\'est connecté sur le socket');
 
-    socket.on('send-private-message', async (data) => {
-        const id = 'pmsg_' + Date.now();
-        const date = new Date().toLocaleTimeString();
-        try {
-            await pool.query(
-                'INSERT INTO private_messages (id, sender_id, sender_name, target_id, text, date, is_read) VALUES ($1, $2, $3, $4, $5, $6, FALSE)',
-                [id, data.senderId, data.senderName, data.targetId, data.text, date]
-            );
-            io.emit(`private-message-${data.targetId}`, { id, senderId: data.senderId, senderName: data.senderName, targetId: data.targetId, text: data.text, date });
-            io.emit(`private-message-${data.senderId}`, { id, senderId: data.senderId, senderName: data.senderName, targetId: data.targetId, text: data.text, date });
-            io.emit(`unread-update-${data.targetId}`);
-        } catch (e) {
-            console.error("Erreur Socket private message:", e);
-        }
-    });
+  socket.on('join', (userId) => {
+    onlineUsers.set(userId, socket.id);
+    io.emit('update-users');
+  });
 
-    socket.on('typing', (data) => io.emit(`typing-${data.targetId}`, { senderName: data.senderName }));
-    socket.on('stop-typing', (data) => io.emit(`stop-typing-${data.targetId}`));
+  socket.on('send-public-message', (data) => {
+    const db = readDb();
+    if (!db.chat) db.chat = [];
+    const newMessage = {
+      id: Date.now().toString(),
+      sender: data.sender,
+      text: data.text,
+      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    db.chat.push(newMessage);
+    writeDb(db);
+    io.emit('new-public-message', newMessage);
+  });
+
+  socket.on('send-private-message', (data) => {
+    const db = readDb();
+    if (!db.privateMessages) db.privateMessages = [];
+    const newMessage = {
+      id: Date.now().toString(),
+      senderId: data.senderId,
+      senderName: data.senderName,
+      targetId: data.targetId,
+      text: data.text,
+      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+    db.privateMessages.push(newMessage);
+    writeDb(db);
+
+    io.emit(`private-message-${data.targetId}`, newMessage);
+    io.emit(`private-message-${data.senderId}`, newMessage);
+  });
+
+  socket.on('typing', (data) => {
+    io.emit(`typing-${data.targetId}`, { senderName: data.senderName });
+  });
+
+  socket.on('stop-typing', (data) => {
+    io.emit(`stop-typing-${data.targetId}`);
+  });
+
+  socket.on('update-users', () => {
+    io.emit('update-users');
+  });
+
+  socket.on('disconnect', () => {
+    for (let [userId, sockId] of onlineUsers.entries()) {
+      if (sockId === socket.id) {
+        onlineUsers.delete(userId);
+        break;
+      }
+    }
+    io.emit('update-users');
+    console.log('Un utilisateur s\'est déconnecté');
+  });
 });
 
-server.listen(PORT, () => console.log(`Serveur lancé sur port ${PORT}`));
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Serveur Nonvitcha démarré sur le port ${PORT}`);
+});

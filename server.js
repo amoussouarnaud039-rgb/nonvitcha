@@ -9,6 +9,10 @@ const bcrypt = require('bcrypt');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// --- CONFIGURATION ADMIN ---
+// Vous pouvez modifier le mot de passe admin ici ou via une variable d'environnement sur Render
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'nonvitchaadmin2026';
+
 // --- CONFIGURATION POSTGRESQL ---
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
@@ -40,15 +44,23 @@ app.use(session({
     secret: 'nonvitcha_secret_key_2026',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // Mettre à true si HTTPS strict avec proxy
+    cookie: { secure: false }
 }));
 
-// Middleware de vérification d'authentification
+// Middleware de vérification d'authentification utilisateur
 function isAuthenticated(req, res, next) {
     if (req.session && req.session.userId) {
         return next();
     }
     res.status(401).json({ success: false, message: 'Non autorisé. Veuillez vous connecter.' });
+}
+
+// Middleware de vérification Administrateur
+function isAdminAuthenticated(req, res, next) {
+    if (req.session && req.session.isAdmin) {
+        return next();
+    }
+    res.status(403).json({ success: false, message: 'Accès refusé. Mot de passe administrateur requis.' });
 }
 
 // ==========================================
@@ -61,7 +73,6 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         const { nom, age, email, password, genre, ville } = req.body;
         const photo = req.file ? `/uploads/${req.file.filename}` : '/uploads/default.png';
         
-        // Hash du mot de passe
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const query = `
@@ -133,6 +144,44 @@ app.get('/api/users', isAuthenticated, async (req, res) => {
     try {
         const result = await pool.query('SELECT id, nom, age, genre, ville, photo, is_vip, is_boosted, bio FROM users ORDER BY is_boosted DESC, id DESC');
         res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ==========================================
+// ROUTES ADMINISTRATION (Par mot de passe global)
+// ==========================================
+
+// Connexion Admin
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    if (password === ADMIN_PASSWORD) {
+        req.session.isAdmin = true;
+        res.json({ success: true, message: 'Connecté en tant qu\'administrateur.' });
+    } else {
+        res.status(401).json({ success: false, message: 'Mot de passe administrateur incorrect.' });
+    }
+});
+
+// Vérifier l'état de la session admin
+app.get('/api/admin/check', (req, res) => {
+    res.json({ success: true, isAdmin: !!req.session.isAdmin });
+});
+
+// Déconnexion Admin
+app.post('/api/admin/logout', (req, res) => {
+    req.session.isAdmin = false;
+    res.json({ success: true });
+});
+
+// Répondre à une écoute (VBG / SOS) en tant qu'admin
+app.post('/api/admin/ecoutes/:id/repondre', isAdminAuthenticated, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reponse } = req.body;
+        await pool.query('UPDATE ecoutes SET reponse = $1 WHERE id = $2', [reponse, id]);
+        res.json({ success: true, message: 'Réponse enregistrée avec succès.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

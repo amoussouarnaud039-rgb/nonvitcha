@@ -1,436 +1,358 @@
-let currentUserId = null;
-let activeChatReceiverId = null;
+const express = require('express');
+const { Pool } = require('pg');
+const session = require('express-session');
+const bcrypt = require('bcrypt');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 
-// Initialisation au chargement de la page
-document.addEventListener('DOMContentLoaded', () => {
-    verifierSession();
-    configurerFormulaires();
+const app = express();
+
+// Création automatique du dossier public/uploads
+const uploadDir = path.join(__dirname, 'public/uploads');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configuration PostgreSQL
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-async function verifierSession() {
-    const res = await fetch('/api/me');
-    const data = await res.json();
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
-    if (data.loggedIn) {
-        currentUserId = data.user.id;
-        document.getElementById('user-coins').innerText = data.user.nonvicoins;
-        document.getElementById('auth-section').style.display = 'none';
-        document.getElementById('nav-bar').style.display = 'flex';
-        naviguerVers('decouverte');
-    } else {
-        document.getElementById('auth-section').style.display = 'block';
-        document.getElementById('nav-bar').style.display = 'none';
-        cacherToutesSections();
-    }
-}
+app.use(session({
+    secret: 'nonvitcha_secret_key_2026',
+    resave: false,
+    saveUninitialized: false,
+    cookie: { maxAge: 24 * 60 * 60 * 1000 }
+}));
 
-function cacherToutesSections() {
-    const sections = ['decouverte-section', 'messages-section', 'chat-section', 'ecoutes-section', 'publicites-section', 'recharge-section', 'admin-section'];
-    sections.forEach(id => document.getElementById(id).style.display = 'none');
-}
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, 'public/uploads/'),
+    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
+});
+const upload = multer({ storage });
 
-function naviguerVers(section) {
-    cacherToutesSections();
-    if (section === 'decouverte') {
-        document.getElementById('decouverte-section').style.display = 'block';
-        chargerUtilisateurs();
-    } else if (section === 'messages') {
-        document.getElementById('messages-section').style.display = 'block';
-    } else if (section === 'chat') {
-        document.getElementById('chat-section').style.display = 'block';
-        chargerChatPublic();
-    } else if (section === 'ecoutes') {
-        document.getElementById('ecoutes-section').style.display = 'block';
-        chargerMesEcoutes();
-    } else if (section === 'publicites') {
-        document.getElementById('publicites-section').style.display = 'block';
-        chargerPublicites();
-    } else if (section === 'recharge') {
-        document.getElementById('recharge-section').style.display = 'block';
-    }
-}
+const isAuthenticated = (req, res, next) => {
+    if (req.session.user) return next();
+    res.status(401).json({ error: 'Non autorisé' });
+};
 
-function configurerFormulaires() {
-    // Inscription avec protection contre la double soumission
-    document.getElementById('form-register')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        if (btn) btn.disabled = true;
+const isAdminAuthenticated = (req, res, next) => {
+    if (req.session.isAdmin) return next();
+    res.status(403).json({ error: 'Accès administrateur refusé' });
+};
 
-        try {
-            const formData = new FormData(e.target);
-            const res = await fetch('/api/register', { method: 'POST', body: formData });
-            const data = await res.json();
+/* --- ROUTES AUTHENTIFICATION --- */
 
-            if (data.success) {
-                alert('Inscription réussie !');
-                verifierSession();
-            } else {
-                alert(data.message || 'Erreur lors de l\'inscription');
-            }
-        } catch (err) {
-            alert('Erreur de connexion au serveur.');
-        } finally {
-            if (btn) btn.disabled = false;
-        }
-    });
-
-    // Connexion
-    document.getElementById('form-login')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData);
-
-        const res = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        const result = await res.json();
-
-        if (result.success) {
-            verifierSession();
-        } else {
-            alert(result.message);
-        }
-    });
-
-    // Formulaire d'écoute
-    document.getElementById('form-ecoute')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const data = Object.fromEntries(formData);
-
-        const res = await fetch('/api/ecoutes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        const result = await res.json();
-        alert(result.message || 'Demande envoyée');
-        e.target.reset();
-        chargerMesEcoutes();
-    });
-
-    // Publicité
-    document.getElementById('form-publicite')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const formData = new FormData(e.target);
-        const res = await fetch('/api/publicites', { method: 'POST', body: formData });
-        const result = await res.json();
-
-        if (result.success) {
-            alert('Annonce publiée !');
-            e.target.reset();
-            chargerPublicites();
-            verifierSession();
-        } else {
-            alert(result.message);
-        }
-    });
-
-    // Chat Privé
-    document.getElementById('form-private-chat')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!activeChatReceiverId) return;
-        const input = document.getElementById('private-message-input');
-        const content = input.value;
-
-        await fetch('/api/messages', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ receiver_id: activeChatReceiverId, content })
-        });
-        input.value = '';
-        chargerDiscussion(activeChatReceiverId);
-    });
-
-    // Chat Public
-    document.getElementById('form-public-chat')?.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const input = document.getElementById('public-message-input');
-        const content = input.value;
-
-        await fetch('/api/chat', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content })
-        });
-        input.value = '';
-        chargerChatPublic();
-    });
-}
-
-// Recherche & Découverte
-async function chargerUtilisateurs(query = '') {
+app.post('/api/register', upload.single('photo'), async (req, res) => {
     try {
-        const url = query ? `/api/users?search=${encodeURIComponent(query)}` : '/api/users';
-        const res = await fetch(url);
-        
-        if (!res.ok) return;
+        const { nom, email, password, age, sexe, ville } = req.body;
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const photoPath = req.file ? `/uploads/${req.file.filename}` : '/uploads/default.png';
 
-        const users = await res.json();
-        const grid = document.getElementById('users-grid');
-        if (!grid) return;
-        grid.innerHTML = '';
-
-        if (users.length === 0) {
-            grid.innerHTML = '<p style="text-align:center; padding:20px;">Aucun autre membre trouvé.</p>';
-            return;
-        }
-
-        users.forEach(u => {
-            const card = document.createElement('div');
-            card.className = 'card';
-            card.innerHTML = `
-                <img src="${u.photo || 'https://via.placeholder.com/150'}" alt="${u.nom}" class="profile-img">
-                <h3>${u.nom}, ${u.age} ans ${u.is_vip ? '⭐ VIP' : ''}</h3>
-                <p>📍 ${u.ville || 'Non renseignée'} ${u.is_online ? '🟢 En ligne' : '🔴 Hors ligne'}</p>
-                <div class="actions" style="margin-top:10px; display:flex; gap:5px; justify-content:center;">
-                    <button onclick="envoyerLike(${u.id}, false)">❤️</button>
-                    <button onclick="envoyerLike(${u.id}, true)">💘 Coup de Cœur</button>
-                    <button onclick="ouvrirDiscussion(${u.id}, '${u.nom}')">💬 Message</button>
-                </div>
-            `;
-            grid.appendChild(card);
-        });
+        const result = await pool.query(
+            `INSERT INTO users (nom, email, password, age, sexe, ville, photo) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, nom, email, nonvicoins, is_vip`,
+            [nom, email, hashedPassword, age, sexe, ville, photoPath]
+        );
+        req.session.user = result.rows[0];
+        res.json({ success: true, user: result.rows[0] });
     } catch (err) {
-        console.error("Erreur chargement utilisateurs:", err);
-    }
-}
-
-function rechercherMembres() {
-    const q = document.getElementById('search-input').value;
-    chargerUtilisateurs(q);
-}
-
-function reinitialiserRecherche() {
-    document.getElementById('search-input').value = '';
-    chargerUtilisateurs();
-}
-
-async function envoyerLike(receiverId, isCoupDeCoeur) {
-    const res = await fetch('/api/like', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ receiver_id: receiverId, is_coup_de_coeur: isCoupDeCoeur })
-    });
-    const data = await res.json();
-    if (data.success) {
-        alert(isCoupDeCoeur ? 'Coup de Cœur envoyé !' : 'Like envoyé !');
-        verifierSession();
-    } else {
-        alert(data.message);
-    }
-}
-
-// Chat Privé
-function ouvrirDiscussion(userId, userNom) {
-    activeChatReceiverId = userId;
-    document.getElementById('chat-with-title').innerText = `Discussion avec ${userNom}`;
-    naviguerVers('messages');
-    chargerDiscussion(userId);
-}
-
-async function chargerDiscussion(userId) {
-    const res = await fetch(`/api/messages/${userId}`);
-    const messages = await res.json();
-    const chatWindow = document.getElementById('private-chat-messages');
-    chatWindow.innerHTML = '';
-
-    messages.forEach(m => {
-        const div = document.createElement('div');
-        div.className = `message-bubble ${m.sender_id === currentUserId ? 'message-self' : 'message-other'}`;
-        div.innerText = m.content;
-        chatWindow.appendChild(div);
-    });
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-}
-
-// Chat Public
-async function chargerChatPublic() {
-    const res = await fetch('/api/chat');
-    const messages = await res.json();
-    const chatWindow = document.getElementById('public-chat-messages');
-    chatWindow.innerHTML = '';
-
-    messages.forEach(m => {
-        const div = document.createElement('div');
-        div.className = `message-bubble ${m.user_id === currentUserId ? 'message-self' : 'message-other'}`;
-        div.innerHTML = `<strong>${m.nom}:</strong> ${m.content}`;
-        chatWindow.appendChild(div);
-    });
-    chatWindow.scrollTop = chatWindow.scrollHeight;
-}
-
-// Écoutes
-async function chargerMesEcoutes() {
-    const res = await fetch('/api/ecoutes/mes-demandes');
-    const demandes = await res.json();
-    const list = document.getElementById('ecoutes-list');
-    list.innerHTML = '';
-
-    demandes.forEach(d => {
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.style.textAlign = 'left';
-        div.style.marginBottom = '10px';
-        div.innerHTML = `
-            <strong>Type:</strong> ${d.type_demande} | <strong>Statut:</strong> ${d.statut}<br>
-            <strong>Message:</strong> ${d.message}<br>
-            ${d.reponse ? `<div style="background:#e8f8f5; padding:8px; margin-top:5px; border-radius:5px;"><strong>Réponse Admin:</strong> ${d.reponse}</div>` : ''}
-        `;
-        list.appendChild(div);
-    });
-}
-
-// Publicités
-async function chargerPublicites() {
-    const res = await fetch('/api/publicites');
-    const pubs = await res.json();
-    const list = document.getElementById('publicites-list');
-    list.innerHTML = '';
-
-    pubs.forEach(p => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        card.innerHTML = `
-            ${p.image ? `<img src="${p.image}" style="width:100%; max-height:150px; object-fit:cover; border-radius:5px;">` : ''}
-            <h3>${p.titre}</h3>
-            <p>${p.description}</p>
-            <small>Par : ${p.nom}</small>
-        `;
-        list.appendChild(card);
-    });
-}
-
-// Paiement Kkiapay
-function payerKkiapay(montant) {
-    openKkiapayWidget({
-        amount: montant,
-        position: "center",
-        callback: "reponseKkiapay",
-        theme: "#e74c3c",
-        key: "VOTRE_CLE_PUBLIQUE_KKIAPAY"
-    });
-}
-
-function reponseKkiapay(response) {
-    fetch('/api/kkiapay/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionId: response.transactionId, amount: response.amount })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert('Recharge effectuée avec succès !');
-            verifierSession();
+        console.error("Erreur inscription:", err.message);
+        if (err.code === '23505') {
+            res.status(400).json({ success: false, message: 'Cette adresse email est déjà enregistrée.' });
+        } else {
+            res.status(500).json({ success: false, message: 'Erreur serveur: ' + err.message });
         }
-    });
-}
+    }
+});
 
-// Administration
-function ouvrirAdminModal() {
-    cacherToutesSections();
-    document.getElementById('admin-section').style.display = 'block';
-}
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (result.rows.length === 0) return res.status(400).json({ success: false, message: 'Identifiants incorrects' });
 
-async function connexionAdmin() {
-    const pass = document.getElementById('admin-pass-input').value;
-    const res = await fetch('/api/admin/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pass })
-    });
-    const data = await res.json();
+        const user = result.rows[0];
+        if (user.is_suspended) return res.status(403).json({ success: false, message: 'Compte suspendu' });
 
-    if (data.success) {
-        document.getElementById('admin-login-box').style.display = 'none';
-        document.getElementById('admin-dashboard').style.display = 'block';
-        chargerAdminDashboard();
+        const match = await bcrypt.compare(password, user.password);
+        if (match) {
+            await pool.query('UPDATE users SET last_seen = NOW() WHERE id = $1', [user.id]);
+            req.session.user = { id: user.id, nom: user.nom, email: user.email, nonvicoins: user.nonvicoins, is_vip: user.is_vip };
+            res.json({ success: true, user: req.session.user });
+        } else {
+            res.status(400).json({ success: false, message: 'Identifiants incorrects' });
+        }
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+});
+
+app.get('/api/me', (req, res) => {
+    if (req.session.user) {
+        res.json({ loggedIn: true, user: req.session.user });
     } else {
-        alert(data.message);
+        res.json({ loggedIn: false });
     }
-}
+});
 
-async function chargerAdminDashboard() {
-    // Charger la liste des utilisateurs
-    const resUsers = await fetch('/api/admin/users');
-    const users = await resUsers.json();
-    const usersDiv = document.getElementById('admin-users-list');
-    usersDiv.innerHTML = '';
+app.post('/api/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ success: true });
+});
 
-    users.forEach(u => {
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.style.marginBottom = '10px';
-        div.style.textAlign = 'left';
-        div.innerHTML = `
-            <strong>${u.nom}</strong> (${u.email}) - Coins: ${u.nonvicoins}<br>
-            VIP: ${u.is_vip ? 'Oui' : 'Non'} | Suspendu: ${u.is_suspended ? 'Oui' : 'Non'}
-            <div style="margin-top:5px; display:flex; gap:5px; flex-wrap:wrap;">
-                <button onclick="actionAdmin(${u.id}, 'toggle_vip', ${!u.is_vip})">${u.is_vip ? 'Retirer VIP' : 'Rendre VIP'}</button>
-                <button onclick="actionAdmin(${u.id}, 'toggle_suspend', ${!u.is_suspended})">${u.is_suspended ? 'Débloquer' : 'Suspendre'}</button>
-                <button onclick="actionAdmin(${u.id}, 'add_coins', 100)">+100 Coins</button>
-                <button onclick="supprimerCompteAdmin(${u.id})" style="background:#c0392b;">Supprimer le compte</button>
-            </div>
-        `;
-        usersDiv.appendChild(div);
-    });
+/* --- ROUTES MEMBRES & RECHERCHE --- */
 
-    // Charger les demandes d'écoute
-    const resEcoutes = await fetch('/api/admin/ecoutes');
-    const ecoutes = await resEcoutes.json();
-    const ecoutesDiv = document.getElementById('admin-ecoutes-list');
-    ecoutesDiv.innerHTML = '';
+app.get('/api/users', isAuthenticated, async (req, res) => {
+    try {
+        const { search } = req.query;
+        let query = `SELECT id, nom, age, sexe, ville, photo, is_vip, 
+                            (last_seen > NOW() - INTERVAL '5 minutes') as is_online 
+                     FROM users WHERE id != $1 AND is_suspended = FALSE`;
+        let params = [req.session.user.id];
 
-    ecoutes.forEach(e => {
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.style.marginBottom = '10px';
-        div.style.textAlign = 'left';
-        div.innerHTML = `
-            <strong>Utilisateur:</strong> ${e.nom} (${e.email})<br>
-            <strong>Type:</strong> ${e.type_demande} | <strong>Statut:</strong> ${e.statut}<br>
-            <strong>Message:</strong> ${e.message}<br>
-            <textarea id="reponse-ecoute-${e.id}" placeholder="Réponse de l'administration..."></textarea>
-            <button onclick="repondreEcouteAdmin(${e.id})" style="margin-top:5px;">Envoyer la réponse</button>
-        `;
-        ecoutesDiv.appendChild(div);
-    });
-}
+        if (search && search.trim() !== '') {
+            query += ` AND (LOWER(nom) LIKE LOWER($2) OR LOWER(ville) LIKE LOWER($2))`;
+            params.push(`%${search.trim()}%`);
+        }
 
-async function actionAdmin(userId, action, value) {
-    await fetch('/api/admin/users/action', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, action, value })
-    });
-    chargerAdminDashboard();
-}
-
-async function supprimerCompteAdmin(userId) {
-    if (!confirm("Voulez-vous supprimer définitivement ce compte ? Cela libérera son adresse email.")) return;
-    const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE' });
-    const data = await res.json();
-    if (data.success) {
-        alert(data.message);
-        chargerAdminDashboard();
+        query += ` ORDER BY last_seen DESC`;
+        const result = await pool.query(query, params);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
-}
+});
 
-async function repondreEcouteAdmin(ecouteId) {
-    const reponse = document.getElementById(`reponse-ecoute-${ecouteId}`).value;
-    await fetch('/api/admin/ecoutes/repondre', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ecouteId, reponse })
-    });
-    alert('Réponse transmise');
-    chargerAdminDashboard();
-}
+/* --- INTERACTIONS --- */
 
-function deconnexion() {
-    fetch('/api/logout', { method: 'POST' }).then(() => location.reload());
-}
+app.post('/api/like', isAuthenticated, async (req, res) => {
+    try {
+        const { receiver_id, is_coup_de_coeur } = req.body;
+        const sender_id = req.session.user.id;
+
+        if (is_coup_de_coeur) {
+            const userRes = await pool.query('SELECT nonvicoins FROM users WHERE id = $1', [sender_id]);
+            if (userRes.rows[0].nonvicoins < 10) {
+                return res.status(400).json({ success: false, message: 'Nonvicoins insuffisants' });
+            }
+            await pool.query('UPDATE users SET nonvicoins = nonvicoins - 10 WHERE id = $1', [sender_id]);
+        }
+
+        await pool.query(
+            `INSERT INTO likes (sender_id, receiver_id, is_coup_de_coeur) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
+            [sender_id, receiver_id, is_coup_de_coeur]
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/messages/:receiver_id', isAuthenticated, async (req, res) => {
+    try {
+        const sender_id = req.session.user.id;
+        const { receiver_id } = req.params;
+        const result = await pool.query(
+            `SELECT * FROM messages 
+             WHERE (sender_id = $1 AND receiver_id = $2) OR (sender_id = $2 AND receiver_id = $1)
+             ORDER BY created_at ASC`,
+            [sender_id, receiver_id]
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/messages', isAuthenticated, async (req, res) => {
+    try {
+        const { receiver_id, content } = req.body;
+        const sender_id = req.session.user.id;
+        const result = await pool.query(
+            `INSERT INTO messages (sender_id, receiver_id, content) VALUES ($1, $2, $3) RETURNING *`,
+            [sender_id, receiver_id, content]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/chat', isAuthenticated, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT p.*, u.nom FROM public_chat p JOIN users u ON p.user_id = u.id ORDER BY p.created_at ASC LIMIT 50`
+        );
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/chat', isAuthenticated, async (req, res) => {
+    try {
+        const { content } = req.body;
+        const user_id = req.session.user.id;
+        const result = await pool.query(
+            `INSERT INTO public_chat (user_id, content) VALUES ($1, $2) RETURNING *`,
+            [user_id, content]
+        );
+        res.json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/ecoutes', isAuthenticated, async (req, res) => {
+    try {
+        const { type_demande, message } = req.body;
+        const user_id = req.session.user.id;
+        await pool.query(
+            `INSERT INTO ecoutes (user_id, type_demande, message) VALUES ($1, $2, $3)`,
+            [user_id, type_demande, message]
+        );
+        res.json({ success: true, message: 'Votre demande d’écoute a été envoyée.' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/ecoutes/mes-demandes', isAuthenticated, async (req, res) => {
+    try {
+        const result = await pool.query(`SELECT * FROM ecoutes WHERE user_id = $1 ORDER BY created_at DESC`, [req.session.user.id]);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/publicites', isAuthenticated, async (req, res) => {
+    try {
+        const result = await pool.query(`SELECT p.*, u.nom FROM publicites p JOIN users u ON p.user_id = u.id ORDER BY p.created_at DESC`);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/publicites', isAuthenticated, upload.single('image'), async (req, res) => {
+    try {
+        const { titre, description } = req.body;
+        const user_id = req.session.user.id;
+        const imagePath = req.file ? `/uploads/${req.file.filename}` : null;
+
+        const userRes = await pool.query('SELECT nonvicoins FROM users WHERE id = $1', [user_id]);
+        if (userRes.rows[0].nonvicoins < 50) {
+            return res.status(400).json({ success: false, message: 'Frais de publication : 50 Nonvicoins requis.' });
+        }
+
+        await pool.query('UPDATE users SET nonvicoins = nonvicoins - 50 WHERE id = $1', [user_id]);
+        await pool.query(`INSERT INTO publicites (user_id, titre, description, image) VALUES ($1, $2, $3, $4)`, [user_id, titre, description, imagePath]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/kkiapay/verify', isAuthenticated, async (req, res) => {
+    try {
+        const { amount } = req.body;
+        const user_id = req.session.user.id;
+
+        let coinsToAdd = 0;
+        if (amount >= 5000) coinsToAdd = 600;
+        else if (amount >= 2000) coinsToAdd = 220;
+        else if (amount >= 1000) coinsToAdd = 100;
+
+        await pool.query('UPDATE users SET nonvicoins = nonvicoins + $1 WHERE id = $2', [coinsToAdd, user_id]);
+        req.session.user.nonvicoins += coinsToAdd;
+
+        res.json({ success: true, newBalance: req.session.user.nonvicoins });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/* --- ADMIN --- */
+
+app.post('/api/admin/login', (req, res) => {
+    const { password } = req.body;
+    if (password === 'NONVITCHA2026') {
+        req.session.isAdmin = true;
+        res.json({ success: true });
+    } else {
+        res.status(401).json({ success: false, message: 'Mot de passe incorrect' });
+    }
+});
+
+app.get('/api/admin/users', isAdminAuthenticated, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT id, nom, email, age, ville, is_vip, is_suspended, nonvicoins FROM users ORDER BY id DESC');
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/users/action', isAdminAuthenticated, async (req, res) => {
+    try {
+        const { userId, action, value } = req.body;
+        if (action === 'toggle_vip') {
+            await pool.query('UPDATE users SET is_vip = $1 WHERE id = $2', [value, userId]);
+        } else if (action === 'toggle_suspend') {
+            await pool.query('UPDATE users SET is_suspended = $1 WHERE id = $2', [value, userId]);
+        } else if (action === 'add_coins') {
+            await pool.query('UPDATE users SET nonvicoins = nonvicoins + $1 WHERE id = $2', [value, userId]);
+        }
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.delete('/api/admin/users/:id', isAdminAuthenticated, async (req, res) => {
+    try {
+        const userId = req.params.id;
+        await pool.query('DELETE FROM likes WHERE sender_id = $1 OR receiver_id = $1', [userId]);
+        await pool.query('DELETE FROM messages WHERE sender_id = $1 OR receiver_id = $1', [userId]);
+        await pool.query('DELETE FROM public_chat WHERE user_id = $1', [userId]);
+        await pool.query('DELETE FROM ecoutes WHERE user_id = $1', [userId]);
+        await pool.query('DELETE FROM publicites WHERE user_id = $1', [userId]);
+        await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/ecoutes', isAdminAuthenticated, async (req, res) => {
+    try {
+        const result = await pool.query(`SELECT e.*, u.nom, u.email FROM ecoutes e JOIN users u ON e.user_id = u.id ORDER BY e.created_at DESC`);
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/ecoutes/repondre', isAdminAuthenticated, async (req, res) => {
+    try {
+        const { ecouteId, reponse } = req.body;
+        await pool.query('UPDATE ecoutes SET reponse = $1, statut = $2 WHERE id = $3', [reponse, 'Traité', ecouteId]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Serveur démarré sur le port ${PORT}`);
+});

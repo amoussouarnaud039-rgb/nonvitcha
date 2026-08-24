@@ -4,6 +4,12 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
+const { FedaPay, Transaction } = require('fedapay');
+
+// Charger les variables d'environnement depuis .env
+require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,20 +17,27 @@ const DB_FILE = path.join(__dirname, 'database.json');
 
 const ADMIN_SECRET_KEY = "admin2026";
 
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'public', 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
+// --- CONFIGURATION CLOUDINARY ---
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'nonvitcha_profiles',
+    allowed_formats: ['jpg', 'png', 'jpeg'],
   },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
 });
 const upload = multer({ storage: storage });
+
+// --- CONFIGURATION FEDAPAY ---
+if (process.env.FEDAPAY_SECRET_KEY) {
+  FedaPay.setApiKey(process.env.FEDAPAY_SECRET_KEY);
+  FedaPay.setEnvironment(process.env.FEDAPAY_ENVIRONMENT || 'live');
+}
 
 function readDb() {
   if (!fs.existsSync(DB_FILE)) {
@@ -90,7 +103,7 @@ app.post('/api/register', upload.single('photo'), (req, res) => {
     age: age ? parseInt(age) : '',
     ville: ville ? ville.trim().toLowerCase() : '',
     villeOriginale: ville || '',
-    photo: req.file ? `/uploads/${req.file.filename}` : '/uploads/default.png',
+    photo: req.file ? req.file.path : 'https://res.cloudinary.com/scp7oawl/image/upload/v1/nonvitcha_profiles/default.png',
     nonvicoins: 100,
     likes: [],
     isVip: false,
@@ -161,7 +174,6 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// Route pour changer la photo de profil
 app.post('/api/user/photo', upload.single('photo'), (req, res) => {
   if (!req.session.userId) return res.status(401).json({ success: false });
   if (!req.file) return res.status(400).json({ success: false, message: 'Aucune image fournie.' });
@@ -170,7 +182,7 @@ app.post('/api/user/photo', upload.single('photo'), (req, res) => {
   const user = db.users.find(u => u.id === req.session.userId);
   if (!user) return res.status(404).json({ success: false });
 
-  user.photo = `/uploads/${req.file.filename}`;
+  user.photo = req.file.path;
   writeDb(db);
 
   const { password: _, ...safeUser } = user;
@@ -193,9 +205,9 @@ app.post('/api/users/like', (req, res) => {
   const index = user.likes.indexOf(targetUserId);
 
   if (index > -1) {
-    user.likes.splice(index, 1); // Unlike
+    user.likes.splice(index, 1);
   } else {
-    user.likes.push(targetUserId); // Like
+    user.likes.push(targetUserId);
   }
 
   writeDb(db);
@@ -203,7 +215,7 @@ app.post('/api/users/like', (req, res) => {
   res.json({ success: true, user: safeUser, liked: index === -1 });
 });
 
-// --- VIP ---
+// --- VIP & PAIEMENT FEDAPAY ---
 
 app.post('/api/vip/upgrade', (req, res) => {
   if (!req.session.userId) return res.status(401).json({ success: false, message: 'Non connecté.' });

@@ -276,7 +276,7 @@
         if (data.success) {
           currentUser = data.user;
           document.getElementById('user-avatar').src = currentUser.photo;
-          alert("Photo de profil mise à jour avec succès !");
+          alert("Photo de profil mise à jour avec succès sur Cloudinary !");
           loadUsers();
         } else {
           alert(data.message || "Erreur lors du changement de photo.");

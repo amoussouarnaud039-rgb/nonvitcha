@@ -3,156 +3,240 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nonvitcha - Rencontres & Solidaire</title>
+    <title>Nonvitcha - Rencontres & Solidarité</title>
+    <!-- Police Plus Jakarta Sans -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Feuille de style personnalisée -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <header>
-        <h1>Nonvitcha</h1>
-        <div id="nav-bar" style="display: none;">
-            <button onclick="naviguerVers('decouverte')">🔍 Découverte</button>
-            <button onclick="naviguerVers('messages')">💬 Discussions Privées</button>
-            <button onclick="naviguerVers('chat')">🌐 Tchat Public</button>
-            <button onclick="naviguerVers('publicites')">📢 Publicités</button>
-            <button onclick="naviguerVers('ecoutes')">🎧 Écoute SOS</button>
-            <button onclick="naviguerVers('recharge')">💰 Nonvicoins (<span id="user-coins">0</span>)</button>
-            <button onclick="naviguerVers('admin')">🔑 Admin</button>
-            <button onclick="deconnexion()" style="background-color: #dc3545;">Déconnexion</button>
+    <!-- EN-TÊTE ET NAVIGATION -->
+    <header class="app-header">
+        <div class="header-container">
+            <div class="logo">
+                <i class="fa-solid fa-heart-pulse"></i> Nonvitcha
+            </div>
+            <nav class="nav-links" id="nav-menu">
+                <!-- Navigation dynamique générée par JS selon le statut de connexion -->
+                <button class="nav-btn active" onclick="showSection('auth-section')">
+                    <i class="fa-solid fa-right-to-bracket"></i> Connexion
+                </button>
+            </nav>
         </div>
     </header>
 
-    <main class="container">
+    <!-- CONTENU PRINCIPAL -->
+    <main class="main-content">
 
-        <!-- AUTHENTIFICATION -->
-        <div id="auth-section">
-            <h2>Connexion</h2>
-            <form id="form-login">
-                <input type="email" id="login-email" placeholder="Votre Email" required>
-                <input type="password" id="login-password" placeholder="Mot de passe" required>
-                <button type="submit" style="background-color: #007bff; color: white; width: 100%; padding: 10px; border: none; border-radius: 5px; cursor: pointer;">Se connecter</button>
-            </form>
+        <!-- SECTION 1 : AUTHENTIFICATION & INSCRIPTION -->
+        <section id="auth-section" class="page-section">
+            <div class="auth-card">
+                <div class="auth-header">
+                    <h2>Bienvenue sur Nonvitcha</h2>
+                    <p>La plateforme de rencontres, d'échanges et d'écoute solidaire.</p>
+                </div>
+                <div class="auth-grid">
+                    <!-- Connexion -->
+                    <div class="auth-box">
+                        <h3><i class="fa-solid fa-key"></i> Connexion</h3>
+                        <form id="login-form">
+                            <div class="input-group">
+                                <i class="fa-solid fa-envelope"></i>
+                                <input type="email" id="login-email" placeholder="Adresse Email" required>
+                            </div>
+                            <div class="input-group">
+                                <i class="fa-solid fa-lock"></i>
+                                <input type="password" id="login-password" placeholder="Mot de passe" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-full">Se connecter</button>
+                        </form>
+                    </div>
 
-            <hr style="margin: 25px 0;">
+                    <div class="auth-divider"></div>
 
-            <h2>Inscription</h2>
-            <form id="form-register" enctype="multipart/form-data">
-                <input type="text" name="nom" placeholder="Nom complet" required>
-                <input type="email" name="email" placeholder="Votre Email" required>
-                <input type="password" name="password" placeholder="Mot de passe" required>
-                <input type="number" name="age" placeholder="Âge" required>
-                <select name="sexe" required>
-                    <option value="Homme">Homme</option>
-                    <option value="Femme">Femme</option>
-                </select>
-                <input type="text" name="ville" placeholder="Ville" required>
-                <label style="display:block; margin-top:10px;">Photo de profil :</label>
-                <input type="file" name="photo" accept="image/*">
-                <button type="submit" style="background-color: #28a745; color: white; width: 100%; padding: 10px; border: none; border-radius: 5px; margin-top: 15px; cursor: pointer;">S'inscrire</button>
-            </form>
-        </div>
+                    <!-- Inscription -->
+                    <div class="auth-box">
+                        <h3><i class="fa-solid fa-user-plus"></i> Créer un compte</h3>
+                        <form id="register-form" enctype="multipart/form-data">
+                            <div class="input-group">
+                                <i class="fa-solid fa-user"></i>
+                                <input type="text" name="nom" placeholder="Nom complet ou Pseudo" required>
+                            </div>
+                            <div class="input-group">
+                                <i class="fa-solid fa-envelope"></i>
+                                <input type="email" name="email" placeholder="Adresse Email" required>
+                            </div>
+                            <div class="input-group">
+                                <i class="fa-solid fa-lock"></i>
+                                <input type="password" name="password" placeholder="Mot de passe" required>
+                            </div>
+                            <div class="input-row">
+                                <div class="input-group">
+                                    <i class="fa-solid fa-cake-candles"></i>
+                                    <input type="number" name="age" placeholder="Âge" min="18" required>
+                                </div>
+                                <div class="input-group">
+                                    <i class="fa-solid fa-venus-mars"></i>
+                                    <select name="sexe" required>
+                                        <option value="" disabled selected>Sexe</option>
+                                        <option value="Homme">Homme</option>
+                                        <option value="Femme">Femme</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <i class="fa-solid fa-location-dot"></i>
+                                <input type="text" name="ville" placeholder="Ville" required>
+                            </div>
+                            <div class="file-upload-group">
+                                <label for="photo"><i class="fa-solid fa-image"></i> Photo de profil :</label>
+                                <input type="file" id="photo" name="photo" accept="image/*" required>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-full">S'inscrire (50 Nonvicoins offerts)</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-        <!-- RECHERCHE & DÉCOUVERTE (Cartes, Likes, Coups de cœur, Statut En ligne) -->
-        <div id="decouverte-section" style="display: none;">
-            <h2>Membres à proximité</h2>
-            <input type="text" id="search-input" placeholder="Rechercher par nom ou ville..." oninput="chargerMembres(this.value)" style="width:100%; padding:10px; margin-bottom:15px;">
-            <div id="membres-list" class="grid-container"></div>
-        </div>
+        <!-- SECTION 2 : MEMBRES & RECHERCHE -->
+        <section id="members-section" class="page-section" style="display: none;">
+            <div class="content-card">
+                <div class="input-group">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="search-input" placeholder="Rechercher par nom ou par ville..." onkeyup="filterUsers()">
+                </div>
+            </div>
+            <div class="cards-grid" id="members-container">
+                <!-- Chargé dynamiquement via JavaScript -->
+            </div>
+        </section>
 
-        <!-- DISCUSSIONS PRIVÉES & CHAT 1-À-1 -->
-        <div id="messages-section" style="display: none;">
-            <h2>Vos Discussions Privées</h2>
-            <div id="conversations-list" style="margin-bottom:20px;"></div>
-
-            <div id="private-chat-container" style="display: none; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
-                <button onclick="fermerDiscussionPrivee()">⬅️ Retour à la liste</button>
-                <h3 id="chat-with-name" style="margin-top:10px;">Discussion</h3>
-                
-                <div id="private-messages-box" style="height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin: 10px 0; background: #f9f9f9;"></div>
-                
-                <!-- Indicateur "En train d'écrire..." -->
-                <div id="typing-indicator" style="font-style: italic; color: #888; height: 20px; font-size: 0.9em;"></div>
-
-                <form id="form-private-message" style="display: flex; gap: 10px;">
-                    <input type="hidden" id="active-receiver-id">
-                    <input type="text" id="private-message-input" placeholder="Écrire un message privé..." required oninput="notifierSaisie()" style="flex: 1; padding: 8px;">
-                    <button type="submit" style="background-color: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px;">Envoyer</button>
+        <!-- SECTION 3 : TCHAT PRIVÉ EN TEMPS RÉEL -->
+        <section id="private-chat-section" class="page-section" style="display: none;">
+            <div class="chat-card">
+                <div class="chat-header">
+                    <button class="btn btn-secondary btn-sm" onclick="showSection('members-section')">
+                        <i class="fa-solid fa-arrow-left"></i> Retour
+                    </button>
+                    <h3 id="chat-target-name">Discussion</h3>
+                </div>
+                <div class="messages-viewport" id="private-messages-viewport">
+                    <!-- Messages affichés dynamiquement -->
+                </div>
+                <form id="private-chat-form" class="chat-input-bar">
+                    <input type="text" id="private-message-input" placeholder="Écrivez votre message..." required>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
                 </form>
             </div>
-        </div>
+        </section>
 
-        <!-- TCHAT PUBLIC -->
-        <div id="chat-section" style="display: none;">
-            <h2>Tchat Public</h2>
-            <div id="chat-box" style="height: 300px; overflow-y: scroll; border: 1px solid #ccc; padding: 10px; margin-bottom: 10px; background: #f9f9f9;"></div>
-            <form id="form-chat" style="display: flex; gap: 10px;">
-                <input type="text" id="chat-input" placeholder="Écrivez votre message public..." required style="flex: 1; padding: 8px;">
-                <button type="submit" style="background-color: #007bff; color: white; border: none; padding: 8px 15px; border-radius: 4px;">Envoyer</button>
-            </form>
-        </div>
-
-        <!-- MONÉTISATION & PUBLICITÉS (Frais en Nonvicoins) -->
-        <div id="publicites-section" style="display: none;">
-            <h2>Espace Annonces & Publicités</h2>
-            <form id="form-publicite" enctype="multipart/form-data" style="margin-bottom: 20px; border: 1px solid #ddd; padding: 15px; border-radius: 8px;">
-                <h3>Publier une annonce (Coût : 50 Nonvicoins)</h3>
-                <input type="text" name="titre" placeholder="Titre de l'annonce" required style="width:100%; margin-bottom:10px; padding:8px;">
-                <textarea name="description" placeholder="Description de l'offre ou du service..." required style="width:100%; margin-bottom:10px; padding:8px;"></textarea>
-                <input type="file" name="image" accept="image/*" style="margin-bottom:10px;">
-                <button type="submit" style="background-color:#28a745; color:white; border:none; padding:10px 15px; border-radius:4px; cursor:pointer;">Publier l'annonce</button>
-            </form>
-            <hr>
-            <div id="publicites-list"></div>
-        </div>
-
-        <!-- ÉCOUTE SOS / VBG -->
-        <div id="ecoutes-section" style="display: none;">
-            <h2>Espace d'Écoute et de Soutien Confidentiel</h2>
-            <form id="form-ecoute">
-                <select id="ecoute-type" required style="width:100%; margin-bottom:10px; padding:8px;">
-                    <option value="Besoin d'écoute">Besoin d'écoute général</option>
-                    <option value="Signalement VBG">Signalement de Violence (VBG)</option>
-                    <option value="Assistance Psychologique">Assistance Psychologique</option>
-                </select>
-                <textarea id="ecoute-message" placeholder="Décrivez votre situation confidentiellement..." required style="width:100%; margin-bottom:10px; padding:8px;"></textarea>
-                <button type="submit" style="background-color: #17a2b8; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer;">Envoyer la demande</button>
-            </form>
-            <hr>
-            <h3>Mes demandes envoyées</h3>
-            <div id="ecoutes-liste"></div>
-        </div>
-
-        <!-- MONÉTISATION & RECHARGE NONVICOINS (Kkiapay) -->
-        <div id="recharge-section" style="display: none;">
-            <h2>Recharger mes Nonvicoins</h2>
-            <p>Solde actuel : <strong><span id="recharge-user-coins">0</span> Nonvicoins</strong></p>
-            <p>Les Nonvicoins vous permettent d'envoyer des Coups de Cœur (10 coins) et de publier des annonces (50 coins).</p>
-            <div class="tarifs" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 15px;">
-                <button onclick="payerKkiapay(1000)" style="padding:12px 20px; background-color:#28a745; color:white; border:none; border-radius:5px; cursor:pointer;">1 000 FCFA (100 Coins)</button>
-                <button onclick="payerKkiapay(2000)" style="padding:12px 20px; background-color:#28a745; color:white; border:none; border-radius:5px; cursor:pointer;">2 000 FCFA (220 Coins)</button>
-                <button onclick="payerKkiapay(5000)" style="padding:12px 20px; background-color:#28a745; color:white; border:none; border-radius:5px; cursor:pointer;">5 000 FCFA (600 Coins)</button>
+        <!-- SECTION 4 : ÉCOUTE SOS & SANTÉ SEXUELLE ET REPRODUCTIVE (SSR) -->
+        <section id="ecoutes-section" class="page-section" style="display: none;">
+            <div class="sos-banner">
+                <i class="fa-solid fa-user-nurse"></i>
+                <div>
+                    <h2>Salle d'Écoute Confidentielle & SSR</h2>
+                    <p>Un espace sécurisé pour poser vos questions, demander du soutien ou échanger avec nos conseillers en toute confidentialité.</p>
+                </div>
             </div>
-        </div>
 
-        <!-- PANNEAU ADMIN -->
-        <div id="admin-section" style="display: none;">
-            <h2>Espace Administration</h2>
-            <div id="admin-login-box">
-                <input type="password" id="admin-password" placeholder="Mot de passe Administrateur" style="padding:8px; margin-right:10px;">
-                <button onclick="connexionAdmin()" style="padding:8px 15px;">Se connecter comme Admin</button>
+            <div class="content-card">
+                <h3>Envoyer une demande d'assistance</h3>
+                <form id="ecoute-form" style="margin-top: 1rem;">
+                    <div class="input-group">
+                        <i class="fa-solid fa-list"></i>
+                        <select id="ecoute-type" required>
+                            <option value="" disabled selected>Type de demande</option>
+                            <option value="Soutien Psychologique">Soutien Psychologique / SOS</option>
+                            <option value="Santé Sexuelle et Reproductive">Santé Sexuelle et Reproductive (SSR)</option>
+                            <option value="Conseil Matrimonial">Conseil Matrimonial & Relations</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <i class="fa-solid fa-comment-dots"></i>
+                        <textarea id="ecoute-message" rows="4" placeholder="Expliquez en détail ce que vous traversez..." required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-info"><i class="fa-solid fa-shield-heart"></i> Envoyer la demande</button>
+                </form>
             </div>
-            <div id="admin-dashboard" style="display: none; margin-top: 20px;">
-                <h3>Gestion des Utilisateurs</h3>
-                <div id="admin-users-list"></div>
-                <hr style="margin:20px 0;">
-                <h3>Demandes d'écoute à traiter</h3>
-                <div id="admin-ecoutes-list"></div>
+
+            <div class="content-card">
+                <h3>Historique de mes demandes</h3>
+                <div class="ecoutes-grid" id="my-ecoutes-container">
+                    <!-- Réponses du staff affichées ici -->
+                </div>
             </div>
-        </div>
+        </section>
+
+        <!-- SECTION 5 : TCHAT PUBLIC -->
+        <section id="public-chat-section" class="page-section" style="display: none;">
+            <div class="chat-card">
+                <div class="chat-header">
+                    <h3><i class="fa-solid fa-comments"></i> Forum & Salon Général</h3>
+                </div>
+                <div class="messages-viewport" id="public-messages-viewport">
+                    <!-- Chat public dynamique -->
+                </div>
+                <form id="public-chat-form" class="chat-input-bar">
+                    <input type="text" id="public-message-input" placeholder="Participez à la discussion commune..." required>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
+                </form>
+            </div>
+        </section>
+
+        <!-- SECTION 6 : BOUTIQUE & RECHARGE NONVICOINS -->
+        <section id="recharge-section" class="page-section" style="display: none;">
+            <div class="recharge-card">
+                <h2>Recharger vos Nonvicoins</h2>
+                <p>Obtenez des jetons pour envoyer des messages privés, déclencher des Coups de Cœur ou débloquer le statut VIP.</p>
+                
+                <div class="balance-badge">
+                    <i class="fa-solid fa-coins"></i> Solde actuel : <span id="current-coins-display">0</span> Nonvicoins
+                </div>
+
+                <div class="pricing-grid">
+                    <div class="price-box" onclick="triggerKkiaPay(1000)">
+                        <div class="coins-amount">100 Nonvicoins</div>
+                        <div class="price">1 000 FCFA</div>
+                        <button class="btn btn-primary btn-sm btn-full">Acheter</button>
+                    </div>
+                    <div class="price-box popular" onclick="triggerKkiaPay(2000)">
+                        <div class="tag">Populaire</div>
+                        <div class="coins-amount">220 Nonvicoins</div>
+                        <div class="price">2 000 FCFA</div>
+                        <button class="btn btn-primary btn-sm btn-full">Acheter</button>
+                    </div>
+                    <div class="price-box" onclick="triggerKkiaPay(5000)">
+                        <div class="tag">Meilleure Offre</div>
+                        <div class="coins-amount">600 Nonvicoins</div>
+                        <div class="price">5 000 FCFA</div>
+                        <button class="btn btn-primary btn-sm btn-full">Acheter</button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+                    <h3>Passez Membre VIP</h3>
+                    <p style="color: var(--text-muted); margin-bottom: 1rem;">Envoyez des messages illimités sans utiliser vos Nonvicoins.</p>
+                    <button class="btn btn-success" onclick="buyVIP()"><i class="fa-solid fa-crown"></i> Devenir VIP (500 Nonvicoins)</button>
+                </div>
+            </div>
+        </section>
 
     </main>
 
-    <script src="https://cdn.kkiapay.me/k.js"></script>
-    <script src="script.js"></script>
+    <!-- LIBRAIRIES ET SCRIPTS JS -->
+    <script src="/socket.io/socket.io.js"></script>
+    
+    <!-- SDK Kkiapay -->
+    <script src="https://cdn.kkiapay.me/kkiapay.js"></script>
+    
+    <!-- Script frontend principal -->
+    <script src="app.js"></script>
 </body>
 </html>

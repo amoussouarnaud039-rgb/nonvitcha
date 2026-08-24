@@ -5,8 +5,12 @@ const bcrypt = require('bcrypt');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const { Server } = require('socket.io');
 
 const app = express();
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: '*' } });
 
 // OBLIGATOIRE POUR RENDER (Gestion des sessions sous HTTPS)
 app.set('trust proxy', 1);
@@ -28,23 +32,32 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Configuration de la Session corrigée
-app.use(session({
-    secret: 'nonvitcha_secret_key_2026',
+// Configuration de la Session
+const sessionMiddleware = session({
+    secret: process.env.SESSION_SECRET || 'nonvitcha_secret_key_2026',
     resave: true,
     saveUninitialized: true,
     cookie: { 
-        secure: false, // Fonctionne derrière le proxy Render
+        secure: false, // Fonctionne derrière le proxy Render avec trust proxy
         maxAge: 24 * 60 * 60 * 1000 
     }
-}));
+});
 
+app.use(sessionMiddleware);
+
+// Partage de session avec Socket.io
+io.use((socket, next) => {
+    sessionMiddleware(socket.request, {}, next);
+});
+
+// Configuration Multer pour les images
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'public/uploads/'),
     filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
 });
 const upload = multer({ storage });
 
+// Middlewares d'Authentification
 const isAuthenticated = (req, res, next) => {
     if (req.session && req.session.user) return next();
     res.status(401).json({ error: 'Non autorisé' });
@@ -55,7 +68,80 @@ const isAdminAuthenticated = (req, res, next) => {
     res.status(403).json({ error: 'Accès administrateur refusé' });
 };
 
-/* --- ROUTES AUTHENTIFICATION --- */
+/* ==========================================================================
+   SOCKET.IO - TCHAT PRIVE EN TEMPS REEL & STATUT EN LIGNE
+   ========================================================================== */
+
+const onlineUsers = new Map(); // userId -> socketId
+
+io.on('connection', async (socket) => {
+    const user = socket.request.session?.user;
+
+    if (user) {
+        onlineUsers.set(user.id, socket.id);
+        await pool.query('UPDATE users SET last_seen = NOW() WHERE id = $1', [user.id]);
+        io.emit('user_status_change', { userId: user.id, isOnline: true });
+    }
+
+    // Gestion de la messagerie privée en temps réel
+    socket.on('send_private_message', async ({ receiver_id, content }) => {
+        if (!user) return;
+
+        const MESSAGE_COST = 5;
+
+        try {
+            // Récupérer le statut actuel de l'utilisateur
+            const userRes = await pool.query('SELECT nonvicoins, is_vip FROM users WHERE id = $1', [user.id]);
+            const currentUser = userRes.rows[0];
+
+            // Déduction de Nonvicoins pour les non-VIP
+            if (!currentUser.is_vip) {
+                if (currentUser.nonvicoins < MESSAGE_COST) {
+                    return socket.emit('error_message', { message: 'Nonvicoins insuffisants pour envoyer un message.' });
+                }
+                await pool.query('UPDATE users SET nonvicoins = nonvicoins - $1 WHERE id = $2', [MESSAGE_COST, user.id]);
+                socket.request.session.user.nonvicoins -= MESSAGE_COST;
+                socket.request.session.save();
+            }
+
+            // Insertion en BDD
+            const msgRes = await pool.query(
+                `INSERT INTO messages (sender_id, receiver_id, content) VALUES ($1, $2, $3) RETURNING *`,
+                [user.id, receiver_id, content]
+            );
+
+            const msgData = msgRes.rows[0];
+
+            // Transmission au destinataire s'il est connecté
+            const receiverSocketId = onlineUsers.get(Number(receiver_id));
+            if (receiverSocketId) {
+                io.to(receiverSocketId).emit('receive_private_message', msgData);
+            }
+
+            // Confirmation à l'expéditeur avec le nouveau solde
+            socket.emit('message_sent', { 
+                msgData, 
+                newBalance: currentUser.is_vip ? currentUser.nonvicoins : currentUser.nonvicoins - MESSAGE_COST 
+            });
+
+        } catch (err) {
+            console.error("Erreur socket message:", err);
+            socket.emit('error_message', { message: 'Erreur lors de l’envoi du message.' });
+        }
+    });
+
+    socket.on('disconnect', async () => {
+        if (user) {
+            onlineUsers.delete(user.id);
+            await pool.query('UPDATE users SET last_seen = NOW() WHERE id = $1', [user.id]);
+            io.emit('user_status_change', { userId: user.id, isOnline: false });
+        }
+    });
+});
+
+/* ==========================================================================
+   ROUTES AUTHENTIFICATION
+   ========================================================================== */
 
 app.post('/api/register', upload.single('photo'), async (req, res) => {
     try {
@@ -64,12 +150,11 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         const photoPath = req.file ? `/uploads/${req.file.filename}` : '/uploads/default.png';
 
         const result = await pool.query(
-            `INSERT INTO users (nom, email, password, age, sexe, ville, photo) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, nom, email, nonvicoins, is_vip`,
+            `INSERT INTO users (nom, email, password, age, sexe, ville, photo, nonvicoins, is_vip) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, 50, FALSE) RETURNING id, nom, email, nonvicoins, is_vip`,
             [nom, email, hashedPassword, age, sexe, ville, photoPath]
         );
 
-        // Sauvegarde explicite de la session avant d'envoyer la réponse
         req.session.user = result.rows[0];
         req.session.save((err) => {
             if (err) {
@@ -115,12 +200,24 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-app.get('/api/me', (req, res) => {
+app.get('/api/me', async (req, res) => {
     if (req.session && req.session.user) {
-        res.json({ loggedIn: true, user: req.session.user });
-    } else {
-        res.json({ loggedIn: false });
+        try {
+            const userRes = await pool.query(
+                `SELECT id, nom, email, nonvicoins, is_vip, photo, ville, age, sexe,
+                 (last_seen > NOW() - INTERVAL '5 minutes') as is_online 
+                 FROM users WHERE id = $1`, 
+                [req.session.user.id]
+            );
+            if (userRes.rows.length > 0) {
+                req.session.user = userRes.rows[0];
+                return res.json({ loggedIn: true, user: req.session.user });
+            }
+        } catch (err) {
+            console.error("Erreur /api/me:", err);
+        }
     }
+    res.json({ loggedIn: false });
 });
 
 app.post('/api/logout', (req, res) => {
@@ -129,7 +226,9 @@ app.post('/api/logout', (req, res) => {
     });
 });
 
-/* --- ROUTES MEMBRES & RECHERCHE --- */
+/* ==========================================================================
+   ROUTES MEMBRES & RECHERCHE
+   ========================================================================== */
 
 app.get('/api/users', isAuthenticated, async (req, res) => {
     try {
@@ -152,7 +251,9 @@ app.get('/api/users', isAuthenticated, async (req, res) => {
     }
 });
 
-/* --- INTERACTIONS --- */
+/* ==========================================================================
+   INTERACTIONS & MONETISATION (Likes, Private Chat, VIP)
+   ========================================================================== */
 
 app.post('/api/like', isAuthenticated, async (req, res) => {
     try {
@@ -160,18 +261,25 @@ app.post('/api/like', isAuthenticated, async (req, res) => {
         const sender_id = req.session.user.id;
 
         if (is_coup_de_coeur) {
-            const userRes = await pool.query('SELECT nonvicoins FROM users WHERE id = $1', [sender_id]);
-            if (userRes.rows[0].nonvicoins < 10) {
-                return res.status(400).json({ success: false, message: 'Nonvicoins insuffisants' });
+            const userRes = await pool.query('SELECT nonvicoins, is_vip FROM users WHERE id = $1', [sender_id]);
+            const user = userRes.rows[0];
+
+            if (!user.is_vip && user.nonvicoins < 10) {
+                return res.status(400).json({ success: false, message: 'Nonvicoins insuffisants (10 requis)' });
             }
-            await pool.query('UPDATE users SET nonvicoins = nonvicoins - 10 WHERE id = $1', [sender_id]);
+
+            if (!user.is_vip) {
+                await pool.query('UPDATE users SET nonvicoins = nonvicoins - 10 WHERE id = $1', [sender_id]);
+                req.session.user.nonvicoins -= 10;
+            }
         }
 
         await pool.query(
             `INSERT INTO likes (sender_id, receiver_id, is_coup_de_coeur) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
             [sender_id, receiver_id, is_coup_de_coeur]
         );
-        res.json({ success: true });
+
+        res.json({ success: true, newBalance: req.session.user.nonvicoins });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -197,15 +305,59 @@ app.post('/api/messages', isAuthenticated, async (req, res) => {
     try {
         const { receiver_id, content } = req.body;
         const sender_id = req.session.user.id;
+        const MESSAGE_COST = 5;
+
+        const userRes = await pool.query('SELECT nonvicoins, is_vip FROM users WHERE id = $1', [sender_id]);
+        const user = userRes.rows[0];
+
+        if (!user.is_vip) {
+            if (user.nonvicoins < MESSAGE_COST) {
+                return res.status(400).json({ success: false, message: 'Nonvicoins insuffisants pour envoyer un message.' });
+            }
+            await pool.query('UPDATE users SET nonvicoins = nonvicoins - $1 WHERE id = $2', [MESSAGE_COST, sender_id]);
+            req.session.user.nonvicoins -= MESSAGE_COST;
+        }
+
         const result = await pool.query(
             `INSERT INTO messages (sender_id, receiver_id, content) VALUES ($1, $2, $3) RETURNING *`,
             [sender_id, receiver_id, content]
         );
-        res.json(result.rows[0]);
+
+        res.json({ success: true, message: result.rows[0], newBalance: req.session.user.nonvicoins });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
+app.post('/api/vip/buy', isAuthenticated, async (req, res) => {
+    try {
+        const sender_id = req.session.user.id;
+        const VIP_COST = 500;
+
+        const userRes = await pool.query('SELECT nonvicoins, is_vip FROM users WHERE id = $1', [sender_id]);
+        const user = userRes.rows[0];
+
+        if (user.is_vip) {
+            return res.status(400).json({ success: false, message: 'Vous êtes déjà membre VIP.' });
+        }
+
+        if (user.nonvicoins < VIP_COST) {
+            return res.status(400).json({ success: false, message: 'Nonvicoins insuffisants (500 requis).' });
+        }
+
+        await pool.query('UPDATE users SET nonvicoins = nonvicoins - $1, is_vip = TRUE WHERE id = $2', [VIP_COST, sender_id]);
+        req.session.user.nonvicoins -= VIP_COST;
+        req.session.user.is_vip = true;
+
+        res.json({ success: true, message: 'Félicitations, vous êtes désormais VIP !', newBalance: req.session.user.nonvicoins });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+/* ==========================================================================
+   TCHAT PUBLIC
+   ========================================================================== */
 
 app.get('/api/chat', isAuthenticated, async (req, res) => {
     try {
@@ -232,6 +384,10 @@ app.post('/api/chat', isAuthenticated, async (req, res) => {
     }
 });
 
+/* ==========================================================================
+   SALLE D'ECOUTE SOS ET SSR (SANTE SEXUELLE ET REPRODUCTIVE)
+   ========================================================================== */
+
 app.post('/api/ecoutes', isAuthenticated, async (req, res) => {
     try {
         const { type_demande, message } = req.body;
@@ -240,7 +396,7 @@ app.post('/api/ecoutes', isAuthenticated, async (req, res) => {
             `INSERT INTO ecoutes (user_id, type_demande, message) VALUES ($1, $2, $3)`,
             [user_id, type_demande, message]
         );
-        res.json({ success: true, message: 'Votre demande d’écoute a été envoyée.' });
+        res.json({ success: true, message: 'Votre demande d’écoute a été transmise en toute confidentialité.' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -254,6 +410,10 @@ app.get('/api/ecoutes/mes-demandes', isAuthenticated, async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+/* ==========================================================================
+   PUBLICITES ET ANNONCES
+   ========================================================================== */
 
 app.get('/api/publicites', isAuthenticated, async (req, res) => {
     try {
@@ -276,12 +436,18 @@ app.post('/api/publicites', isAuthenticated, upload.single('image'), async (req,
         }
 
         await pool.query('UPDATE users SET nonvicoins = nonvicoins - 50 WHERE id = $1', [user_id]);
+        req.session.user.nonvicoins -= 50;
+
         await pool.query(`INSERT INTO publicites (user_id, titre, description, image) VALUES ($1, $2, $3, $4)`, [user_id, titre, description, imagePath]);
-        res.json({ success: true });
+        res.json({ success: true, newBalance: req.session.user.nonvicoins });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
+
+/* ==========================================================================
+   PAIEMENTS KKIAPAY
+   ========================================================================== */
 
 app.post('/api/kkiapay/verify', isAuthenticated, async (req, res) => {
     try {
@@ -302,7 +468,9 @@ app.post('/api/kkiapay/verify', isAuthenticated, async (req, res) => {
     }
 });
 
-/* --- ADMIN --- */
+/* ==========================================================================
+   E-SPACE ADMINISTRATION
+   ========================================================================== */
 
 app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
@@ -373,7 +541,8 @@ app.post('/api/admin/ecoutes/repondre', isAdminAuthenticated, async (req, res) =
     }
 });
 
+// Lancement du serveur HTTP avec Socket.IO
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Serveur démarré sur le port ${PORT}`);
+server.listen(PORT, () => {
+    console.log(`Serveur Nonvitcha opérationnel sur le port ${PORT}`);
 });

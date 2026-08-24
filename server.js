@@ -88,6 +88,7 @@ app.post('/api/register', upload.single('photo'), (req, res) => {
     photo: req.file ? `/uploads/${req.file.filename}` : '/uploads/default.png',
     nonvicoins: 100, // Bonus de départ
     isVip: false,
+    vipExpire: null,
     isAdmin: db.users.length === 0, // Le premier inscrit est admin
     online: true,
     lastSeen: new Date().toISOString()
@@ -110,6 +111,12 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ success: false, message: 'Email ou mot de passe incorrect.' });
   }
 
+  // Vérifier si le statut VIP a expiré
+  if (user.isVip && user.vipExpire && new Date() > new Date(user.vipExpire)) {
+    user.isVip = false;
+    user.vipExpire = null;
+  }
+
   user.online = true;
   user.lastSeen = new Date().toISOString();
   writeDb(db);
@@ -124,6 +131,12 @@ app.get('/api/me', (req, res) => {
   const db = readDb();
   const user = db.users.find(u => u.id === req.session.userId);
   if (!user) return res.status(401).json({ success: false });
+
+  if (user.isVip && user.vipExpire && new Date() > new Date(user.vipExpire)) {
+    user.isVip = false;
+    user.vipExpire = null;
+    writeDb(db);
+  }
 
   const { password: _, ...safeUser } = user;
   res.json({ success: true, user: safeUser });
@@ -141,6 +154,34 @@ app.post('/api/logout', (req, res) => {
   }
   req.session.destroy();
   res.json({ success: true });
+});
+
+// --- ROUTE ACHAT VIP ---
+
+app.post('/api/vip/upgrade', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false, message: 'Non connecté.' });
+  
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  if (!user) return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
+
+  const coutVipCoins = 80; // Coût de l'abonnement VIP en Nonvicoins
+  if ((user.nonvicoins || 0) < coutVipCoins) {
+    return res.status(400).json({ success: false, message: `Solde insuffisant ! Le statut VIP coûte ${coutVipCoins} Nonvicoins.` });
+  }
+
+  user.nonvicoins -= coutVipCoins;
+  user.isVip = true;
+  
+  // Expiration dans 30 jours
+  const expireDate = new Date();
+  expireDate.setDate(expireDate.getDate() + 30);
+  user.vipExpire = expireDate.toISOString();
+
+  writeDb(db);
+
+  const { password: _, ...safeUser } = user;
+  res.json({ success: true, user: safeUser, message: 'Félicitations, vous êtes désormais membre VIP !' });
 });
 
 // --- ROUTES UTILISATEURS & MATCHING ---
@@ -174,12 +215,13 @@ app.post('/api/chat', (req, res) => {
     userId: user.id,
     userName: user.nom,
     userPhoto: user.photo,
+    userVip: user.isVip,
     message: message.trim(),
     time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
   };
 
   db.chat.push(newMessage);
-  if (db.chat.length > 100) db.chat.shift(); // Garder les 100 derniers messages
+  if (db.chat.length > 100) db.chat.shift();
   writeDb(db);
 
   res.json({ success: true, message: newMessage });

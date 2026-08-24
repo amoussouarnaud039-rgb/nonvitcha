@@ -64,7 +64,7 @@ app.use(session({
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- AUTHENTIFICATION ---
+// --- AUTHENTIFICATION & PROFIL ---
 
 app.post('/api/register', upload.single('photo'), (req, res) => {
   const { nom, email, password, genre, recherche, bio, age, ville, adminCode } = req.body;
@@ -92,6 +92,7 @@ app.post('/api/register', upload.single('photo'), (req, res) => {
     villeOriginale: ville || '',
     photo: req.file ? `/uploads/${req.file.filename}` : '/uploads/default.png',
     nonvicoins: 100,
+    likes: [],
     isVip: false,
     vipExpire: null,
     isAdmin: isAdmin,
@@ -158,6 +159,48 @@ app.post('/api/logout', (req, res) => {
   }
   req.session.destroy();
   res.json({ success: true });
+});
+
+// Route pour changer la photo de profil
+app.post('/api/user/photo', upload.single('photo'), (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
+  if (!req.file) return res.status(400).json({ success: false, message: 'Aucune image fournie.' });
+
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  if (!user) return res.status(404).json({ success: false });
+
+  user.photo = `/uploads/${req.file.filename}`;
+  writeDb(db);
+
+  const { password: _, ...safeUser } = user;
+  res.json({ success: true, user: safeUser });
+});
+
+// --- LIKES ENTRE MEMBRES ---
+
+app.post('/api/users/like', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
+  const { targetUserId } = req.body;
+
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  const target = db.users.find(u => u.id === targetUserId);
+
+  if (!user || !target) return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
+
+  if (!user.likes) user.likes = [];
+  const index = user.likes.indexOf(targetUserId);
+
+  if (index > -1) {
+    user.likes.splice(index, 1); // Unlike
+  } else {
+    user.likes.push(targetUserId); // Like
+  }
+
+  writeDb(db);
+  const { password: _, ...safeUser } = user;
+  res.json({ success: true, user: safeUser, liked: index === -1 });
 });
 
 // --- VIP ---
@@ -251,7 +294,7 @@ app.post('/api/ecoutes/repondre', (req, res) => {
   res.json({ success: true, ecoutes: db.ecoutes });
 });
 
-// --- UTILISATEURS & RECHERCHE ---
+// --- UTILISATEURS ---
 
 app.get('/api/users', (req, res) => {
   if (!req.session.userId) return res.status(401).json({ success: false });
@@ -260,7 +303,7 @@ app.get('/api/users', (req, res) => {
   res.json(safeUsers);
 });
 
-// --- CHAT PUBLIC ---
+// --- CHAT PUBLIC & TYPING ---
 
 app.get('/api/chat', (req, res) => {
   if (!req.session.userId) return res.status(401).json({ success: false });

@@ -3,348 +3,246 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nonvitcha - Rencontres, Solidarité & Sensibilisation</title>
-    <!-- Tailwind CSS pour un design moderne et responsive -->
+    <title>Nonvitcha - Rencontres & Communauté</title>
+    <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 4px; }
-    </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col">
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen flex flex-col">
 
     <!-- HEADER / NAVIGATION -->
     <header class="bg-white shadow-sm sticky top-0 z-50">
         <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-2 cursor-pointer" onclick="switchTab('accueil')">
-                <div class="bg-rose-500 text-white p-2 rounded-full font-bold text-lg shadow-md flex items-center justify-center w-10 h-10">
-                    <i class="fa-solid fa-heart"></i>
-                </div>
-                <span class="text-xl font-black tracking-wider text-rose-600">NONVITCHA</span>
+            <div class="flex items-center space-x-2">
+                <span class="text-2xl font-black text-rose-600 tracking-wider">NONVITCHA</span>
             </div>
-
-            <!-- Navigation Desktop & Mobile Icons -->
-            <nav id="mainNav" class="hidden md:flex items-center space-x-6 font-medium text-sm">
-                <button onclick="switchTab('accueil')" class="nav-btn text-rose-600 font-semibold transition hover:text-rose-600"><i class="fa-solid fa-fire mr-1"></i> Découvrir</button>
-                <button onclick="switchTab('chat')" class="nav-btn text-slate-600 transition hover:text-rose-600"><i class="fa-solid fa-comments mr-1"></i> Salon</button>
-                <button onclick="switchTab('ecoute')" class="nav-btn text-slate-600 transition hover:text-rose-600"><i class="fa-solid fa-hands-holding-child mr-1"></i> Écoute & SSR</button>
-                <button onclick="switchTab('publicites')" class="nav-btn text-slate-600 transition hover:text-rose-600"><i class="fa-solid fa-bullhorn mr-1"></i> Annonces</button>
-                <button onclick="switchTab('vip')" class="nav-btn text-amber-500 font-bold transition hover:text-amber-600"><i class="fa-solid fa-crown mr-1"></i> VIP & Boutique</button>
+            <nav id="nav-menu" class="hidden md:flex items-center space-x-6 text-sm font-medium">
+                <button onclick="switchTab('accueil')" class="hover:text-rose-600 transition">Accueil</button>
+                <button onclick="switchTab('decouvrir')" class="hover:text-rose-600 transition">Découvrir</button>
+                <button onclick="switchTab('chat')" class="hover:text-rose-600 transition">Salon</button>
+                <button onclick="switchTab('annonces')" class="hover:text-rose-600 transition">Annonces</button>
+                <button onclick="switchTab('ecoute')" class="hover:text-rose-600 transition">Écoute & VBG</button>
+                <button onclick="switchTab('admin')" class="text-rose-600 font-semibold hover:underline">Admin</button>
             </nav>
-
-            <!-- Profil & Coins Header -->
-            <div id="userHeaderInfo" class="hidden flex items-center space-x-3">
-                <div class="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-xs font-bold flex items-center shadow-inner">
-                    <i class="fa-solid fa-coins text-amber-500 mr-1.5"></i> <span id="headerCoins">100</span> NC
-                </div>
-                <div class="relative cursor-pointer" onclick="switchTab('profil')">
-                    <img id="headerAvatar" src="" alt="Avatar" class="w-10 h-10 rounded-full object-cover border-2 border-rose-500 shadow">
-                    <span id="headerVipBadge" class="hidden absolute -top-1 -right-1 text-amber-500 text-xs bg-white rounded-full px-1 shadow">👑</span>
-                </div>
-                <button onclick="logout()" class="text-slate-400 hover:text-red-500 transition text-sm ml-2" title="Déconnexion"><i class="fa-solid fa-power-off"></i></button>
+            <div id="user-badge" class="flex items-center space-x-3">
+                <!-- Chargé dynamiquement selon la connexion -->
+                <button onclick="openModal('login-modal')" class="text-sm px-4 py-2 bg-rose-600 text-white rounded-full font-medium hover:bg-rose-700 transition">Connexion</button>
             </div>
         </div>
     </header>
 
     <!-- CONTENU PRINCIPAL -->
-    <main class="flex-grow max-w-6xl w-full mx-auto px-4 py-6">
+    <main class="flex-grow max-w-6xl mx-auto px-4 py-6 w-full">
 
-        <!-- AUTHENTIFICATION (LOGIN / REGISTER) -->
-        <section id="authSection" class="max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden p-8 mt-6">
-            <div class="text-center mb-6">
-                <h2 id="authTitle" class="text-2xl font-bold text-slate-800">Connexion à Nonvitcha</h2>
-                <p class="text-sm text-slate-500 mt-1">Trouvez l'amour, échangez et informez-vous en toute sécurité.</p>
+        <!-- ONGLET ACCUEIL -->
+        <section id="tab-accueil" class="space-y-8">
+            <div class="bg-gradient-to-r from-rose-500 to-pink-600 rounded-3xl p-8 md:p-12 text-white shadow-xl flex flex-col md:flex-row items-center justify-between">
+                <div class="max-w-xl space-y-4">
+                    <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight">Trouvez l'amour et partagez votre culture</h1>
+                    <p class="text-rose-100 text-base md:text-lg">La plateforme de découverte sociale pensée pour connecter les célibataires, échanger en toute sécurité et faire grandir notre communauté.</p>
+                    <div class="flex space-x-4 pt-2">
+                        <button onclick="switchTab('decouvrir')" class="px-6 py-3 bg-white text-rose-600 font-bold rounded-xl shadow-md hover:bg-rose-50 transition">Commencer</button>
+                        <button onclick="openModal('register-modal')" class="px-6 py-3 border-2 border-white text-white font-bold rounded-xl hover:bg-white/10 transition">Créer un compte</button>
+                    </div>
+                </div>
             </div>
+        </section>
 
-            <!-- Formulaire Login -->
-            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Email</label>
-                    <input type="email5" id="loginEmail" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Mot de passe</label>
-                    <input type="password" id="loginPassword" required class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none">
-                </div>
-                <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-lg transition shadow-md">Se connecter</button>
-                <p class="text-center text-sm text-slate-600 mt-4">Pas encore de compte ? <a href="#" onclick="toggleAuthMode(true)" class="text-rose-600 font-semibold hover:underline">S'inscrire</a></p>
+        <!-- ONGLET DÉCOUVRIR (Profils) -->
+        <section id="tab-decouvrir" class="hidden space-y-6">
+            <h2 class="text-2xl font-bold text-slate-800">Profils récents</h2>
+            <div id="profiles-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                <!-- Injecté par JavaScript -->
+            </div>
+        </section>
+
+        <!-- ONGLET SALON (Chat) -->
+        <section id="tab-chat" class="hidden flex flex-col h-[70vh] bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="bg-slate-100 px-6 py-3 border-b border-slate-200 font-bold text-slate-700">Salon de discussion public</div>
+            <div id="chat-messages" class="flex-grow p-4 overflow-y-auto space-y-4">
+                <!-- Messages injectés ici -->
+            </div>
+            <form id="chat-form" onsubmit="sendChatMessage(event)" class="p-3 bg-slate-50 border-t border-slate-200 flex gap-2">
+                <input type="text" id="chat-input" placeholder="Écrivez votre message..." required class="flex-grow px-4 py-2 border rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500">
+                <button type="submit" class="px-6 py-2 bg-rose-600 text-white font-medium rounded-xl hover:bg-rose-700 transition">Envoyer</button>
             </form>
+        </section>
 
-            <!-- Formulaire Inscription -->
-            <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-4 hidden">
-                <div class="grid grid-cols-2 gap-3">
+        <!-- ONGLET ANNONCES -->
+        <section id="tab-annonces" class="hidden space-y-6">
+            <div class="flex justify-between items-center">
+                <h2 class="text-2xl font-bold text-slate-800">Annonces & Publicités</h2>
+                <button onclick="openModal('annonce-modal')" class="px-4 py-2 bg-rose-600 text-white rounded-xl text-sm font-medium hover:bg-rose-700">Publier une annonce</button>
+            </div>
+            <div id="annonces-list" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Injecté par JavaScript -->
+            </div>
+        </section>
+
+        <!-- ONGLET ÉCOUTE & VBG -->
+        <section id="tab-ecoute" class="hidden space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                <h2 class="text-xl font-bold text-slate-800">Espace Écoute & Assistance</h2>
+                <p class="text-sm text-slate-600">Un espace sécurisé et confidentiel pour poser vos questions ou signaler une situation.</p>
+                <form onsubmit="submitEcoute(event)" class="space-y-4">
                     <div>
-                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Nom / Pseudo</label>
-                        <input type="text" id="regNom" required class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Âge</label>
-                        <input type="number" id="regAge" required min="18" class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
-                    </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Email</label>
-                    <input type="email" id="regEmail" required class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Mot de passe</label>
-                    <input type="password" id="regPassword" required class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Genre</label>
-                        <select id="regGenre" class="w-full px-3 py-2 border rounded-lg text-sm bg-white">
-                            <option value="Homme">Homme</option>
-                            <option value="Femme">Femme</option>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Catégorie</label>
+                        <select id="ecoute-cat" class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-rose-500">
+                            <option value="Conseil relationnel">Conseil relationnel</option>
+                            <option value="Assistance VBG">Assistance VBG</option>
                             <option value="Autre">Autre</option>
                         </select>
                     </div>
                     <div>
-                        <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Ville</label>
-                        <input type="text" id="regVille" placeholder="Cotonou..." class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-rose-500 focus:outline-none">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Votre message / Demande</label>
+                        <textarea id="ecoute-msg" rows="4" required class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-rose-500" placeholder="Exprimez-vous en toute sécurité..."></textarea>
                     </div>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Photo de profil</label>
-                    <input type="file" id="regPhoto" accept="image/*" class="w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100">
-                </div>
-                <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-lg transition shadow-md">Créer mon compte</button>
-                <p class="text-center text-sm text-slate-600 mt-4">Déjà un compte ? <a href="#" onclick="toggleAuthMode(false)" class="text-rose-600 font-semibold hover:underline">Se connecter</a></p>
-            </form>
+                    <button type="submit" class="px-6 py-2 bg-rose-600 text-white font-medium rounded-xl hover:bg-rose-700">Envoyer la demande</button>
+                </form>
+            </div>
+            <div class="space-y-4">
+                <h3 class="font-bold text-lg text-slate-800">Mes requêtes et réponses reçues</h3>
+                <div id="my-ecoutes-list" class="space-y-3"></div>
+            </div>
         </section>
 
-        <!-- APPLICATION CONTAINER (MASQUÉ TANT QUE NON CONNECTÉ) -->
-        <div id="appContainer" class="hidden space-y-6">
-
-            <!-- TAB 1 : ACCUEIL / DÉCOUVERTE -->
-            <div id="tab-accueil" class="tab-content space-y-6">
-                <!-- Filtres et Recherche -->
-                <div class="bg-white p-4 rounded-2xl shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div class="flex items-center space-x-2 w-full md:w-auto">
-                        <span class="text-sm font-bold text-slate-600">Filtrer par ville :</span>
-                        <input type="text" id="filterVille" placeholder="Toutes les villes" oninput="filterProfiles()" class="px-3 py-1.5 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500 w-full md:w-48">
+        <!-- ONGLET ADMIN -->
+        <section id="tab-admin" class="hidden space-y-6 max-w-xl mx-auto">
+            <div id="admin-login-box" class="bg-white p-8 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+                <h2 class="text-2xl font-bold text-slate-800 text-center">Accès Administrateur</h2>
+                <form onsubmit="adminLogin(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Mot de passe admin</label>
+                        <input type="password" id="admin-pwd-input" required class="w-full px-4 py-2 border rounded-xl focus:ring-2 focus:ring-rose-500">
                     </div>
-                    <div class="flex items-center space-x-3 w-full md:w-auto justify-end">
-                        <button onclick="boostMyProfile()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition flex items-center">
-                            <i class="fa-solid fa-bolt mr-1.5"></i> Booster mon profil (50 NC)
-                        </button>
-                    </div>
+                    <button type="submit" class="w-full py-3 bg-slate-900 text-white font-medium rounded-xl hover:bg-slate-800 transition">Se connecter</button>
+                </form>
+            </div>
+            <div id="admin-panel" class="hidden space-y-6">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border">
+                    <span class="font-bold text-rose-600">Panneau Administrateur Actif</span>
+                    <button onclick="adminLogout()" class="text-sm px-3 py-1 bg-slate-200 rounded-lg hover:bg-slate-300">Déconnexion</button>
                 </div>
-
-                <!-- Grille des profils -->
-                <div id="profilesGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    <!-- Dynamique via JS -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border space-y-4">
+                    <h3 class="font-bold text-lg">Gestion des requêtes d'écoute / réponses</h3>
+                    <div id="admin-ecoutes-list" class="space-y-4"></div>
                 </div>
             </div>
+        </section>
 
-            <!-- TAB 2 : SALON DE DISCUSSION -->
-            <div id="tab-chat" class="tab-content hidden space-y-4">
-                <div class="bg-white rounded-2xl shadow-sm flex flex-col h-[70vh] overflow-hidden">
-                    <div class="bg-rose-600 text-white p-4 font-bold flex items-center justify-between">
-                        <span><i class="fa-solid fa-comments mr-2"></i> Salon Public Nonvitcha</span>
-                        <span class="text-xs bg-rose-500 px-2 py-1 rounded-full">En direct</span>
-                    </div>
-                    <div id="chatMessages" class="flex-grow p-4 overflow-y-auto space-y-3 custom-scrollbar bg-slate-50">
-                        <!-- Messages dynamiques -->
-                    </div>
-                    <form onsubmit="sendChatMessage(event)" class="p-3 bg-white border-t flex gap-2">
-                        <input type="text" id="chatInput" placeholder="Écrivez votre message..." autocomplete="off" class="flex-grow px-4 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500">
-                        <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow transition"><i class="fa-solid fa-paper-plane"></i></button>
-                    </form>
-                </div>
-            </div>
-
-            <!-- TAB 3 : ÉCOUTE & SENSIBILISATION (SSR / VBG) -->
-            <div id="tab-ecoute" class="tab-content hidden space-y-6">
-                <!-- Ressources éducatives -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-                    <h3 class="text-lg font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-book-medical text-rose-500 mr-2"></i> Ressources & Guides Officiels</h3>
-                    <div id="ressourcesList" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <!-- Dynamique -->
-                    </div>
-                </div>
-
-                <!-- Espace d'écoute confidentiel -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-                    <h3 class="text-lg font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-headset text-rose-500 mr-2"></i> Service d'Écoute & Orientation Confidentiel</h3>
-                    <p class="text-sm text-slate-500">Posez vos questions ou signalez une situation en toute discrétion. Seuls les administrateurs pourront vous répondre.</p>
-                    
-                    <form onsubmit="sendEcouteMessage(event)" class="space-y-3">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div>
-                                <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Catégorie</label>
-                                <select id="ecouteCategorie" class="w-full px-3 py-2 border rounded-lg text-sm bg-white">
-                                    <option value="SSR">Santé Sexuelle et Reproductive (SSR)</option>
-                                    <option value="VBG">Violences Basées sur le Genre (VBG)</option>
-                                    <option value="AUTRE">Orientation & Soutien Général</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div>
-                            <textarea id="ecouteMessage" rows="3" required placeholder="Votre message ou signalement en toute confidentialité..." class="w-full p-3 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"></textarea>
-                        </div>
-                        <button type="submit" class="bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-xl text-sm font-bold shadow transition">Envoyer en toute sécurité</button>
-                    </form>
-
-                    <!-- Historique des requêtes d'écoute -->
-                    <div class="mt-6 space-y-3">
-                        <h4 class="font-bold text-sm text-slate-700">Vos requêtes et réponses reçues :</h4>
-                        <div id="ecoutesHistory" class="space-y-3">
-                            <!-- Dynamique -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 4 : ANNONCES & PUBLICITÉS -->
-            <div id="tab-publicites" class="tab-content hidden space-y-6">
-                <div class="flex justify-between items-center bg-white p-4 rounded-2xl shadow-sm">
-                    <h3 class="font-bold text-slate-800"><i class="fa-solid fa-bullhorn text-rose-500 mr-2"></i> Annonces & Opportunités Sponsorisées</h3>
-                    <button onclick="openPubModal()" class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow transition">Publier une annonce (50 NC / 25 VIP)</button>
-                </div>
-                <div id="publicitesGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <!-- Dynamique -->
-                </div>
-            </div>
-
-            <!-- TAB 5 : VIP & BOUTIQUE NONVICOINS -->
-            <div id="tab-vip" class="tab-content hidden space-y-6">
-                <!-- Carte VIP Status -->
-                <div class="bg-gradient-to-r from-amber-500 to-amber-600 rounded-3xl p-6 text-white shadow-lg flex flex-col md:flex-row justify-between items-center gap-6">
-                    <div class="space-y-2">
-                        <span class="bg-amber-400 text-amber-900 text-xs font-black uppercase px-3 py-1 rounded-full shadow-inner">Avantages Exclusifs</span>
-                        <h2 class="text-3xl font-black">Passez au niveau VIP 👑</h2>
-                        <p class="text-amber-100 text-sm max-w-lg">Profitez d'une visibilité prioritaire (boost auto), d'un badge exclusif, d'un accès instantané et gratuit à vos visiteurs, de -50% sur vos super likes et annonces, ainsi que de **30 Nonvicoins offerts chaque mois** !</p>
-                    </div>
-                    <button onclick="upgradeVip()" class="bg-white text-amber-600 font-black px-6 py-3 rounded-2xl shadow-lg hover:bg-amber-50 transition whitespace-nowrap">Activer VIP (80 NC)</button>
-                </div>
-
-                <!-- Boutique FedaPay Coins -->
-                <div class="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-                    <h3 class="text-lg font-bold text-slate-800 border-b pb-2"><i class="fa-solid fa-coins text-amber-500 mr-2"></i> Recharger des Nonvicoins (Paiement FedaPay)</h3>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div class="border rounded-2xl p-5 text-center space-y-3 hover:border-amber-500 transition">
-                            <h4 class="font-bold text-slate-700">Pack Petit</h4>
-                            <p class="text-2xl font-black text-rose-600">100 NC</p>
-                            <p class="text-xs text-slate-400">500 FCFA</p>
-                            <button onclick="acheterCoins('petit')" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-bold transition">Acheter</button>
-                        </div>
-                        <div class="border-2 border-amber-500 rounded-2xl p-5 text-center space-y-3 relative shadow-sm">
-                            <span class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-amber-500 text-white text-[10px] font-bold px-3 py-0.5 rounded-full">POPULAIRE</span>
-                            <h4 class="font-bold text-slate-700">Pack Moyen</h4>
-                            <p class="text-2xl font-black text-rose-600">500 NC</p>
-                            <p class="text-xs text-slate-400">2 000 FCFA</p>
-                            <button onclick="acheterCoins('moyen')" class="w-full bg-amber-500 hover:bg-amber-600 text-white py-2 rounded-xl text-xs font-bold transition">Acheter</button>
-                        </div>
-                        <div class="border rounded-2xl p-5 text-center space-y-3 hover:border-amber-500 transition">
-                            <h4 class="font-bold text-slate-700">Pack Grand</h4>
-                            <p class="text-2xl font-black text-rose-600">1 500 NC</p>
-                            <p class="text-xs text-slate-400">5 000 FCFA</p>
-                            <button onclick="acheterCoins('grand')" class="w-full bg-slate-900 hover:bg-slate-800 text-white py-2 rounded-xl text-xs font-bold transition">Acheter</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- TAB 6 : PROFIL UTILISATEUR -->
-            <div id="tab-profil" class="tab-content hidden space-y-6 max-w-2xl mx-auto">
-                <div class="bg-white p-6 rounded-2xl shadow-sm space-y-6">
-                    <div class="flex items-center space-x-4 border-b pb-6">
-                        <div class="relative">
-                            <img id="profilAvatar" src="" alt="Profil" class="w-24 h-24 rounded-full object-cover border-4 border-rose-500 shadow">
-                            <label for="changePhotoInput" class="absolute bottom-0 right-0 bg-slate-900 text-white p-2 rounded-full cursor-pointer hover:bg-rose-600 transition shadow text-xs">
-                                <i class="fa-solid fa-camera"></i>
-                            </label>
-                            <input type="file" id="changePhotoInput" accept="image/*" class="hidden" onchange="updatePhoto(event)">
-                        </div>
-                        <div>
-                            <h2 id="profilNom" class="text-2xl font-bold text-slate-800">Nom</h2>
-                            <p id="profilEmail" class="text-sm text-slate-500">email@example.com</p>
-                            <div id="profilBadgeContainer" class="mt-2"></div>
-                        </div>
-                    </div>
-
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center bg-slate-50 p-4 rounded-xl">
-                            <div>
-                                <p class="text-xs font-bold uppercase text-slate-400">Solde actuel</p>
-                                <p class="text-xl font-black text-amber-600"><span id="profilCoins">100</span> Nonvicoins</p>
-                            </div>
-                            <button onclick="switchTab('vip')" class="bg-amber-500 text-white px-4 py-2 rounded-xl text-xs font-bold shadow hover:bg-amber-600 transition">Recharger</button>
-                        </div>
-
-                        <!-- Visiteurs du profil -->
-                        <div class="border rounded-xl p-4 space-y-3">
-                            <div class="flex justify-between items-center">
-                                <h4 class="font-bold text-slate-700 text-sm"><i class="fa-solid fa-eye text-rose-500 mr-2"></i> Qui a consulté mon profil ?</h4>
-                                <button onclick="loadVisiteurs()" class="text-xs bg-rose-50 text-rose-600 font-bold px-3 py-1.5 rounded-lg hover:bg-rose-100 transition">Voir la liste (Gratuit VIP / 30 NC)</button>
-                            </div>
-                            <div id="visiteursContainer" class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
-                                <p class="text-xs text-slate-400 italic col-span-full">Cliquez sur le bouton pour révéler vos visiteurs.</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-        </div>
     </main>
 
-    <!-- MODAL PUBLICATION ANNONCE -->
-    <div id="pubModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm hidden items-center justify-center z-50 p-4">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-xl">
-            <h3 class="text-lg font-bold text-slate-800">Publier une annonce sponsorisée</h3>
-            <form onsubmit="submitPub(event)" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Titre de l'annonce</label>
-                    <input type="text" id="pubTitre" required class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Description / Offre</label>
-                    <textarea id="pubDescription" rows="3" required class="w-full p-3 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500"></textarea>
-                </div>
-                <div>
-                    <label class="block text-xs font-bold uppercase text-slate-600 mb-1">Contact (Téléphone ou Email)</label>
-                    <input type="text" id="pubContact" required class="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-rose-500">
-                </div>
-                <div class="flex justify-end space-x-2 pt-2">
-                    <button type="button" onclick="closePubModal()" class="px-4 py-2 border rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">Annuler</button>
-                    <button type="submit" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow transition">Publier</button>
-                </div>
+    <!-- MODALS (Connexion, Inscription, Annonce) -->
+    <div id="login-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 space-y-4 relative">
+            <button onclick="closeModal('login-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <h3 class="text-xl font-bold">Connexion</h3>
+            <form onsubmit="handleLogin(event)" class="space-y-3">
+                <input type="email" id="login-email" placeholder="Email" required class="w-full px-4 py-2 border rounded-xl">
+                <input type="password" id="login-password" placeholder="Mot de passe" required class="w-full px-4 py-2 border rounded-xl">
+                <button type="submit" class="w-full py-2 bg-rose-600 text-white font-medium rounded-xl">Se connecter</button>
             </form>
         </div>
     </div>
 
-    <!-- SCRIPT LOGIQUE FRONT-END -->
+    <div id="register-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 space-y-4 relative max-h-[90vh] overflow-y-auto">
+            <button onclick="closeModal('register-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <h3 class="text-xl font-bold">Créer un compte</h3>
+            <form id="register-form" onsubmit="handleRegister(event)" class="space-y-3">
+                <input type="text" name="nom" placeholder="Nom complet" required class="w-full px-4 py-2 border rounded-xl">
+                <input type="number" name="age" placeholder="Âge" required class="w-full px-4 py-2 border rounded-xl">
+                <input type="email" name="email" placeholder="Email" required class="w-full px-4 py-2 border rounded-xl">
+                <input type="password" name="password" placeholder="Mot de passe" required class="w-full px-4 py-2 border rounded-xl">
+                <select name="genre" class="w-full px-4 py-2 border rounded-xl">
+                    <option value="Homme">Homme</option>
+                    <option value="Femme">Femme</option>
+                </select>
+                <input type="text" name="ville" placeholder="Ville" required class="w-full px-4 py-2 border rounded-xl">
+                <div>
+                    <label class="block text-xs text-slate-500 mb-1">Photo de profil</label>
+                    <input type="file" name="photo" accept="image/*" class="w-full text-sm">
+                </div>
+                <button type="submit" class="w-full py-2 bg-rose-600 text-white font-medium rounded-xl">S'inscrire</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="annonce-modal" class="fixed inset-0 bg-black/50 hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white w-full max-w-md rounded-2xl p-6 space-y-4 relative">
+            <button onclick="closeModal('annonce-modal')" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <h3 class="text-xl font-bold">Publier une annonce</h3>
+            <form onsubmit="submitAnnonce(event)" class="space-y-3">
+                <input type="text" id="annonce-titre" placeholder="Titre de l'annonce" required class="w-full px-4 py-2 border rounded-xl">
+                <textarea id="annonce-desc" placeholder="Description..." required rows="3" class="w-full px-4 py-2 border rounded-xl"></textarea>
+                <input type="text" id="annonce-contact" placeholder="Contact (Téléphone / Email)" required class="w-full px-4 py-2 border rounded-xl">
+                <button type="submit" class="w-full py-2 bg-rose-600 text-white font-medium rounded-xl">Publier (50 Nonvicoins)</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- SCRIPT FRONT-END -->
     <script>
         let currentUser = null;
-        let allUsers = [];
 
-        // Vérification de session au chargement
-        async function checkSession() {
+        function switchTab(tabId) {
+            ['accueil', 'decouvrir', 'chat', 'annonces', 'ecoute', 'admin'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+            });
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            if (tabId === 'decouvrir') loadProfiles();
+            if (tabId === 'chat') loadChat();
+            if (tabId === 'annonces') loadAnnonces();
+            if (tabId === 'ecoute') loadEcoutes();
+            if (tabId === 'admin') checkAdminStatus();
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+        async function checkAuth() {
             try {
                 const res = await fetch('/api/me');
                 const data = await res.json();
                 if (data.success) {
                     currentUser = data.user;
-                    initApp();
+                    updateUserBadge();
                 }
-            } catch (e) { console.error(e); }
+            } catch (e) { console.log('Non connecté'); }
         }
-        checkSession();
 
-        function toggleAuthMode(isRegister) {
-            document.getElementById('loginForm').classList.toggle('hidden', isRegister);
-            document.getElementById('registerForm').classList.toggle('hidden', !isRegister);
-            document.getElementById('authTitle').innerText = isRegister ? "Inscription sur Nonvitcha" : "Connexion à Nonvitcha";
+        function updateUserBadge() {
+            const badge = document.getElementById('user-badge');
+            if (currentUser) {
+                badge.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs font-bold px-2 py-1 bg-amber-100 text-amber-700 rounded-lg"><i class="fa-solid fa-coins"></i> ${currentUser.nonvicoins} NC</span>
+                        <img src="${currentUser.photo || '/uploads/default.png'}" class="w-8 h-8 rounded-full object-cover border">
+                        <button onclick="logout()" class="text-xs text-slate-500 hover:text-rose-600"><i class="fa-solid fa-right-from-bracket"></i></button>
+                    </div>
+                `;
+            }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const res = await fetch('/api/register', { method: 'POST', body: formData });
+            const data = await res.json();
+            if (data.success) {
+                currentUser = data.user;
+                updateUserBadge();
+                closeModal('register-modal');
+                switchTab('decouvrir');
+            } else {
+                alert(data.message || 'Erreur lors de l\'inscription');
+            }
         }
 
         async function handleLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
             const res = await fetch('/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -353,344 +251,89 @@
             const data = await res.json();
             if (data.success) {
                 currentUser = data.user;
-                initApp();
+                updateUserBadge();
+                closeModal('login-modal');
+                switchTab('decouvrir');
             } else {
                 alert(data.message || 'Erreur de connexion');
-            }
-        }
-
-        async function handleRegister(e) {
-            e.preventDefault();
-            const formData = new FormData();
-            formData.append('nom', document.getElementById('regNom').value);
-            formData.append('age', document.getElementById('regAge').value);
-            formData.append('email', document.getElementById('regEmail').value);
-            formData.append('password', document.getElementById('regPassword').value);
-            formData.append('genre', document.getElementById('regGenre').value);
-            formData.append('ville', document.getElementById('regVille').value);
-            
-            const photoInput = document.getElementById('regPhoto').files[0];
-            if (photoInput) formData.append('photo', photoInput);
-
-            const res = await fetch('/api/register', { method: 'POST', body: formData });
-            const data = await res.json();
-            if (data.success) {
-                currentUser = data.user;
-                initApp();
-            } else {
-                alert(data.message || 'Erreur lors de l\'inscription');
             }
         }
 
         async function logout() {
             await fetch('/api/logout', { method: 'POST' });
             currentUser = null;
-            document.getElementById('authSection').classList.remove('hidden');
-            document.getElementById('appContainer').classList.add('hidden');
-            document.getElementById('userHeaderInfo').classList.add('hidden');
+            location.reload();
         }
 
-        function initApp() {
-            document.getElementById('authSection').classList.add('hidden');
-            document.getElementById('appContainer').classList.remove('hidden');
-            document.getElementById('userHeaderInfo').classList.remove('hidden');
-
-            updateHeaderAndProfile();
-            switchTab('accueil');
-        }
-
-        function updateHeaderAndProfile() {
-            if (!currentUser) return;
-            document.getElementById('headerCoins').innerText = currentUser.nonvicoins;
-            document.getElementById('headerAvatar').src = currentUser.photo;
-            document.getElementById('headerVipBadge').classList.toggle('hidden', !currentUser.isVip);
-
-            document.getElementById('profilAvatar').src = currentUser.photo;
-            document.getElementById('profilNom').innerText = currentUser.nom + (currentUser.isVip ? ' 👑' : '');
-            document.getElementById('profilEmail').innerText = currentUser.email;
-            document.getElementById('profilCoins').innerText = currentUser.nonvicoins;
-
-            const badgeContainer = document.getElementById('profilBadgeContainer');
-            if (currentUser.isVip) {
-                badgeContainer.innerHTML = `<span class="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full"><i class="fa-solid fa-crown text-amber-500 mr-1"></i> Membre VIP Actif</span>`;
-            } else {
-                badgeContainer.innerHTML = `<button onclick="switchTab('vip')" class="text-xs bg-amber-500 text-white font-bold px-3 py-1 rounded-full shadow hover:bg-amber-600 transition">Devenir VIP</button>`;
-            }
-        }
-
-        function switchTab(tabId) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById('tab-' + tabId).classList.remove('hidden');
-
-            if (tabId === 'accueil') loadProfiles();
-            if (tabId === 'chat') loadChat();
-            if (tabId === 'ecoute') loadRessourcesAndEcoutes();
-            if (tabId === 'publicites') loadPublicites();
-        }
-
-        // --- GESTION PROFIL & DÉCOUVERTE ---
         async function loadProfiles() {
             const res = await fetch('/api/users');
-            allUsers = await res.json();
-            displayProfiles(allUsers);
-        }
-
-        function displayProfiles(users) {
-            const grid = document.getElementById('profilesGrid');
-            grid.innerHTML = '';
-
-            users.forEach(u => {
-                if (currentUser && u.id === currentUser.id) return; // Ne pas s'afficher soi-même
-
-                const isLiked = currentUser && currentUser.likes && currentUser.likes.includes(u.id);
-
-                const card = document.createElement('div');
-                card.className = `bg-white rounded-2xl shadow-sm overflow-hidden border ${u.isBoosted ? 'border-amber-400 ring-2 ring-amber-200' : 'border-slate-100'} flex flex-col`;
-                card.innerHTML = `
-                    <div class="relative h-48 bg-slate-200 cursor-pointer" onclick="visiterProfil('${u.id}')">
-                        <img src="${u.photo}" alt="${u.nom}" class="w-full h-full object-cover">
-                        ${u.isVip ? '<span class="absolute top-2 right-2 bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full font-bold shadow">👑 VIP</span>' : ''}
-                        ${u.isBoosted ? '<span class="absolute top-2 left-2 bg-rose-500 text-white text-xs px-2 py-0.5 rounded-full font-bold shadow"><i class="fa-solid fa-bolt"></i> Boost</span>' : ''}
+            if (res.status === 401) { alert('Veuillez vous connecter pour voir les profils.'); openModal('login-modal'); return; }
+            const users = await res.json();
+            const grid = document.getElementById('profiles-grid');
+            grid.innerHTML = users.map(u => `
+                <div class="bg-white rounded-2xl shadow-sm border p-4 flex flex-col items-center text-center space-y-3">
+                    <img src="${u.photo || '/uploads/default.png'}" class="w-24 h-24 rounded-full object-cover shadow-md">
+                    <div>
+                        <h3 class="font-bold text-lg">${u.nom}, ${u.age || ''}</h3>
+                        <p class="text-xs text-slate-500"><i class="fa-solid fa-location-dot"></i> ${u.ville || 'Non renseignée'}</p>
                     </div>
-                    <div class="p-4 flex-grow flex flex-col justify-between space-y-3">
-                        <div>
-                            <h4 class="font-bold text-slate-800 text-lg flex items-center">${u.nom}, ${u.age || ''}</h4>
-                            <p class="text-xs text-slate-400"><i class="fa-solid fa-location-dot mr-1"></i> ${u.villeOriginale || 'Non spécifié'}</p>
-                            <p class="text-xs text-slate-600 mt-2 line-clamp-2">${u.bio || 'Aucune biographie pour le moment.'}</p>
-                        </div>
-                        <div class="flex items-center gap-2 pt-2 border-t">
-                            <button onclick="toggleLike('${u.id}')" class="flex-grow py-2 rounded-xl text-xs font-bold transition flex items-center justify-center ${isLiked ? 'bg-rose-500 text-white' : 'bg-rose-50 text-rose-600 hover:bg-rose-100'}">
-                                <i class="fa-solid fa-heart mr-1"></i> ${isLiked ? 'Aimé' : 'J\'aime'}
-                            </button>
-                            <button onclick="sendSuperLike('${u.id}')" class="px-3 py-2 bg-amber-50 text-amber-600 hover:bg-amber-100 rounded-xl text-xs font-bold transition" title="Super Like (5 NC si VIP, 10 NC sinon)">
-                                <i class="fa-solid fa-star"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
+                    <p class="text-sm text-slate-600 line-clamp-2">${u.bio || 'Membre de Nonvitcha'}</p>
+                </div>
+            `).join('');
         }
 
-        function filterProfiles() {
-            const query = document.getElementById('filterVille').value.toLowerCase();
-            const filtered = allUsers.filter(u => u.ville && u.ville.includes(query));
-            displayProfiles(filtered);
-        }
-
-        async function visiterProfil(targetId) {
-            await fetch('/api/users/visiter', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetUserId: targetId })
-            });
-        }
-
-        async function toggleLike(targetId) {
-            const res = await fetch('/api/users/like', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetUserId: targetId })
-            });
-            const data = await res.json();
-            if (data.success) {
-                currentUser = data.user;
-                updateHeaderAndProfile();
-                loadProfiles();
-            }
-        }
-
-        async function sendSuperLike(targetId) {
-            const res = await fetch('/api/users/super-like', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ targetUserId: targetId })
-            });
-            const data = await res.json();
-            if (data.success) {
-                currentUser = data.user;
-                updateHeaderAndProfile();
-                alert(data.message);
-            } else {
-                alert(data.message || 'Erreur');
-            }
-        }
-
-        async function boostMyProfile() {
-            const res = await fetch('/api/boost/upgrade', { method: 'POST' });
-            const data = await res.json();
-            if (data.success) {
-                currentUser = data.user;
-                updateHeaderAndProfile();
-                loadProfiles();
-                alert(data.message);
-            } else {
-                alert(data.message || 'Erreur');
-            }
-        }
-
-        async function loadVisiteurs() {
-            const res = await fetch('/api/users/voir-visiteurs', { method: 'POST' });
-            const data = await res.json();
-            if (data.success) {
-                currentUser = data.user;
-                updateHeaderAndProfile();
-                const container = document.getElementById('visiteursContainer');
-                container.innerHTML = '';
-
-                if (data.visiteurs.length === 0) {
-                    container.innerHTML = `<p class="text-xs text-slate-400 italic col-span-full">Aucun visiteur pour le moment.</p>`;
-                    return;
-                }
-
-                data.visiteurs.forEach(v => {
-                    container.innerHTML += `
-                        <div class="flex items-center space-x-2 bg-slate-50 p-2 rounded-xl border">
-                            <img src="${v.photo}" class="w-10 h-10 rounded-full object-cover">
-                            <div>
-                                <p class="text-xs font-bold text-slate-800">${v.nom}, ${v.age || ''}</p>
-                                <p class="text-[10px] text-slate-400">${v.ville || ''}</p>
-                            </div>
-                        </div>
-                    `;
-                });
-            } else {
-                alert(data.message || 'Erreur');
-            }
-        }
-
-        // --- CHAT PUBLIC ---
         async function loadChat() {
             const res = await fetch('/api/chat');
-            const messages = await res.json();
-            const container = document.getElementById('chatMessages');
-            container.innerHTML = '';
-
-            messages.forEach(m => {
-                const isMe = m.userId === currentUser.id;
-                container.innerHTML += `
-                    <div class="flex items-start space-x-2 ${isMe ? 'flex-row-reverse space-x-reverse' : ''}">
-                        <img src="${m.userPhoto}" class="w-8 h-8 rounded-full object-cover">
-                        <div class="max-w-xs md:max-w-md bg-white p-3 rounded-2xl shadow-sm border ${isMe ? 'bg-rose-50 border-rose-100' : ''}">
-                            <div class="flex items-center space-x-2 mb-1">
-                                <span class="text-xs font-bold text-slate-700">${m.userName}</span>
-                                ${m.userVip ? '<span class="text-[10px] bg-amber-100 text-amber-800 px-1.5 rounded-full font-bold">👑 VIP</span>' : ''}
-                                <span class="text-[10px] text-slate-400">${m.time}</span>
-                            </div>
-                            <p class="text-xs text-slate-600">${m.message}</p>
+            if (res.status === 401) return;
+            const msgs = await res.json();
+            const box = document.getElementById('chat-messages');
+            box.innerHTML = msgs.map(m => `
+                <div class="flex items-start space-x-2">
+                    <img src="${m.userPhoto || '/uploads/default.png'}" class="w-8 h-8 rounded-full object-cover">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <span class="font-bold text-sm">${m.userName}</span>
+                            <span class="text-[10px] text-slate-400">${m.time}</span>
                         </div>
+                        <p class="text-sm bg-slate-100 px-3 py-2 rounded-xl mt-1">${m.message}</p>
                     </div>
-                `;
-            });
-            container.scrollTop = container.scrollHeight;
+                </div>
+            `).join('');
+            box.scrollTop = box.scrollHeight;
         }
 
         async function sendChatMessage(e) {
             e.preventDefault();
-            const input = document.getElementById('chatInput');
-            const message = input.value.trim();
-            if (!message) return;
-
+            const input = document.getElementById('chat-input');
             await fetch('/api/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message })
+                body: JSON.stringify({ message: input.value })
             });
             input.value = '';
             loadChat();
         }
 
-        // --- ÉCOUTE & SENSIBILISATION ---
-        async function loadRessourcesAndEcoutes() {
-            const resR = await fetch('/api/ressources');
-            const ressources = await resR.json();
-            const rList = document.getElementById('ressourcesList');
-            rList.innerHTML = '';
-            ressources.forEach(r => {
-                rList.innerHTML += `
-                    <div class="border rounded-xl p-4 space-y-2 bg-slate-50">
-                        <span class="text-[10px] bg-rose-100 text-rose-700 font-bold px-2 py-0.5 rounded-full">${r.categorie}</span>
-                        <h4 class="font-bold text-slate-800 text-sm">${r.titre}</h4>
-                        <p class="text-xs text-slate-500">${r.contenu}</p>
-                    </div>
-                `;
-            });
-
-            const resE = await fetch('/api/ecoutes');
-            const ecoutes = await resE.json();
-            const eHistory = document.getElementById('ecoutesHistory');
-            eHistory.innerHTML = '';
-
-            if (ecoutes.length === 0) {
-                eHistory.innerHTML = `<p class="text-xs text-slate-400 italic">Aucune requête en cours.</p>`;
-                return;
-            }
-
-            ecoutes.forEach(eq => {
-                eHistory.innerHTML += `
-                    <div class="border rounded-xl p-4 space-y-2 bg-white shadow-sm">
-                        <div class="flex justify-between items-center text-xs text-slate-400">
-                            <span>Par ${eq.userName} (${eq.categorie})</span>
-                            <span>${eq.date}</span>
-                        </div>
-                        <p class="text-xs font-semibold text-slate-800">Question : ${eq.message}</p>
-                        ${eq.reponse ? `<div class="bg-emerald-50 border border-emerald-100 p-3 rounded-lg mt-2"><p class="text-xs text-emerald-800 font-semibold">Réponse de l'équipe : ${eq.reponse}</p></div>` : '<p class="text-[11px] text-amber-600 italic">En attente de réponse confidentielle...</p>'}
-                    </div>
-                `;
-            });
-        }
-
-        async function sendEcouteMessage(e) {
-            e.preventDefault();
-            const categorie = document.getElementById('ecouteCategorie').value;
-            const message = document.getElementById('ecouteMessage').value;
-
-            const res = await fetch('/api/ecoutes', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ categorie, message })
-            });
-            const data = await res.json();
-            if (data.success) {
-                document.getElementById('ecouteMessage').value = '';
-                loadRessourcesAndEcoutes();
-                alert('Votre message a été envoyé en toute sécurité.');
-            }
-        }
-
-        // --- ANNONCES & PUBLICITÉS ---
-        async function loadPublicites() {
+        async function loadAnnonces() {
             const res = await fetch('/api/publicites');
             const pubs = await res.json();
-            const grid = document.getElementById('publicitesGrid');
-            grid.innerHTML = '';
-
-            pubs.forEach(p => {
-                grid.innerHTML += `
-                    <div class="bg-white p-5 rounded-2xl shadow-sm border space-y-3">
-                        <div class="flex justify-between items-start">
-                            <h4 class="font-bold text-slate-800">${p.titre}</h4>
-                            <span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold">Annonce</span>
-                        </div>
-                        <p class="text-xs text-slate-600">${p.description}</p>
-                        <div class="flex justify-between items-center pt-2 border-t text-xs text-slate-400">
-                            <span>Par ${p.annonceur} (${p.date})</span>
-                            <span class="font-semibold text-rose-600"><i class="fa-solid fa-phone mr-1"></i> ${p.contact}</span>
-                        </div>
+            document.getElementById('annonces-list').innerHTML = pubs.map(p => `
+                <div class="bg-white p-5 rounded-2xl shadow-sm border space-y-2">
+                    <div class="flex justify-between items-start">
+                        <h3 class="font-bold text-base text-rose-600">${p.titre}</h3>
+                        <span class="text-xs text-slate-400">${p.date}</span>
                     </div>
-                `;
-            });
+                    <p class="text-sm text-slate-600">${p.description}</p>
+                    <div class="text-xs font-semibold text-slate-700 pt-2 border-t">Contact : ${p.contact} (Par ${p.annonceur})</div>
+                </div>
+            `).join('');
         }
 
-        function openPubModal() { document.getElementById('pubModal').classList.remove('hidden'); document.getElementById('pubModal').classList.add('flex'); }
-        function closePubModal() { document.getElementById('pubModal').classList.add('hidden'); document.getElementById('pubModal').classList.remove('flex'); }
-
-        async function submitPub(e) {
+        async function submitAnnonce(e) {
             e.preventDefault();
-            const titre = document.getElementById('pubTitre').value;
-            const description = document.getElementById('pubDescription').value;
-            const contact = document.getElementById('pubContact').value;
-
+            const titre = document.getElementById('annonce-titre').value;
+            const description = document.getElementById('annonce-desc').value;
+            const contact = document.getElementById('annonce-contact').value;
             const res = await fetch('/api/publicites', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -699,58 +342,110 @@
             const data = await res.json();
             if (data.success) {
                 currentUser = data.user;
-                updateHeaderAndProfile();
-                closePubModal();
-                loadPublicites();
+                updateUserBadge();
+                closeModal('annonce-modal');
+                loadAnnonces();
                 alert('Annonce publiée avec succès !');
             } else {
-                alert(data.message || 'Erreur');
-            }
-        }
-
-        // --- VIP & ACHAT COINS ---
-        async function upgradeVip() {
-            const res = await fetch('/api/vip/upgrade', { method: 'POST' });
-            const data = await res.json();
-            if (data.success) {
-                currentUser = data.user;
-                updateHeaderAndProfile();
                 alert(data.message);
-            } else {
-                alert(data.message || 'Erreur');
             }
         }
 
-        async function acheterCoins(pack) {
-            const res = await fetch('/api/coins/acheter', {
+        async function loadEcoutes() {
+            const res = await fetch('/api/ecoutes');
+            if (res.status === 401) return;
+            const list = await res.json();
+            document.getElementById('my-ecoutes-list').innerHTML = list.map(e => `
+                <div class="bg-white p-4 rounded-xl border space-y-2">
+                    <div class="text-xs font-bold text-rose-600">${e.categorie} - ${e.date}</div>
+                    <p class="text-sm text-slate-700"><strong>Ma requête :</strong> ${e.message}</p>
+                    ${e.reponse ? `<p class="text-sm bg-emerald-50 text-emerald-800 p-2 rounded-lg"><strong>Réponse admin :</strong> ${e.reponse}</p>` : `<p class="text-xs text-amber-600 italic">En attente de réponse...</p>`}
+                </div>
+            `).join('');
+        }
+
+        async function submitEcoute(e) {
+            e.preventDefault();
+            const categorie = document.getElementById('ecoute-cat').value;
+            const message = document.getElementById('ecoute-msg').value;
+            const res = await fetch('/api/ecoutes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pack })
+                body: JSON.stringify({ categorie, message })
+            });
+            if (res.ok) {
+                document.getElementById('ecoute-msg').value = '';
+                loadEcoutes();
+                alert('Votre requête a été transmise en toute confidentialité.');
+            }
+        }
+
+        async function adminLogin(e) {
+            e.preventDefault();
+            const password = document.getElementById('admin-pwd-input').value;
+            const res = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
             });
             const data = await res.json();
-            if (data.success && data.url) {
-                window.location.href = data.url; // Redirection vers le portail de paiement FedaPay
-            } else {
-                alert(data.message || 'Erreur lors de l\'initialisation du paiement');
-            }
-        }
-
-        async function updatePhoto(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('photo', file);
-
-            const res = await fetch('/api/user/photo', { method: 'POST', body: formData });
-            const data = await res.json();
             if (data.success) {
-                currentUser = data.user;
-                updateHeaderAndProfile();
-                loadProfiles();
-                alert('Photo de profil mise à jour avec succès !');
+                checkAdminStatus();
+            } else {
+                alert(data.message);
             }
         }
+
+        async function checkAdminStatus() {
+            const res = await fetch('/api/admin/check');
+            const data = await res.json();
+            if (data.isAdmin) {
+                document.getElementById('admin-login-box').classList.add('hidden');
+                document.getElementById('admin-panel').classList.remove('hidden');
+                loadAdminEcoutes();
+            } else {
+                document.getElementById('admin-login-box').classList.remove('hidden');
+                document.getElementById('admin-panel').classList.add('hidden');
+            }
+        }
+
+        async function adminLogout() {
+            await fetch('/api/admin/logout', { method: 'POST' });
+            checkAdminStatus();
+        }
+
+        async function loadAdminEcoutes() {
+            // Utilise l'endpoint général ou équivalent admin pour lister
+            const res = await fetch('/api/ecoutes');
+            // Pour l'admin, on peut adapter pour récupérer toutes les écoutes si besoin dans le serveur, ou afficher
+            const list = await res.json();
+            document.getElementById('admin-ecoutes-list').innerHTML = list.map(e => `
+                <div class="bg-slate-50 p-4 rounded-xl border space-y-2">
+                    <div class="text-xs font-bold">${e.userName} (${e.categorie})</div>
+                    <p class="text-sm">${e.message}</p>
+                    <div class="flex gap-2">
+                        <input type="text" id="rep-${e.id}" placeholder="Écrire une réponse..." class="flex-grow px-3 py-1 border rounded-lg text-sm" value="${e.reponse || ''}">
+                        <button onclick="sendAdminReply(${e.id})" class="px-4 py-1 bg-rose-600 text-white rounded-lg text-sm">Envoyer</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function sendAdminReply(id) {
+            const reponse = document.getElementById(`rep-${id}`).value;
+            const res = await fetch(`/api/admin/ecoutes/${id}/repondre`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reponse })
+            });
+            if (res.ok) {
+                alert('Réponse envoyée !');
+                loadAdminEcoutes();
+            }
+        }
+
+        // Initialisation au chargement
+        checkAuth();
     </script>
 </body>
 </html>

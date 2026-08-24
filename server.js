@@ -8,6 +8,9 @@ const fs = require('fs');
 
 const app = express();
 
+// OBLIGATOIRE POUR RENDER (Gestion des sessions sous HTTPS)
+app.set('trust proxy', 1);
+
 // Création automatique du dossier public/uploads
 const uploadDir = path.join(__dirname, 'public/uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -20,16 +23,20 @@ const pool = new Pool({
     ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
-// Middleware
+// Middlewares de base
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
+// Configuration de la Session corrigée
 app.use(session({
     secret: 'nonvitcha_secret_key_2026',
-    resave: false,
-    saveUninitialized: false,
-    cookie: { maxAge: 24 * 60 * 60 * 1000 }
+    resave: true,
+    saveUninitialized: true,
+    cookie: { 
+        secure: false, // Fonctionne derrière le proxy Render
+        maxAge: 24 * 60 * 60 * 1000 
+    }
 }));
 
 const storage = multer.diskStorage({
@@ -39,12 +46,12 @@ const storage = multer.diskStorage({
 const upload = multer({ storage });
 
 const isAuthenticated = (req, res, next) => {
-    if (req.session.user) return next();
+    if (req.session && req.session.user) return next();
     res.status(401).json({ error: 'Non autorisé' });
 };
 
 const isAdminAuthenticated = (req, res, next) => {
-    if (req.session.isAdmin) return next();
+    if (req.session && req.session.isAdmin) return next();
     res.status(403).json({ error: 'Accès administrateur refusé' });
 };
 
@@ -61,8 +68,17 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
              VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, nom, email, nonvicoins, is_vip`,
             [nom, email, hashedPassword, age, sexe, ville, photoPath]
         );
+
+        // Sauvegarde explicite de la session avant d'envoyer la réponse
         req.session.user = result.rows[0];
-        res.json({ success: true, user: result.rows[0] });
+        req.session.save((err) => {
+            if (err) {
+                console.error("Erreur sauvegarde session:", err);
+                return res.status(500).json({ success: false, message: 'Erreur lors de la création de la session.' });
+            }
+            res.json({ success: true, user: result.rows[0] });
+        });
+
     } catch (err) {
         console.error("Erreur inscription:", err.message);
         if (err.code === '23505') {
@@ -85,8 +101,12 @@ app.post('/api/login', async (req, res) => {
         const match = await bcrypt.compare(password, user.password);
         if (match) {
             await pool.query('UPDATE users SET last_seen = NOW() WHERE id = $1', [user.id]);
+            
             req.session.user = { id: user.id, nom: user.nom, email: user.email, nonvicoins: user.nonvicoins, is_vip: user.is_vip };
-            res.json({ success: true, user: req.session.user });
+            req.session.save((err) => {
+                if (err) return res.status(500).json({ success: false, message: 'Erreur session' });
+                res.json({ success: true, user: req.session.user });
+            });
         } else {
             res.status(400).json({ success: false, message: 'Identifiants incorrects' });
         }
@@ -96,7 +116,7 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.get('/api/me', (req, res) => {
-    if (req.session.user) {
+    if (req.session && req.session.user) {
         res.json({ loggedIn: true, user: req.session.user });
     } else {
         res.json({ loggedIn: false });
@@ -104,8 +124,9 @@ app.get('/api/me', (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-    req.session.destroy();
-    res.json({ success: true });
+    req.session.destroy(() => {
+        res.json({ success: true });
+    });
 });
 
 /* --- ROUTES MEMBRES & RECHERCHE --- */
@@ -287,7 +308,7 @@ app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
     if (password === 'NONVITCHA2026') {
         req.session.isAdmin = true;
-        res.json({ success: true });
+        req.session.save(() => res.json({ success: true }));
     } else {
         res.status(401).json({ success: false, message: 'Mot de passe incorrect' });
     }

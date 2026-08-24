@@ -1,21 +1,31 @@
 const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
 const session = require('express-session');
-const multer = require('multer');
+const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
+const multer = require('multer');
 
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-
-// Code secret pour devenir admin
-const SECRET_ADMIN_CODE = "NONVITCHA2026";
-
-// Configuration de la base de données JSON locale
+const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'database.json');
 
+// Configuration de multer pour l'upload de photos de profil
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadDir = path.join(__dirname, 'public', 'uploads');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const upload = multer({ storage: storage });
+
+// Gestion de la base de données JSON
 function readDb() {
   if (!fs.existsSync(DB_FILE)) {
     const initialData = {
@@ -27,300 +37,214 @@ function readDb() {
       ],
       ecoutes: [],
       chat: [],
-      privateMessages: []
+      privateMessages: [],
+      publicites: []
     };
     fs.writeFileSync(DB_FILE, JSON.stringify(initialData, null, 2));
   }
-  return JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  if (!data.publicites) data.publicites = [];
+  return data;
 }
 
 function writeDb(data) {
   fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
 }
 
-// Configuration Multer pour les images
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const uploadDir = path.join(__dirname, 'public', 'uploads');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
-});
-const upload = multer({ storage: storage });
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({ extended: true }));
 app.use(session({
-  secret: 'nonvitcha-secret-key-2026',
+  secret: 'nonvitcha_secret_key_2026',
   resave: false,
   saveUninitialized: false,
-  cookie: { secure: false }
+  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 heures
 }));
 
-// Stockage des sockets connectés
-const onlineUsers = new Map();
+app.use(express.static(path.join(__dirname, 'public')));
 
 // --- ROUTES AUTHENTIFICATION ---
 
-app.post('/api/auth/register', (req, res) => {
-  const { email, password, nom, age, ville, adminCode } = req.body;
-  const db = readDb();
+app.post('/api/register', upload.single('photo'), (req, res) => {
+  const { nom, email, password, genre, recherche, bio, age, ville } = req.body;
+  if (!nom || !email || !password) {
+    return res.status(400).json({ success: false, message: 'Nom, email et mot de passe requis.' });
+  }
 
+  const db = readDb();
   if (db.users.find(u => u.email === email)) {
     return res.status(400).json({ success: false, message: 'Cet email est déjà utilisé.' });
   }
 
-  // Vérification du code secret admin
-  let isAdmin = false;
-  if (adminCode && adminCode === SECRET_ADMIN_CODE) {
-    isAdmin = true;
-  }
-
   const newUser = {
     id: Date.now().toString(),
+    nom,
     email,
     password,
-    nom,
-    age: parseInt(age) || 18,
-    ville: ville || 'Inconnue',
-    photo: '/uploads/default.png',
-    nonvicoins: 10,
+    genre: genre || 'Non spécifié',
+    recherche: recherche || 'Tous',
+    bio: bio || '',
+    age: age || '',
+    ville: ville || '',
+    photo: req.file ? `/uploads/${req.file.filename}` : '/uploads/default.png',
+    nonvicoins: 100, // Bonus de départ
     isVip: false,
-    likes: 0,
-    isAdmin: isAdmin
+    isAdmin: db.users.length === 0, // Le premier inscrit est admin
+    online: true,
+    lastSeen: new Date().toISOString()
   };
 
   db.users.push(newUser);
   writeDb(db);
 
   req.session.userId = newUser.id;
-  res.json({ success: true });
+  const { password: _, ...safeUser } = newUser;
+  res.json({ success: true, user: safeUser });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/login', (req, res) => {
   const { email, password } = req.body;
   const db = readDb();
   const user = db.users.find(u => u.email === email && u.password === password);
 
   if (!user) {
-    return res.status(400).json({ success: false, message: 'Email ou mot de passe incorrect.' });
+    return res.status(401).json({ success: false, message: 'Email ou mot de passe incorrect.' });
   }
 
+  user.online = true;
+  user.lastSeen = new Date().toISOString();
+  writeDb(db);
+
   req.session.userId = user.id;
-  res.json({ success: true });
+  const { password: _, ...safeUser } = user;
+  res.json({ success: true, user: safeUser });
 });
 
-app.post('/api/auth/logout', (req, res) => {
+app.get('/api/me', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  if (!user) return res.status(401).json({ success: false });
+
+  const { password: _, ...safeUser } = user;
+  res.json({ success: true, user: safeUser });
+});
+
+app.post('/api/logout', (req, res) => {
+  if (req.session.userId) {
+    const db = readDb();
+    const user = db.users.find(u => u.id === req.session.userId);
+    if (user) {
+      user.online = false;
+      user.lastSeen = new Date().toISOString();
+      writeDb(db);
+    }
+  }
   req.session.destroy();
   res.json({ success: true });
 });
 
-app.get('/api/auth/me', (req, res) => {
-  if (!req.session.userId) {
-    return res.json({ loggedIn: false });
-  }
-  const db = readDb();
-  const user = db.users.find(u => u.id === req.session.userId);
-  if (!user) {
-    return res.json({ loggedIn: false });
-  }
-  const { password, ...safeUser } = user;
-  res.json({ loggedIn: true, user: safeUser });
-});
-
-// --- ROUTES UTILISATEURS & PROFIL ---
+// --- ROUTES UTILISATEURS & MATCHING ---
 
 app.get('/api/users', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
   const db = readDb();
-  const users = db.users.map(({ password, ...u }) => u);
-  res.json(users);
+  const safeUsers = db.users.map(({ password, ...u }) => u);
+  res.json(safeUsers);
 });
 
-app.get('/api/online-users', (req, res) => {
-  res.json(Array.from(onlineUsers.keys()));
-});
-
-app.post('/api/users/upload-photo', upload.single('photo'), (req, res) => {
-  if (!req.session.userId || !req.file) {
-    return res.status(400).json({ success: false });
-  }
-  const db = readDb();
-  const user = db.users.find(u => u.id === req.session.userId);
-  if (!user) return res.status(404).json({ success: false });
-
-  user.photo = `/uploads/${req.file.filename}`;
-  writeDb(db);
-
-  const { password, ...safeUser } = user;
-  res.json({ success: true, user: safeUser });
-});
-
-app.post('/api/users/:id/like', (req, res) => {
-  const db = readDb();
-  const user = db.users.find(u => u.id === req.params.id);
-  if (user) {
-    user.likes = (user.likes || 0) + 1;
-    writeDb(db);
-    res.json({ success: true });
-  } else {
-    res.status(404).json({ success: false });
-  }
-});
-
-// --- ESPACE ADMIN & ÉCOUTES ---
-
-app.get('/api/admin/ecoutes', (req, res) => {
-  if (!req.session.userId) return res.status(401).json({ success: false, error: "Non connecté" });
-  const db = readDb();
-  const user = db.users.find(u => u.id === req.session.userId);
-  
-  if (!user || !user.isAdmin) {
-    return res.status(403).json({ success: false, error: "Accès refusé. Réservé aux administrateurs." });
-  }
-
-  res.json({ success: true, ecoutes: db.ecoutes || [] });
-});
-
-app.post('/api/ecoute', (req, res) => {
-  const { sujet, message } = req.body;
-  if (!sujet || !message) {
-    return res.status(400).json({ success: false, message: 'Le sujet et le message sont requis.' });
-  }
-
-  const db = readDb();
-  if (!db.ecoutes) db.ecoutes = [];
-
-  const nouvelleDemande = {
-    id: Date.now().toString(),
-    sujet,
-    message,
-    date: new Date().toLocaleDateString('fr-FR')
-  };
-
-  db.ecoutes.unshift(nouvelleDemande);
-  writeDb(db);
-
-  res.json({ success: true, message: 'Votre demande d\'écoute confidentielle a bien été transmise à l\'équipe.' });
-});
-
-// --- RESSOURCES & TCHAT ---
-
-app.get('/api/ressources', (req, res) => {
-  const db = readDb();
-  const { categorie } = req.query;
-  if (categorie) {
-    return res.json(db.ressources.filter(r => r.categorie === categorie));
-  }
-  res.json(db.ressources);
-});
+// --- ROUTES CHAT PUBLIC ---
 
 app.get('/api/chat', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
   const db = readDb();
   res.json(db.chat || []);
 });
 
-app.delete('/api/chat/:id', (req, res) => {
+app.post('/api/chat', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
+  const { message } = req.body;
+  if (!message || !message.trim()) return res.status(400).json({ success: false });
+
   const db = readDb();
-  db.chat = (db.chat || []).filter(m => m.id !== req.params.id);
+  const user = db.users.find(u => u.id === req.session.userId);
+  if (!user) return res.status(401).json({ success: false });
+
+  const newMessage = {
+    id: Date.now().toString(),
+    userId: user.id,
+    userName: user.nom,
+    userPhoto: user.photo,
+    message: message.trim(),
+    time: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+  };
+
+  db.chat.push(newMessage);
+  if (db.chat.length > 100) db.chat.shift(); // Garder les 100 derniers messages
   writeDb(db);
-  io.emit('delete-public-message', req.params.id);
-  res.json({ success: true });
+
+  res.json({ success: true, message: newMessage });
 });
 
-app.get('/api/private-messages/:targetId', (req, res) => {
-  if (!req.session.userId) return res.json([]);
+// --- ROUTES PUBLICITÉS SPONSORISÉES ---
+
+app.get('/api/publicites', (req, res) => {
   const db = readDb();
-  const currentId = req.session.userId;
-  const targetId = req.params.id || req.params.targetId;
-
-  const messages = (db.privateMessages || []).filter(m => 
-    (m.senderId === currentId && m.targetId === targetId) ||
-    (m.senderId === targetId && m.targetId === currentId)
-  );
-  res.json(messages);
+  res.json(db.publicites || []);
 });
 
-app.get('/api/unread-messages', (req, res) => {
-  if (!req.session.userId) return res.json({});
+app.post('/api/publicites', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false, message: 'Non connecté.' });
+  const { titre, description, contact } = req.body;
+  
+  if (!titre || !description) {
+    return res.status(400).json({ success: false, message: 'Le titre et la description sont requis.' });
+  }
+
   const db = readDb();
-  const unreadCounts = {};
-  res.json(unreadCounts);
+  const user = db.users.find(u => u.id === req.session.userId);
+  if (!user) return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
+
+  const coutPubCoins = 50;
+  if ((user.nonvicoins || 0) < coutPubCoins && !user.isAdmin) {
+    return res.status(400).json({ success: false, message: `Solde insuffisant ! Une publication publicitaire coûte ${coutPubCoins} Nonvicoins.` });
+  }
+
+  if (!user.isAdmin) {
+    user.nonvicoins -= coutPubCoins;
+  }
+
+  if (!db.publicites) db.publicites = [];
+
+  const nouvellePub = {
+    id: Date.now().toString(),
+    titre,
+    description,
+    contact: contact || user.email,
+    annonceur: user.nom,
+    date: new Date().toLocaleDateString('fr-FR')
+  };
+
+  db.publicites.unshift(nouvellePub);
+  writeDb(db);
+
+  const { password: _, ...safeUser } = user;
+  res.json({ success: true, user: safeUser, publicites: db.publicites });
 });
 
-// --- WEBSOCKETS (SOCKET.IO) ---
+app.delete('/api/publicites/:id', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ success: false, message: 'Réservé aux administrateurs.' });
+  }
 
-io.on('connection', (socket) => {
-  console.log('Un utilisateur s\'est connecté sur le socket');
-
-  socket.on('join', (userId) => {
-    onlineUsers.set(userId, socket.id);
-    io.emit('update-users');
-  });
-
-  socket.on('send-public-message', (data) => {
-    const db = readDb();
-    if (!db.chat) db.chat = [];
-    const newMessage = {
-      id: Date.now().toString(),
-      sender: data.sender,
-      text: data.text,
-      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    db.chat.push(newMessage);
-    writeDb(db);
-    io.emit('new-public-message', newMessage);
-  });
-
-  socket.on('send-private-message', (data) => {
-    const db = readDb();
-    if (!db.privateMessages) db.privateMessages = [];
-    const newMessage = {
-      id: Date.now().toString(),
-      senderId: data.senderId,
-      senderName: data.senderName,
-      targetId: data.targetId,
-      text: data.text,
-      date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    db.privateMessages.push(newMessage);
-    writeDb(db);
-
-    io.emit(`private-message-${data.targetId}`, newMessage);
-    io.emit(`private-message-${data.senderId}`, newMessage);
-  });
-
-  socket.on('typing', (data) => {
-    io.emit(`typing-${data.targetId}`, { senderName: data.senderName });
-  });
-
-  socket.on('stop-typing', (data) => {
-    io.emit(`stop-typing-${data.targetId}`);
-  });
-
-  socket.on('update-users', () => {
-    io.emit('update-users');
-  });
-
-  socket.on('disconnect', () => {
-    for (let [userId, sockId] of onlineUsers.entries()) {
-      if (sockId === socket.id) {
-        onlineUsers.delete(userId);
-        break;
-      }
-    }
-    io.emit('update-users');
-    console.log('Un utilisateur s\'est déconnecté');
-  });
+  db.publicites = (db.publicites || []).filter(p => p.id !== req.params.id);
+  writeDb(db);
+  res.json({ success: true, publicites: db.publicites });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Serveur Nonvitcha démarré sur le port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Serveur Nonvitcha lancé sur le port ${PORT}`);
 });

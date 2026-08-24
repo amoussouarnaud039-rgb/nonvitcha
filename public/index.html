@@ -3,590 +3,332 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nonvitcha - Rencontres & Tchat</title>
-  <script src="https://cdn.fedapay.com/checkout.js?v=1.1.7"></script>
-  <script src="/socket.io/socket.io.js"></script>
+  <title>Nonvitcha - Social & Dating</title>
   <style>
-    :root { --primary: #e91e63; --bg: #f5f5f5; --card-bg: #ffffff; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: var(--bg); margin: 0; padding: 20px; color: #333; }
-    .container { max-width: 900px; margin: 0 auto; }
-    header { display: flex; justify-content: space-between; align-items: center; background: var(--primary); color: white; padding: 15px 20px; border-radius: 10px; margin-bottom: 20px; }
-    .card { background: var(--card-bg); padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 0; color: #333; }
+    header { background: #e91e63; color: white; padding: 15px; text-align: center; }
+    .container { max-width: 800px; margin: 20px auto; padding: 15px; }
+    .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    input, select, textarea, button { width: 100%; padding: 10px; margin: 8px 0; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+    button { background: #e91e63; color: white; border: none; cursor: pointer; font-weight: bold; }
+    button:hover { background: #d81b60; }
+    .btn-danger { background: #d9534f; }
+    .btn-danger:hover { background: #c9302c; }
     .hidden { display: none !important; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
-    .user-card { border: 1px solid #ddd; border-radius: 8px; padding: 15px; text-align: center; background: #fff; position: relative; }
-    .user-card img { width: 90px; height: 90px; border-radius: 50%; object-fit: cover; }
-    .badge-vip { background: #ffd700; color: #000; font-weight: bold; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; }
-    .badge-unread { background: #e91e63; color: white; border-radius: 50%; padding: 2px 6px; font-size: 0.75em; position: absolute; top: 10px; right: 10px; font-weight: bold; }
-    .status-dot { height: 10px; width: 10px; background-color: #bbb; border-radius: 50%; display: inline-block; margin-right: 5px; }
-    .status-online { background-color: #4CAF50; box-shadow: 0 0 5px #4CAF50; }
-    button { background: var(--primary); color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-top: 5px; }
-    button:hover { opacity: 0.9; }
-    button.btn-alt { background: #333; }
-    button.btn-blue { background: #2196F3; }
-    button.btn-danger { background: #f44336; padding: 2px 6px; font-size: 0.7em; margin-left: 10px; }
-    input, select, textarea { width: 100%; padding: 8px; margin: 5px 0 15px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-    .chat-box { height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; background: #fafafa; margin-bottom: 10px; border-radius: 5px; }
-    .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px; }
-    .filter-bar input, .filter-bar select { flex: 1; min-width: 150px; margin: 0; }
+    .profile-img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; }
+    .user-card { display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #eee; padding: 10px 0; }
   </style>
 </head>
 <body>
 
-<div class="container">
   <header>
-    <h1>Nonvitcha 💕</h1>
-    <div id="header-auth"></div>
+    <h1>Nonvitcha 💖</h1>
+    <p>Application de Découverte Sociale & Rencontres</p>
   </header>
 
-  <!-- CONNEXION / INSCRIPTION -->
-  <div id="auth-section" class="card">
-    <h2>Connexion / Inscription</h2>
-    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
-      <div style="flex: 1; min-width: 250px;">
-        <h3>Se connecter</h3>
-        <input type="email" id="login-email" placeholder="Email">
-        <input type="password" id="login-pass" placeholder="Mot de passe">
-        <button onclick="login()">Se connecter</button>
+  <div class="container">
+
+    <!-- SECTION AUTH (CONNEXION / INSCRIPTION) -->
+    <div id="auth-section" class="card">
+      <div id="login-form-container">
+        <h2>Connexion</h2>
+        <form onsubmit="handleLogin(event)">
+          <input type="email" id="login-email" placeholder="Email" required>
+          <input type="password" id="login-password" placeholder="Mot de passe" required>
+          <button type="submit">Se connecter</button>
+        </form>
+        <p>Pas encore de compte ? <a href="#" onclick="toggleAuth(event)">S'inscrire</a></p>
       </div>
-      <div style="flex: 1; min-width: 250px;">
-        <h3>S'inscrire</h3>
-        <input type="email" id="reg-email" placeholder="Email (ex: mon@email.com)" required>
-        <input type="password" id="reg-pass" placeholder="Mot de passe" required>
-        <input type="text" id="reg-nom" placeholder="Nom" required>
-        <input type="number" id="reg-age" placeholder="Âge" required>
-        <input type="text" id="reg-ville" placeholder="Ville (ex: Cotonou)" required>
-        <input type="password" id="reg-admin-code" placeholder="Code secret Admin (optionnel)">
-        <button onclick="register()">Créer un compte</button>
+
+      <div id="register-form-container" class="hidden">
+        <h2>Inscription</h2>
+        <form onsubmit="handleRegister(event)" enctype="multipart/form-data">
+          <input type="text" name="nom" placeholder="Nom complet" required>
+          <input type="email" name="email" placeholder="Email" required>
+          <input type="password" name="password" placeholder="Mot de passe" required>
+          <select name="genre">
+            <option value="Homme">Homme</option>
+            <option value="Femme">Femme</option>
+          </select>
+          <select name="recherche">
+            <option value="Tous">Recherche : Tous</option>
+            <option value="Homme">Recherche : Hommes</option>
+            <option value="Femme">Recherche : Femmes</option>
+          </select>
+          <input type="text" name="ville" placeholder="Ville / Localisation">
+          <input type="number" name="age" placeholder="Âge">
+          <textarea name="bio" placeholder="Parlez un peu de vous..."></textarea>
+          <label>Photo de profil :</label>
+          <input type="file" name="photo" accept="image/*">
+          <button type="submit">Créer mon compte</button>
+        </form>
+        <p>Déjà un compte ? <a href="#" onclick="toggleAuth(event)">Se connecter</a></p>
       </div>
     </div>
-  </div>
 
-  <!-- APPLICATION -->
-  <div id="app-section" class="hidden">
-    
-    <!-- MON PROFIL -->
-    <div class="card" id="profile-card"></div>
-
-    <!-- ESPACE ADMINISTRATEUR (Strictement réservé aux admins) -->
-    <div class="card hidden" id="admin-section" style="border: 2px solid #e91e63; background: #fff8fb;">
-      <h2>👑 Espace Administrateur & Gestion</h2>
-      <p style="color: #666; font-size: 0.9em;">Panneau de modération et consultation des demandes d'écoute confidentielles.</p>
-      <h3>💬 Demandes d'écoute reçues :</h3>
-      <div id="admin-ecoutes-list" style="max-height: 250px; overflow-y: auto; background: white; padding: 10px; border-radius: 5px; border: 1px solid #ddd;"></div>
-    </div>
-
-    <!-- SALLE D'INFORMATION ET D'ÉCOUTE -->
-    <div class="card">
-      <h2>📚 Salle d'Information et d'Écoute</h2>
+    <!-- SECTION APPLICATION PRINCIPALE -->
+    <div id="app-section" class="hidden">
       
-      <div style="margin-bottom: 15px; display: flex; gap: 5px; flex-wrap: wrap;">
-        <button onclick="chargerRessources()">Tous</button>
-        <button onclick="chargerRessources('SSR')" class="btn-blue">SSR</button>
-        <button onclick="chargerRessources('VBG')" style="background: #e91e63;">VBG</button>
-        <button onclick="chargerRessources('MINORITES')" class="btn-alt">Minorités</button>
+      <!-- PROFIL & SOLDE -->
+      <div class="card" style="display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 15px;">
+          <img id="user-avatar" src="" alt="Avatar" class="profile-img">
+          <div>
+            <h3 id="user-name" style="margin: 0;"></h3>
+            <p id="user-coins" style="margin: 5px 0 0; color: #e91e63; font-weight: bold;"></p>
+          </div>
+        </div>
+        <button onclick="handleLogout()" style="width: auto; padding: 8px 15px; background: #666;">Déconnexion</button>
       </div>
 
-      <div id="liste-ressources" style="max-height: 250px; overflow-y: auto; margin-bottom: 20px; border: 1px solid #ddd; padding: 10px; border-radius: 5px; background: #fafafa;"></div>
+      <!-- ESPACE PUBLICITAIRE & ANNONCES SPONSORISÉES -->
+      <div class="card" style="border: 2px dashed #ff9800; background: #fffdf5;">
+        <h2>📢 Espaces Publicitaires & Annonces Partenaires</h2>
+        <p style="color: #666; font-size: 0.9em;">Mettez en avant votre entreprise, vos services ou vos événements sur Nonvitcha ! (Coût : 50 Nonvicoins par annonce).</p>
+        
+        <!-- Liste des pubs affichées -->
+        <div id="liste-publicites" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin-bottom: 20px;"></div>
 
-      <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+        <hr style="border: 0; border-top: 1px solid #ddd; margin: 15px 0;">
 
-      <h3>💬 Demande d'écoute confidentielle</h3>
-      <form id="form-ecoute" onsubmit="envoyerDemandeEcoute(event)">
-        <input type="text" id="sujet-ecoute" placeholder="Sujet (ex: Conseil, Soutien...)" required>
-        <textarea id="message-ecoute" placeholder="Exprimez-vous en toute sécurité..." style="height: 80px;" required></textarea>
-        <button type="submit" style="background-color: #4CAF50;">Envoyer en toute confidentialité</button>
-      </form>
-      <p id="feedback-ecoute" style="margin-top: 8px; font-weight: bold;"></p>
-    </div>
-
-    <!-- TCHAT PRIVÉ -->
-    <div id="private-chat-section" class="card hidden" style="border: 2px solid #2196F3;">
-      <h2>Discussion privée avec <span id="chat-target-name" style="color: #2196F3;"></span></h2>
-      <div id="private-chat-box" class="chat-box"></div>
-      <div id="typing-indicator" style="font-size: 0.85em; color: #666; font-style: italic; height: 20px; margin-bottom: 5px;"></div>
-      <div style="display: flex; gap: 10px;">
-        <input type="text" id="private-msg-input" placeholder="Écrivez votre message privé..." oninput="notifyTyping()" onkeypress="handlePrivateKeyPress(event)">
-        <button onclick="sendPrivateMessage()" class="btn-blue">Envoyer</button>
-        <button onclick="closePrivateChat()" class="btn-alt">Fermer</button>
+        <h3>✍️ Publier une annonce publicitaire</h3>
+        <form id="form-pub" onsubmit="envoyerPublicite(event)">
+          <input type="text" id="pub-titre" placeholder="Titre de votre offre ou service" required>
+          <textarea id="pub-desc" placeholder="Description détaillée de votre publicité..." style="height: 60px;" required></textarea>
+          <input type="text" id="pub-contact" placeholder="Contact (Téléphone, WhatsApp ou Email)" required>
+          <button type="submit" style="background-color: #ff9800; color: white;">Publier l'annonce (50 Coins)</button>
+        </form>
+        <p id="feedback-pub" style="margin-top: 8px; font-weight: bold;"></p>
       </div>
-    </div>
 
-    <!-- LISTE DES MEMBRES & FILTRES -->
-    <div class="card">
-      <h2>Membres Nonvitcha</h2>
-      <div class="filter-bar">
-        <input type="text" id="search-name" placeholder="🔍 Rechercher par nom..." oninput="filterAndRenderUsers()">
-        <input type="text" id="search-ville" placeholder="📍 Filtrer par ville..." oninput="filterAndRenderUsers()">
-        <select id="filter-status" onchange="filterAndRenderUsers()">
-          <option value="all">Tous les statuts</option>
-          <option value="vip">Membres VIP ⭐</option>
-          <option value="online">En ligne uniquement 🟢</option>
-        </select>
+      <!-- DÉCOUVERTE / UTILISATEURS -->
+      <div class="card">
+        <h2>💖 Profils Recommandés</h2>
+        <div id="users-list">Chargement des profils...</div>
       </div>
-      <div id="users-list" class="grid"></div>
-    </div>
 
-    <!-- TCHAT PUBLIC -->
-    <div class="card">
-      <h2>Tchat Public 💬</h2>
-      <div id="public-chat" class="chat-box"></div>
-      <div style="display: flex; gap: 10px;">
-        <input type="text" id="public-msg-input" placeholder="Écrivez un message public..." onkeypress="handlePublicKeyPress(event)">
-        <button onclick="sendPublicMessage()">Envoyer</button>
+      <!-- CHAT PUBLIC -->
+      <div class="card">
+        <h2>💬 Salon de Discussion Général</h2>
+        <div id="chat-box" style="height: 200px; overflow-y: scroll; border: 1px solid #eee; padding: 10px; margin-bottom: 10px; background: #fafafa;"></div>
+        <form onsubmit="sendChatMessage(event)" style="display: flex; gap: 10px; margin: 0;">
+          <input type="text" id="chat-input" placeholder="Écrivez votre message..." style="margin: 0;" required>
+          <button type="submit" style="width: 120px; margin: 0;">Envoyer</button>
+        </form>
       </div>
+
     </div>
 
   </div>
-</div>
 
-<script>
-  let currentUser = null;
-  let activeTargetId = null;
-  let allUsersCache = [];
-  let onlineIdsCache = [];
-  let unreadCountsCache = {};
-  let typingTimeout = null;
-  const socket = io();
+  <script>
+    let currentUser = null;
 
-  async function checkAuth() {
-    const res = await fetch('/api/auth/me');
-    const data = await res.json();
-    if (data.loggedIn) {
-      currentUser = data.user;
-      showAppUI();
-      initSocketsListeners();
-      chargerRessources();
-    } else {
-      currentUser = null;
-      showAuthUI();
-    }
-  }
-
-  function showAuthUI() {
-    document.getElementById('auth-section').classList.remove('hidden');
-    document.getElementById('app-section').classList.add('hidden');
-    document.getElementById('admin-section').classList.add('hidden');
-    document.getElementById('header-auth').innerHTML = '';
-  }
-
-  function showAppUI() {
-    document.getElementById('auth-section').classList.add('hidden');
-    document.getElementById('app-section').classList.remove('hidden');
-    
-    // Gestion stricte de l'affichage de l'espace admin
-    const adminSection = document.getElementById('admin-section');
-    if (currentUser && currentUser.isAdmin) {
-      adminSection.classList.remove('hidden');
-      loadAdminData();
-    } else {
-      adminSection.classList.add('hidden');
+    // Vérifier la session au chargement
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/me');
+        const data = await res.json();
+        if (data.success) {
+          currentUser = data.user;
+          showAppUI();
+        }
+      } catch (err) {
+        console.error("Non connecté");
+      }
     }
 
-    document.getElementById('header-auth').innerHTML = `
-      <span>Bonjour, <strong>${currentUser.nom}</strong> ${currentUser.isAdmin ? '👑 (Admin)' : ''}</span>
-      <button onclick="logout()" class="btn-alt">Déconnexion</button>
-    `;
-    renderProfile();
-    loadUsersData();
-    loadPublicChat();
-  }
+    function toggleAuth(event) {
+      event.preventDefault();
+      document.getElementById('login-form-container').classList.toggle('hidden');
+      document.getElementById('register-form-container').classList.toggle('hidden');
+    }
 
-  async function loadAdminData() {
-    try {
-      const res = await fetch('/api/admin/ecoutes');
+    async function handleLogin(event) {
+      event.preventDefault();
+      const email = document.getElementById('login-email').value;
+      const password = document.getElementById('login-password').value;
+
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
       const data = await res.json();
-      const list = document.getElementById('admin-ecoutes-list');
-      if (!data.success || !data.ecoutes || data.ecoutes.length === 0) {
-        list.innerHTML = '<p style="color: #666; text-align: center; margin: 0;">Aucune demande d\'écoute pour le moment.</p>';
+
+      if (data.success) {
+        currentUser = data.user;
+        showAppUI();
+      } else {
+        alert(data.message);
+      }
+    }
+
+    async function handleRegister(event) {
+      event.preventDefault();
+      const form = event.target;
+      const formData = new FormData(form);
+
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        currentUser = data.user;
+        showAppUI();
+      } else {
+        alert(data.message);
+      }
+    }
+
+    async function handleLogout() {
+      await fetch('/api/logout', { method: 'POST' });
+      currentUser = null;
+      document.getElementById('app-section').classList.add('hidden');
+      document.getElementById('auth-section').classList.remove('hidden');
+    }
+
+    function showAppUI() {
+      document.getElementById('auth-section').classList.add('hidden');
+      document.getElementById('app-section').classList.remove('hidden');
+
+      document.getElementById('user-avatar').src = currentUser.photo;
+      document.getElementById('user-name').textContent = currentUser.nom + (currentUser.isAdmin ? ' (Admin)' : '');
+      document.getElementById('user-coins').textContent = `💰 Solde : ${currentUser.nonvicoins || 0} Nonvicoins`;
+
+      loadUsers();
+      loadChat();
+      loadPublicites();
+    }
+
+    async function loadUsers() {
+      const res = await fetch('/api/users');
+      const users = await res.json();
+      const container = document.getElementById('users-list');
+
+      const filtered = users.filter(u => u.id !== currentUser.id);
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<p>Aucun autre utilisateur pour le moment.</p>';
         return;
       }
-      list.innerHTML = data.ecoutes.map(e => `
-        <div style="background: white; padding: 10px; margin-bottom: 8px; border-radius: 4px; border: 1px solid #ddd;">
-          <strong style="color: var(--primary);">Sujet : ${e.sujet}</strong>
-          <p style="margin: 5px 0 0; color: #333;">${e.message}</p>
+
+      container.innerHTML = filtered.map(u => `
+        <div class="user-card">
+          <img src="${u.photo}" class="profile-img" alt="Avatar">
+          <div style="flex-grow: 1;">
+            <h4 style="margin: 0 0 5px 0;">${u.nom}, ${u.age || '?'} ans (${u.ville || 'Non renseigné'})</h4>
+            <p style="margin: 0; color: #666; font-size: 0.9em;">${u.bio || 'Aucune biographie.'}</p>
+          </div>
+          <span style="height: 12px; width: 12px; background-color: ${u.online ? '#4CAF50' : '#ccc'}; border-radius: 50%; display: inline-block;" title="${u.online ? 'En ligne' : 'Hors ligne'}"></span>
         </div>
       `).join('');
-    } catch (err) {
-      console.error("Erreur chargement admin:", err);
-    }
-  }
-
-  function initSocketsListeners() {
-    socket.off('new-public-message');
-    socket.on('new-public-message', (m) => {
-      const box = document.getElementById('public-chat');
-      const isAtBottom = box.scrollHeight - box.scrollTop <= box.clientHeight + 50;
-      const canDelete = m.sender === currentUser.nom ? `<button class="btn-danger" onclick="deletePublicMessage('${m.id}')">Supprimer</button>` : '';
-      box.innerHTML += `<div id="pub-msg-${m.id}"><strong>[${m.date}] ${m.sender} :</strong> ${m.text} ${canDelete}</div>`;
-      if (isAtBottom) box.scrollTop = box.scrollHeight;
-    });
-
-    socket.off('delete-public-message');
-    socket.on('delete-public-message', (msgId) => {
-      const el = document.getElementById(`pub-msg-${msgId}`);
-      if (el) el.remove();
-    });
-
-    socket.off('update-users');
-    socket.on('update-users', () => {
-      loadUsersData();
-    });
-
-    socket.off(`private-message-${currentUser.id}`);
-    socket.on(`private-message-${currentUser.id}`, (m) => {
-      if (activeTargetId === m.senderId || activeTargetId === m.targetId) {
-        loadPrivateMessages();
-      }
-    });
-
-    socket.off(`unread-update-${currentUser.id}`);
-    socket.on(`unread-update-${currentUser.id}`, () => {
-      loadUsersData();
-    });
-
-    socket.off(`typing-${currentUser.id}`);
-    socket.on(`typing-${currentUser.id}`, (data) => {
-      if (activeTargetId) {
-        document.getElementById('typing-indicator').innerText = `${data.senderName} est en train d'écrire...`;
-      }
-    });
-
-    socket.off(`stop-typing-${currentUser.id}`);
-    socket.on(`stop-typing-${currentUser.id}`, () => {
-      document.getElementById('typing-indicator').innerText = '';
-    });
-  }
-
-  async function login() {
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-pass').value;
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
-    });
-    const data = await res.json();
-    if (data.success) checkAuth();
-    else alert(data.message);
-  }
-
-  async function register() {
-    const email = document.getElementById('reg-email').value;
-    const password = document.getElementById('reg-pass').value;
-    const nom = document.getElementById('reg-nom').value;
-    const age = document.getElementById('reg-age').value;
-    const ville = document.getElementById('reg-ville').value;
-    const adminCode = document.getElementById('reg-admin-code').value;
-
-    if (!email || !password || !nom) {
-      alert('Veuillez remplir les champs obligatoires (Email, Mot de passe, Nom).');
-      return;
     }
 
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password, nom, age, ville, adminCode })
-    });
-    const data = await res.json();
-    if (data.success) checkAuth();
-    else alert(data.message);
-  }
+    async function loadChat() {
+      const res = await fetch('/api/chat');
+      const messages = await res.json();
+      const box = document.getElementById('chat-box');
 
-  async function logout() {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    checkAuth();
-  }
-
-  function renderProfile() {
-    const card = document.getElementById('profile-card');
-    const vipBadge = currentUser.isVip ? '<span class="badge-vip">⭐ MEMBRE VIP</span>' : '<span>Statut Standard</span>';
-
-    card.innerHTML = `
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 20px;">
-        <div style="text-align: center;">
-          <img src="${currentUser.photo}" alt="${currentUser.nom}" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 3px solid var(--primary);"><br>
-          <input type="file" id="photo-input" accept="image/*" style="margin-top: 10px; width: 180px; font-size: 0.8em;">
-          <button onclick="uploadPhoto()" style="padding: 4px 10px; font-size: 0.8em;">Changer photo</button>
+      box.innerHTML = messages.map(m => `
+        <div style="margin-bottom: 8px; font-size: 0.95em;">
+          <strong style="color: #e91e63;">${m.userName}</strong> <span style="font-size: 0.8em; color: #999;">(${m.time})</span> : ${m.message}
         </div>
-        <div style="flex: 1; min-width: 200px;">
-          <h2>Mon Profil ${vipBadge}</h2>
-          <p><strong>Nom :</strong> ${currentUser.nom} (${currentUser.age} ans)</p>
-          <p><strong>Ville :</strong> ${currentUser.ville}</p>
-          <p><strong>Mes Likes :</strong> ❤️ ${currentUser.likes || 0}</p>
-          <p style="font-size: 1.1em;"><strong>Solde :</strong> 💰 <strong>${currentUser.nonvicoins || 0}</strong> Nonvicoins</p>
-        </div>
-        <div>
-          <button onclick="buyCoins('${currentUser.id}')">Acheter +50 Coins</button><br>
-          ${!currentUser.isVip ? `<button onclick="becomeVip('${currentUser.id}')" style="background: #ffd700; color: #000;">Passer VIP (100 coins)</button>` : ''}
-        </div>
-      </div>
-    `;
-  }
-
-  async function uploadPhoto() {
-    const fileInput = document.getElementById('photo-input');
-    if (fileInput.files.length === 0) return alert('Veuillez sélectionner une image.');
-    const formData = new FormData();
-    formData.append('photo', fileInput.files[0]);
-
-    const res = await fetch('/api/users/upload-photo', { method: 'POST', body: formData });
-    const data = await res.json();
-    if (data.success) {
-      currentUser = data.user;
-      renderProfile();
-      loadUsersData();
-      socket.emit('update-users');
-      alert('Photo mise à jour avec succès !');
-    } else {
-      alert('Erreur lors de l\'upload.');
+      `).join('');
+      box.scrollTop = box.scrollHeight;
     }
-  }
 
-  function buyCoins(userId) {
-    FedaPay.init({
-      public_key: 'pk_live_nL75JBWaRG69V8iMo6-7mMor',
-      transaction: { amount: 500, description: 'Achat de 50 Nonvicoins sur Nonvitcha' },
-      customer: { email: currentUser.email, firstname: currentUser.nom, lastname: '' }
-    }).open().then(async (response) => {
-      const res = await fetch(`/api/users/${userId}/buy-coins`, { 
+    async function sendChatMessage(event) {
+      event.preventDefault();
+      const input = document.getElementById('chat-input');
+      const message = input.value;
+
+      await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ transactionId: response.token })
+        body: JSON.stringify({ message })
       });
+
+      input.value = '';
+      loadChat();
+    }
+
+    async function loadPublicites() {
+      try {
+        const res = await fetch('/api/publicites');
+        const pubs = await res.json();
+        const container = document.getElementById('liste-publicites');
+        
+        if (!pubs || pubs.length === 0) {
+          container.innerHTML = '<p style="color: #666; grid-column: 1/-1; text-align: center;">Aucun espace publicitaire actif pour le moment.</p>';
+          return;
+        }
+
+        container.innerHTML = pubs.map(p => {
+          const deleteBtn = (currentUser && currentUser.isAdmin) ? `<button onclick="deletePublicite('${p.id}')" class="btn-danger" style="margin-top:5px;">Supprimer (Admin)</button>` : '';
+          return `
+            <div style="background: white; padding: 12px; border-radius: 6px; border: 1px solid #ffe0b2; position: relative;">
+              <span style="background: #ff9800; color: white; font-size: 0.7em; padding: 2px 6px; border-radius: 4px; font-weight: bold;">SPONSORISÉ</span>
+              <h4 style="margin: 8px 0 5px; color: #e91e63;">${p.titre}</h4>
+              <p style="margin: 0 0 8px; font-size: 0.9em; color: #444;">${p.description}</p>
+              <p style="margin: 0; font-size: 0.85em; color: #666;"><strong>Contact :</strong> ${p.contact}</p>
+              <p style="margin: 2px 0 0; font-size: 0.75em; color: #999;">Par ${p.annonceur} le ${p.date}</p>
+              ${deleteBtn}
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error("Erreur chargement pubs:", err);
+      }
+    }
+
+    async function envoyerPublicite(event) {
+      event.preventDefault();
+      const titre = document.getElementById('pub-titre').value;
+      const description = document.getElementById('pub-desc').value;
+      const contact = document.getElementById('pub-contact').value;
+      const feedback = document.getElementById('feedback-pub');
+
+      try {
+        const res = await fetch('/api/publicites', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ titre, description, contact })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          feedback.style.color = 'green';
+          feedback.textContent = "Annonce publicitaire publiée avec succès !";
+          currentUser = data.user;
+          showAppUI();
+          document.getElementById('form-pub').reset();
+          loadPublicites();
+        } else {
+          feedback.style.color = 'red';
+          feedback.textContent = data.message || "Erreur lors de la publication.";
+        }
+      } catch (err) {
+        feedback.style.color = 'red';
+        feedback.textContent = "Erreur de connexion au serveur.";
+      }
+    }
+
+    async function deletePublicite(pubId) {
+      if (!confirm("Voulez-vous vraiment supprimer cette publicité ?")) return;
+      const res = await fetch(`/api/publicites/${pubId}`, { method: 'DELETE' });
       const data = await res.json();
       if (data.success) {
-        alert('Paiement réussi ! 50 Nonvicoins ajoutés.');
-        checkAuth();
+        loadPublicites();
       } else {
-        alert(data.message || 'Erreur lors de la validation du paiement.');
+        alert("Erreur lors de la suppression.");
       }
-    }).catch((error) => {
-      console.log(error);
-      alert('Paiement annulé ou échoué.');
-    });
-  }
-
-  async function becomeVip(userId) {
-    const res = await fetch(`/api/users/${userId}/become-vip`, { method: 'POST' });
-    const data = await res.json();
-    if (data.success) {
-      alert('Félicitations ! Vous êtes désormais Membre VIP ⭐');
-      checkAuth();
-    } else {
-      alert(data.message);
     }
-  }
 
-  async function loadUsersData() {
-    const [resUsers, resOnline, resUnread] = await Promise.all([
-      fetch('/api/users'),
-      fetch('/api/online-users'),
-      fetch('/api/unread-messages')
-    ]);
-    allUsersCache = await resUsers.json();
-    onlineIdsCache = await resOnline.json();
-    unreadCountsCache = await resUnread.json();
-    filterAndRenderUsers();
-  }
-
-  function filterAndRenderUsers() {
-    const searchName = document.getElementById('search-name').value.toLowerCase();
-    const searchVille = document.getElementById('search-ville').value.toLowerCase();
-    const filterStatus = document.getElementById('filter-status').value;
-    const list = document.getElementById('users-list');
-
-    const filtered = allUsersCache.filter(u => {
-      if (u.id === currentUser.id) return false;
-      const matchName = u.nom.toLowerCase().includes(searchName);
-      const matchVille = u.ville.toLowerCase().includes(searchVille);
-      const isOnline = onlineIdsCache.includes(String(u.id));
-
-      if (!matchName || !matchVille) return false;
-      if (filterStatus === 'vip' && !u.isVip) return false;
-      if (filterStatus === 'online' && !isOnline) return false;
-      return true;
-    });
-
-    list.innerHTML = filtered.map(u => {
-      const isOnline = onlineIdsCache.includes(String(u.id));
-      const statusClass = isOnline ? 'status-dot status-online' : 'status-dot';
-      const statusText = isOnline ? 'En ligne 🟢' : 'Hors ligne';
-      const vipBadge = u.isVip ? '<span class="badge-vip">⭐ VIP</span>' : '';
-      const unreadBadge = unreadCountsCache[u.id] ? `<span class="badge-unread">${unreadCountsCache[u.id]}</span>` : '';
-
-      return `
-        <div class="user-card">
-          ${unreadBadge}
-          <img src="${u.photo}" alt="${u.nom}">
-          <h3>${u.nom} ${vipBadge}</h3>
-          <p><span class="${statusClass}" title="${statusText}"></span>${u.age} ans - ${u.ville}</p>
-          <button onclick="likeUser('${u.id}')">❤️ Like (${u.likes || 0})</button>
-          <button onclick="openPrivateChat('${u.id}', '${u.nom}')" class="btn-blue">💬 Discuter</button>
-        </div>
-      `;
-    }).join('');
-  }
-
-  async function likeUser(id) {
-    await fetch(`/api/users/${id}/like`, { method: 'POST' });
-    loadUsersData();
-  }
-
-  async function chargerRessources(categorie = '') {
-    try {
-      let url = '/api/ressources';
-      if (categorie) url += `?categorie=${categorie}`;
-      
-      const response = await fetch(url);
-      const ressources = await response.json();
-      
-      const container = document.getElementById('liste-ressources');
-      container.innerHTML = '';
-      
-      if (ressources.length === 0) {
-        container.innerHTML = '<p style="color: #666; text-align: center;">Aucune ressource disponible pour cette catégorie.</p>';
-        return;
-      }
-
-      ressources.forEach(r => {
-        container.innerHTML += `
-          <div style="background: white; padding: 12px; margin-bottom: 10px; border-radius: 6px; border: 1px solid #e0e0e0;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
-              <strong style="color: var(--primary);">${r.titre}</strong>
-              <span style="font-size: 0.75em; background: #eee; padding: 2px 6px; border-radius: 4px; font-weight: bold;">${r.categorie}</span>
-            </div>
-            <p style="margin: 0; font-size: 0.95em; color: #444; line-height: 1.4;">${r.contenu}</p>
-          </div>
-        `;
-      });
-    } catch (err) {
-      console.error("Erreur chargement ressources:", err);
-    }
-  }
-
-  async function envoyerDemandeEcoute(event) {
-    event.preventDefault();
-    const sujet = document.getElementById('sujet-ecoute').value;
-    const message = document.getElementById('message-ecoute').value;
-    const feedback = document.getElementById('feedback-ecoute');
-
-    try {
-      const response = await fetch('/api/ecoute', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sujet, message })
-      });
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        feedback.style.color = 'green';
-        feedback.textContent = data.message;
-        document.getElementById('form-ecoute').reset();
-      } else {
-        feedback.style.color = 'red';
-        feedback.textContent = data.error || data.message || "Une erreur est survenue.";
-      }
-    } catch (err) {
-      feedback.style.color = 'red';
-      feedback.textContent = "Erreur de connexion au serveur.";
-    }
-  }
-
-  async function loadPublicChat() {
-    const res = await fetch('/api/chat');
-    const messages = await res.json();
-    const box = document.getElementById('public-chat');
-    box.innerHTML = messages.map(m => {
-      const canDelete = m.sender === currentUser.nom ? `<button class="btn-danger" onclick="deletePublicMessage('${m.id}')">Supprimer</button>` : '';
-      return `<div id="pub-msg-${m.id}"><strong>[${m.date}] ${m.sender} :</strong> ${m.text} ${canDelete}</div>`;
-    }).join('');
-    box.scrollTop = box.scrollHeight;
-  }
-
-  async function deletePublicMessage(msgId) {
-    await fetch(`/api/chat/${msgId}`, { method: 'DELETE' });
-  }
-
-  function handlePublicKeyPress(e) {
-    if (e.key === 'Enter') sendPublicMessage();
-  }
-
-  function sendPublicMessage() {
-    const input = document.getElementById('public-msg-input');
-    const text = input.value.trim();
-    if (!text) return;
-
-    socket.emit('send-public-message', { sender: currentUser.nom, text });
-    input.value = '';
-  }
-
-  function openPrivateChat(targetId, targetName) {
-    activeTargetId = targetId;
-    document.getElementById('chat-target-name').innerText = targetName;
-    document.getElementById('private-chat-section').classList.remove('hidden');
-    loadPrivateMessages();
-    loadUsersData();
-  }
-
-  function closePrivateChat() {
-    if (activeTargetId) socket.emit('stop-typing', { targetId: activeTargetId });
-    activeTargetId = null;
-    document.getElementById('private-chat-section').classList.add('hidden');
-    document.getElementById('typing-indicator').innerText = '';
-    loadUsersData();
-  }
-
-  async function loadPrivateMessages() {
-    if (!activeTargetId) return;
-    const res = await fetch(`/api/private-messages/${activeTargetId}`);
-    const messages = await res.json();
-    const box = document.getElementById('private-chat-box');
-    
-    box.innerHTML = messages.map(m => {
-      const canDelete = m.senderId === currentUser.id ? `<button class="btn-danger" onclick="deletePrivateMessage('${m.id}')">Supprimer</button>` : '';
-      return `<div id="priv-msg-${m.id}"><strong>[${m.date}] ${m.senderName} :</strong> ${m.text} ${canDelete}</div>`;
-    }).join('');
-    box.scrollTop = box.scrollHeight;
-  }
-
-  async function deletePrivateMessage(msgId) {
-    await fetch(`/api/private-messages/${msgId}`, { method: 'DELETE' });
-    const el = document.getElementById(`priv-msg-${msgId}`);
-    if (el) el.remove();
-  }
-
-  function notifyTyping() {
-    if (!activeTargetId) return;
-    socket.emit('typing', { targetId: activeTargetId, senderName: currentUser.nom });
-    clearTimeout(typingTimeout);
-    typingTimeout = setTimeout(() => {
-      socket.emit('stop-typing', { targetId: activeTargetId });
-    }, 2000);
-  }
-
-  function handlePrivateKeyPress(e) {
-    if (e.key === 'Enter') sendPrivateMessage();
-  }
-
-  function sendPrivateMessage() {
-    const input = document.getElementById('private-msg-input');
-    const text = input.value.trim();
-    if (!text || !activeTargetId) return;
-
-    socket.emit('stop-typing', { targetId: activeTargetId });
-    socket.emit('send-private-message', {
-      senderId: currentUser.id,
-      senderName: currentUser.nom,
-      targetId: activeTargetId,
-      text
-    });
-    input.value = '';
-  }
-
-  checkAuth();
-</script>
-
+    // Lancer la vérification de session au démarrage
+    checkAuth();
+  </script>
 </body>
 </html>

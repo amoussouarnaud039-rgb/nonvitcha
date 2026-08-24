@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Nonvitcha - Social & Dating</title>
+  <title>Nonvitcha - Social, Dating & Sensibilisation</title>
   <style>
     body { font-family: Arial, sans-serif; background: #f4f7f6; margin: 0; padding: 0; color: #333; }
     header { background: #e91e63; color: white; padding: 15px; text-align: center; }
@@ -20,13 +20,15 @@
     .profile-img { width: 60px; height: 60px; border-radius: 50%; object-fit: cover; }
     .user-card { display: flex; align-items: center; gap: 15px; border-bottom: 1px solid #eee; padding: 10px 0; }
     .vip-badge { background: gold; color: #333; font-size: 0.75em; padding: 2px 6px; border-radius: 4px; font-weight: bold; margin-left: 5px; }
+    .ressource-box { background: #fdf2f8; border-left: 4px solid #e91e63; padding: 10px; margin-bottom: 10px; border-radius: 4px; }
+    .filter-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; background: #fafafa; padding: 12px; border-radius: 6px; border: 1px solid #eee; margin-bottom: 15px; }
   </style>
 </head>
 <body>
 
   <header>
     <h1>Nonvitcha 💖</h1>
-    <p>Application de Découverte Sociale & Rencontres</p>
+    <p>Découverte Sociale, Rencontres & Sensibilisation (SSR, VBG)</p>
   </header>
 
   <div class="container">
@@ -58,9 +60,12 @@
             <option value="Homme">Recherche : Hommes</option>
             <option value="Femme">Recherche : Femmes</option>
           </select>
-          <input type="text" name="ville" placeholder="Ville / Localisation">
+          <input type="text" name="ville" placeholder="Ville / Localisation (ex: Cotonou)">
           <input type="number" name="age" placeholder="Âge">
-          <textarea name="bio" placeholder="Parlez un peu de vous..."></textarea>
+          <textarea name="bio" placeholder="Parlez un peu de vous ou de vos intérêts..."></textarea>
+          
+          <input type="password" name="adminCode" placeholder="Code secret Administrateur (optionnel)">
+          
           <label>Photo de profil :</label>
           <input type="file" name="photo" accept="image/*">
           <button type="submit">Créer mon compte</button>
@@ -87,6 +92,61 @@
         </div>
       </div>
 
+      <!-- DÉCOUVERTE & FILTRES DE RECHERCHE -->
+      <div class="card">
+        <h2>💖 Profils Recommandés & Recherche</h2>
+        
+        <!-- Barres de filtres -->
+        <div class="filter-bar">
+          <div>
+            <label style="font-size: 0.8em; font-weight: bold; color: #555;">Filtrer par Genre :</label>
+            <select id="filter-genre" onchange="filterUsers()">
+              <option value="Tous">Tous les genres</option>
+              <option value="Homme">Hommes</option>
+              <option value="Femme">Femmes</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size: 0.8em; font-weight: bold; color: #555;">Filtrer par Ville :</label>
+            <input type="text" id="filter-ville" placeholder="Toutes les villes" oninput="filterUsers()" style="margin: 8px 0 0; padding: 10px;">
+          </div>
+          <div>
+            <label style="font-size: 0.8em; font-weight: bold; color: #555;">Âge max :</label>
+            <input type="number" id="filter-age" placeholder="Ex: 40" oninput="filterUsers()" style="margin: 8px 0 0; padding: 10px;">
+          </div>
+        </div>
+
+        <div id="users-list">Chargement des profils...</div>
+      </div>
+
+      <!-- SALLE DE SENSIBILISATION & ÉCOUTE -->
+      <div class="card">
+        <h2>🛡️ Salle de Sensibilisation & Écoute Confidentielle</h2>
+        <p style="color: #666; font-size: 0.9em;">Informations sur la Santé Sexuelle et Reproductive (SSR), la lutte contre les Violences Basées sur le Genre (VBG) et l'inclusion.</p>
+        
+        <div id="ressources-list" style="margin-bottom: 20px;">Chargement des ressources...</div>
+
+        <hr style="border: 0; border-top: 1px solid #ddd; margin: 15px 0;">
+
+        <h3>💬 Poser une question ou demander de l'aide en toute confidentialité</h3>
+        <form onsubmit="envoyerDemandeEcoute(event)">
+          <select id="ecoute-categorie" required>
+            <option value="SSR">Santé Sexuelle et Reproductive (SSR)</option>
+            <option value="VBG">Violences Basées sur le Genre (VBG)</option>
+            <option value="MINORITES">Inclusion & Minorités</option>
+            <option value="AUTRE">Autre question confidentielle</option>
+          </select>
+          <textarea id="ecoute-message" placeholder="Votre message ou signalement confidentiel..." style="height: 70px;" required></textarea>
+          <button type="submit">Envoyer en toute confidentialité</button>
+        </form>
+        <p id="feedback-ecoute" style="margin-top: 8px; font-weight: bold;"></p>
+
+        <h3 style="margin-top: 20px;">📋 Vos demandes / Suivi d'écoute</h3>
+        <div id="suivi-ecoutes-container" style="background: #fafafa; border: 1px solid #eee; padding: 10px; border-radius: 4px; max-height: 250px; overflow-y: auto;">
+          Aucune demande enregistrée.
+        </div>
+      </div>
+
       <!-- ESPACE PUBLICITAIRE & ANNONCES SPONSORISÉES -->
       <div class="card" style="border: 2px dashed #ff9800; background: #fffdf5;">
         <h2>📢 Espaces Publicitaires & Annonces Partenaires</h2>
@@ -106,12 +166,6 @@
         <p id="feedback-pub" style="margin-top: 8px; font-weight: bold;"></p>
       </div>
 
-      <!-- DÉCOUVERTE / UTILISATEURS -->
-      <div class="card">
-        <h2>💖 Profils Recommandés</h2>
-        <div id="users-list">Chargement des profils...</div>
-      </div>
-
       <!-- CHAT PUBLIC -->
       <div class="card">
         <h2>💬 Salon de Discussion Général</h2>
@@ -128,6 +182,7 @@
 
   <script>
     let currentUser = null;
+    let allUsers = [];
 
     async function checkAuth() {
       try {
@@ -204,7 +259,6 @@
       document.getElementById('user-name').innerHTML = currentUser.nom + adminBadgeHtml + vipBadgeHtml;
       document.getElementById('user-coins').textContent = `💰 Solde : ${currentUser.nonvicoins || 0} Nonvicoins`;
 
-      // Gestion du bouton VIP
       const vipContainer = document.getElementById('vip-action-container');
       if (currentUser.isVip) {
         vipContainer.innerHTML = '<span style="color: #d4af37; font-weight: bold; font-size: 0.9em;">⭐ Membre VIP Actif</span>';
@@ -212,6 +266,8 @@
         vipContainer.innerHTML = '<button onclick="upgradeVip()" class="btn-vip" style="padding: 8px 12px; font-size: 0.9em; width: auto;">✨ Devenir VIP (80 Coins)</button>';
       }
 
+      loadRessources();
+      loadEcoutes();
       loadUsers();
       loadChat();
       loadPublicites();
@@ -234,15 +290,147 @@
       }
     }
 
-    async function loadUsers() {
-      const res = await fetch('/api/users');
-      const users = await res.json();
-      const container = document.getElementById('users-list');
+    async function loadRessources() {
+      try {
+        const res = await fetch('/api/ressources');
+        const list = await res.json();
+        const container = document.getElementById('ressources-list');
+        if (!list || list.length === 0) {
+          container.innerHTML = '<p>Aucune ressource disponible.</p>';
+          return;
+        }
+        container.innerHTML = list.map(r => `
+          <div class="ressource-box">
+            <h4 style="margin: 0 0 5px 0; color: #e91e63;">[${r.categorie}] ${r.titre}</h4>
+            <p style="margin: 0; font-size: 0.9em; color: #444;">${r.contenu}</p>
+          </div>
+        `).join('');
+      } catch (err) {
+        console.error("Erreur chargement ressources:", err);
+      }
+    }
 
-      const filtered = users.filter(u => u.id !== currentUser.id);
+    async function loadEcoutes() {
+      try {
+        const res = await fetch('/api/ecoutes');
+        const items = await res.json();
+        const container = document.getElementById('suivi-ecoutes-container');
+
+        if (!items || items.length === 0) {
+          container.innerHTML = '<p style="color: #666; font-size: 0.9em;">Aucune demande enregistrée.</p>';
+          return;
+        }
+
+        container.innerHTML = items.map(e => {
+          let adminReplyBox = '';
+          if (currentUser.isAdmin) {
+            adminReplyBox = `
+              <div style="margin-top: 8px; background: #fff; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <p style="margin: 0 0 5px; font-size: 0.85em; font-weight: bold; color: #e91e63;">Réponse Admin (Auteur: ${e.userName})</p>
+                <textarea id="reply-${e.id}" placeholder="Répondre confidentiellement..." style="height: 40px; margin: 0 0 5px;">${e.reponse || ''}</textarea>
+                <button onclick="repondreEcoute('${e.id}')" style="padding: 5px 10px; font-size: 0.8em; width: auto;">Envoyer la réponse</button>
+              </div>
+            `;
+          } else {
+            adminReplyBox = e.reponse ? `<p style="margin: 5px 0 0; color: #2e7d32; font-size: 0.9em;"><strong>Réponse de l'équipe :</strong> ${e.reponse}</p>` : `<p style="margin: 5px 0 0; color: #ff9800; font-size: 0.85em;">En attente de réponse par un conseiller...</p>`;
+          }
+
+          return `
+            <div style="background: white; padding: 10px; margin-bottom: 8px; border-radius: 4px; border: 1px solid #ddd;">
+              <span style="font-size: 0.75em; background: #e91e63; color: white; padding: 2px 6px; border-radius: 3px;">${e.categorie}</span>
+              <p style="margin: 5px 0; font-size: 0.9em;"><strong>Message :</strong> ${e.message}</p>
+              <p style="margin: 0; font-size: 0.75em; color: #888;">Le ${e.date}</p>
+              ${adminReplyBox}
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        console.error("Erreur chargement écoutes:", err);
+      }
+    }
+
+    async function envoyerDemandeEcoute(event) {
+      event.preventDefault();
+      const categorie = document.getElementById('ecoute-categorie').value;
+      const message = document.getElementById('ecoute-message').value;
+      const feedback = document.getElementById('feedback-ecoute');
+
+      try {
+        const res = await fetch('/api/ecoutes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ categorie, message })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          feedback.style.color = 'green';
+          feedback.textContent = "Votre message a été transmis en toute confidentialité.";
+          document.getElementById('ecoute-message').value = '';
+          loadEcoutes();
+        } else {
+          feedback.style.color = 'red';
+          feedback.textContent = data.message || "Erreur lors de l'envoi.";
+        }
+      } catch (err) {
+        feedback.style.color = 'red';
+        feedback.textContent = "Erreur de connexion au serveur.";
+      }
+    }
+
+    async function repondreEcoute(ecouteId) {
+      const reponse = document.getElementById(`reply-${ecouteId}`).value;
+      try {
+        const res = await fetch('/api/ecoutes/repondre', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ecouteId, reponse })
+        });
+        const data = await res.json();
+        if (data.success) {
+          alert("Réponse enregistrée avec succès !");
+          loadEcoutes();
+        } else {
+          alert(data.message || "Erreur.");
+        }
+      } catch (err) {
+        alert("Erreur de connexion.");
+      }
+    }
+
+    async function loadUsers() {
+      try {
+        const res = await fetch('/api/users');
+        allUsers = await res.json();
+        filterUsers();
+      } catch (err) {
+        console.error("Erreur chargement utilisateurs:", err);
+      }
+    }
+
+    function filterUsers() {
+      const container = document.getElementById('users-list');
+      const genreFiltre = document.getElementById('filter-genre').value;
+      const villeFiltre = document.getElementById('filter-ville').value.toLowerCase().trim();
+      const ageMaxFiltre = parseInt(document.getElementById('filter-age').value) || 120;
+
+      const filtered = allUsers.filter(u => {
+        if (u.id === currentUser.id) return false;
+        
+        // Filtre genre
+        if (genreFiltre !== 'Tous' && u.genre !== genreFiltre) return false;
+
+        // Filtre ville
+        if (villeFiltre && (!u.ville || !u.ville.includes(villeFiltre))) return false;
+
+        // Filtre âge max
+        if (u.age && u.age > ageMaxFiltre) return false;
+
+        return true;
+      });
 
       if (filtered.length === 0) {
-        container.innerHTML = '<p>Aucun autre utilisateur pour le moment.</p>';
+        container.innerHTML = '<p style="color: #666; text-align: center; padding: 10px;">Aucun profil ne correspond à vos critères de recherche.</p>';
         return;
       }
 
@@ -250,7 +438,7 @@
         <div class="user-card">
           <img src="${u.photo}" class="profile-img" alt="Avatar">
           <div style="flex-grow: 1;">
-            <h4 style="margin: 0 0 5px 0;">${u.nom}, ${u.age || '?'} ans (${u.ville || 'Non renseigné'}) ${u.isVip ? '<span class="vip-badge">👑 VIP</span>' : ''}</h4>
+            <h4 style="margin: 0 0 5px 0;">${u.nom}, ${u.age || '?'} ans (${u.villeOriginale || 'Non renseigné'}) ${u.isVip ? '<span class="vip-badge">👑 VIP</span>' : ''}</h4>
             <p style="margin: 0; color: #666; font-size: 0.9em;">${u.bio || 'Aucune biographie.'}</p>
           </div>
           <span style="height: 12px; width: 12px; background-color: ${u.online ? '#4CAF50' : '#ccc'}; border-radius: 50%; display: inline-block;" title="${u.online ? 'En ligne' : 'Hors ligne'}"></span>

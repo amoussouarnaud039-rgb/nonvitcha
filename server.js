@@ -9,7 +9,8 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const DB_FILE = path.join(__dirname, 'database.json');
 
-// Configuration de multer pour l'upload de photos de profil
+const ADMIN_SECRET_KEY = "admin2026";
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const uploadDir = path.join(__dirname, 'public', 'uploads');
@@ -25,7 +26,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// Gestion de la base de données JSON
 function readDb() {
   if (!fs.existsSync(DB_FILE)) {
     const initialData = {
@@ -44,6 +44,8 @@ function readDb() {
   }
   const data = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
   if (!data.publicites) data.publicites = [];
+  if (!data.ecoutes) data.ecoutes = [];
+  if (!data.ressources) data.ressources = [];
   return data;
 }
 
@@ -57,15 +59,15 @@ app.use(session({
   secret: 'nonvitcha_secret_key_2026',
   resave: false,
   saveUninitialized: false,
-  cookie: { maxAge: 24 * 60 * 60 * 1000 } // 24 heures
+  cookie: { maxAge: 24 * 60 * 60 * 1000 }
 }));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// --- ROUTES AUTHENTIFICATION ---
+// --- AUTHENTIFICATION ---
 
 app.post('/api/register', upload.single('photo'), (req, res) => {
-  const { nom, email, password, genre, recherche, bio, age, ville } = req.body;
+  const { nom, email, password, genre, recherche, bio, age, ville, adminCode } = req.body;
   if (!nom || !email || !password) {
     return res.status(400).json({ success: false, message: 'Nom, email et mot de passe requis.' });
   }
@@ -75,6 +77,8 @@ app.post('/api/register', upload.single('photo'), (req, res) => {
     return res.status(400).json({ success: false, message: 'Cet email est déjà utilisé.' });
   }
 
+  const isAdmin = (adminCode === ADMIN_SECRET_KEY) || (db.users.length === 0);
+
   const newUser = {
     id: Date.now().toString(),
     nom,
@@ -83,13 +87,14 @@ app.post('/api/register', upload.single('photo'), (req, res) => {
     genre: genre || 'Non spécifié',
     recherche: recherche || 'Tous',
     bio: bio || '',
-    age: age || '',
-    ville: ville || '',
+    age: age ? parseInt(age) : '',
+    ville: ville ? ville.trim().toLowerCase() : '',
+    villeOriginale: ville || '',
     photo: req.file ? `/uploads/${req.file.filename}` : '/uploads/default.png',
-    nonvicoins: 100, // Bonus de départ
+    nonvicoins: 100,
     isVip: false,
     vipExpire: null,
-    isAdmin: db.users.length === 0, // Le premier inscrit est admin
+    isAdmin: isAdmin,
     online: true,
     lastSeen: new Date().toISOString()
   };
@@ -111,7 +116,6 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ success: false, message: 'Email ou mot de passe incorrect.' });
   }
 
-  // Vérifier si le statut VIP a expiré
   if (user.isVip && user.vipExpire && new Date() > new Date(user.vipExpire)) {
     user.isVip = false;
     user.vipExpire = null;
@@ -156,7 +160,7 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true });
 });
 
-// --- ROUTE ACHAT VIP ---
+// --- VIP ---
 
 app.post('/api/vip/upgrade', (req, res) => {
   if (!req.session.userId) return res.status(401).json({ success: false, message: 'Non connecté.' });
@@ -165,7 +169,7 @@ app.post('/api/vip/upgrade', (req, res) => {
   const user = db.users.find(u => u.id === req.session.userId);
   if (!user) return res.status(404).json({ success: false, message: 'Utilisateur introuvable.' });
 
-  const coutVipCoins = 80; // Coût de l'abonnement VIP en Nonvicoins
+  const coutVipCoins = 80;
   if ((user.nonvicoins || 0) < coutVipCoins) {
     return res.status(400).json({ success: false, message: `Solde insuffisant ! Le statut VIP coûte ${coutVipCoins} Nonvicoins.` });
   }
@@ -173,7 +177,6 @@ app.post('/api/vip/upgrade', (req, res) => {
   user.nonvicoins -= coutVipCoins;
   user.isVip = true;
   
-  // Expiration dans 30 jours
   const expireDate = new Date();
   expireDate.setDate(expireDate.getDate() + 30);
   user.vipExpire = expireDate.toISOString();
@@ -184,7 +187,71 @@ app.post('/api/vip/upgrade', (req, res) => {
   res.json({ success: true, user: safeUser, message: 'Félicitations, vous êtes désormais membre VIP !' });
 });
 
-// --- ROUTES UTILISATEURS & MATCHING ---
+// --- SENSIBILISATION & ÉCOUTE ---
+
+app.get('/api/ressources', (req, res) => {
+  const db = readDb();
+  res.json(db.ressources || []);
+});
+
+app.get('/api/ecoutes', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  if (!user) return res.status(401).json({ success: false });
+
+  if (user.isAdmin) {
+    res.json(db.ecoutes || []);
+  } else {
+    res.json((db.ecoutes || []).filter(e => e.userId === user.id));
+  }
+});
+
+app.post('/api/ecoutes', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
+  const { categorie, message } = req.body;
+  if (!message || !message.trim()) return res.status(400).json({ success: false, message: 'Le message est requis.' });
+
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+  if (!user) return res.status(401).json({ success: false });
+
+  const nouvelleEcoute = {
+    id: Date.now().toString(),
+    userId: user.id,
+    userName: user.nom,
+    categorie: categorie || 'SSR',
+    message: message.trim(),
+    reponse: '',
+    date: new Date().toLocaleDateString('fr-FR')
+  };
+
+  db.ecoutes.push(nouvelleEcoute);
+  writeDb(db);
+
+  res.json({ success: true, ecoutes: user.isAdmin ? db.ecoutes : db.ecoutes.filter(e => e.userId === user.id) });
+});
+
+app.post('/api/ecoutes/repondre', (req, res) => {
+  if (!req.session.userId) return res.status(401).json({ success: false });
+  const db = readDb();
+  const user = db.users.find(u => u.id === req.session.userId);
+
+  if (!user || !user.isAdmin) {
+    return res.status(403).json({ success: false, message: 'Réservé aux administrateurs.' });
+  }
+
+  const { ecouteId, reponse } = req.body;
+  const ecoute = (db.ecoutes || []).find(e => e.id === ecouteId);
+  if (!ecoute) return res.status(404).json({ success: false, message: 'Demande introuvable.' });
+
+  ecoute.reponse = reponse;
+  writeDb(db);
+
+  res.json({ success: true, ecoutes: db.ecoutes });
+});
+
+// --- UTILISATEURS & RECHERCHE ---
 
 app.get('/api/users', (req, res) => {
   if (!req.session.userId) return res.status(401).json({ success: false });
@@ -193,7 +260,7 @@ app.get('/api/users', (req, res) => {
   res.json(safeUsers);
 });
 
-// --- ROUTES CHAT PUBLIC ---
+// --- CHAT PUBLIC ---
 
 app.get('/api/chat', (req, res) => {
   if (!req.session.userId) return res.status(401).json({ success: false });
@@ -227,7 +294,7 @@ app.post('/api/chat', (req, res) => {
   res.json({ success: true, message: newMessage });
 });
 
-// --- ROUTES PUBLICITÉS SPONSORISÉES ---
+// --- PUBLICITÉS SPONSORISÉES ---
 
 app.get('/api/publicites', (req, res) => {
   const db = readDb();

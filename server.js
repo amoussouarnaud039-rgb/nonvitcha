@@ -10,14 +10,74 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // --- CONFIGURATION ADMIN ---
-// Vous pouvez modifier le mot de passe admin ici ou via une variable d'environnement sur Render
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'nonvitchaadmin2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'NONVITCHA2026';
 
 // --- CONFIGURATION POSTGRESQL ---
 const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
+
+// --- CRÉATION AUTOMATIQUE DES TABLES DANS LA BASE DE DONNÉES ---
+async function initializeDatabase() {
+    try {
+        await pool.query(`
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                nom VARCHAR(100) NOT NULL,
+                age INT,
+                email VARCHAR(150) UNIQUE NOT NULL,
+                password VARCHAR(255) NOT NULL,
+                genre VARCHAR(50),
+                ville VARCHAR(100),
+                photo VARCHAR(255) DEFAULT '/uploads/default.png',
+                bio TEXT,
+                nonvicoins INT DEFAULT 100,
+                is_vip BOOLEAN DEFAULT FALSE,
+                is_boosted BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id SERIAL PRIMARY KEY,
+                user_id INT REFERENCES users(id) ON DELETE CASCADE,
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS ressources (
+                id SERIAL PRIMARY KEY,
+                titre VARCHAR(200) NOT NULL,
+                description TEXT,
+                lien VARCHAR(255),
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS ecoutes (
+                id SERIAL PRIMARY KEY,
+                user_id INT REFERENCES users(id) ON DELETE CASCADE,
+                categorie VARCHAR(100) NOT NULL,
+                message TEXT NOT NULL,
+                reponse TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS publicites (
+                id SERIAL PRIMARY KEY,
+                user_id INT REFERENCES users(id) ON DELETE CASCADE,
+                titre VARCHAR(200) NOT NULL,
+                description TEXT NOT NULL,
+                contact VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        console.log("Tables de la base de données vérifiées / créées avec succès !");
+    } catch (err) {
+        console.error("Erreur lors de l'initialisation de la base de données :", err);
+    }
+}
+
+initializeDatabase();
 
 // --- CRÉATION AUTOMATIQUE DU DOSSIER UPLOADS ---
 const uploadDir = path.join(__dirname, 'public/uploads');
@@ -150,10 +210,8 @@ app.get('/api/users', isAuthenticated, async (req, res) => {
 });
 
 // ==========================================
-// ROUTES ADMINISTRATION (Par mot de passe global)
+// ROUTES ADMINISTRATION
 // ==========================================
-
-// Connexion Admin
 app.post('/api/admin/login', (req, res) => {
     const { password } = req.body;
     if (password === ADMIN_PASSWORD) {
@@ -164,18 +222,15 @@ app.post('/api/admin/login', (req, res) => {
     }
 });
 
-// Vérifier l'état de la session admin
 app.get('/api/admin/check', (req, res) => {
     res.json({ success: true, isAdmin: !!req.session.isAdmin });
 });
 
-// Déconnexion Admin
 app.post('/api/admin/logout', (req, res) => {
     req.session.isAdmin = false;
     res.json({ success: true });
 });
 
-// Répondre à une écoute (VBG / SOS) en tant qu'admin
 app.post('/api/admin/ecoutes/:id/repondre', isAdminAuthenticated, async (req, res) => {
     try {
         const { id } = req.params;
@@ -224,7 +279,7 @@ app.post('/api/chat', isAuthenticated, async (req, res) => {
 });
 
 // ==========================================
-// ROUTES RESSOURCES & SSR / VBG (ÉCOUTE)
+// ROUTES RESSOURCES & ÉCOUTES
 // ==========================================
 app.get('/api/ressources', async (req, res) => {
     try {

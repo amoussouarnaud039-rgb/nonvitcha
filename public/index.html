@@ -174,9 +174,9 @@
     document.getElementById('auth-section').classList.add('hidden');
     document.getElementById('app-section').classList.remove('hidden');
     
-    // Gestion de l'affichage sécurisé de l'espace admin
+    // Gestion stricte de l'affichage de l'espace admin
     const adminSection = document.getElementById('admin-section');
-    if (currentUser.isAdmin) {
+    if (currentUser && currentUser.isAdmin) {
       adminSection.classList.remove('hidden');
       loadAdminData();
     } else {
@@ -197,7 +197,7 @@
       const res = await fetch('/api/admin/ecoutes');
       const data = await res.json();
       const list = document.getElementById('admin-ecoutes-list');
-      if (!data.success || data.ecoutes.length === 0) {
+      if (!data.success || !data.ecoutes || data.ecoutes.length === 0) {
         list.innerHTML = '<p style="color: #666; text-align: center; margin: 0;">Aucune demande d\'écoute pour le moment.</p>';
         return;
       }

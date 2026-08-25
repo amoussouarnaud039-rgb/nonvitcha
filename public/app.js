@@ -1,21 +1,20 @@
-// Connexion Socket.io
+// Initialisation de Socket.io
 const socket = io();
 
-// État local de l'application
+// État global de l'application
 let currentUser = null;
 let activeChatTargetId = null;
 
-// --- NAVIGATION ENTRE LES SECTIONS ---
+// --- GESTION DE LA NAVIGATION ---
 function showSection(sectionId) {
     document.querySelectorAll('.page-section').forEach(sec => sec.style.display = 'none');
     const targetSection = document.getElementById(sectionId);
     if (targetSection) targetSection.style.display = 'block';
 
-    // Mise à jour de la navigation
     document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
 }
 
-// --- RENDU DE LA BARRE DE NAVIGATION DYNAMIQUE ---
+// --- MISE À JOUR EN-TÊTE ET BARRE DE NAVIGATION ---
 function updateNavbar() {
     const navMenu = document.getElementById('nav-menu');
     if (!currentUser) {
@@ -27,7 +26,13 @@ function updateNavbar() {
         return;
     }
 
+    const vipBadge = currentUser.isVip ? '<span style="color:#eab308; margin-left:4px;"><i class="fa-solid fa-crown"></i> VIP</span>' : '';
+
     navMenu.innerHTML = `
+        <div class="user-profile-badge" style="display:flex; align-items:center; gap:0.5rem; margin-right:0.5rem; padding:0.3rem 0.8rem; background:var(--border); border-radius:20px; font-weight:600; font-size:0.85rem;">
+            <i class="fa-solid fa-circle-user" style="color:#dc2626; font-size:1.2rem;"></i>
+            <span>${currentUser.nom}</span> ${vipBadge}
+        </div>
         <button class="nav-btn" onclick="showSection('members-section')">
             <i class="fa-solid fa-users"></i> Membres
         </button>
@@ -40,14 +45,16 @@ function updateNavbar() {
         <button class="nav-btn coins-btn" onclick="showSection('recharge-section')">
             <i class="fa-solid fa-coins"></i> <span id="nav-coins">${currentUser.coins || 0}</span> Nonvicoins
         </button>
-        <button class="nav-btn" onclick="logout()">
+        <button class="nav-btn" onclick="logout()" title="Déconnexion">
             <i class="fa-solid fa-right-from-bracket"></i>
         </button>
     `;
-    document.getElementById('current-coins-display').innerText = currentUser.coins || 0;
+    
+    const coinsDisplay = document.getElementById('current-coins-display');
+    if (coinsDisplay) coinsDisplay.innerText = currentUser.coins || 0;
 }
 
-// --- AUTHENTIFICATION ---
+// --- AUTHENTIFICATION & INSCRIPTION ---
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const email = document.getElementById('login-email').value;
@@ -66,10 +73,10 @@ document.getElementById('login-form').addEventListener('submit', async (e) => {
             showSection('members-section');
             loadMembers();
         } else {
-            alert(data.error || 'Échec de connexion');
+            alert(data.error || 'Identifiants incorrects');
         }
     } catch (err) {
-        console.error(err);
+        console.error('Erreur connexion:', err);
     }
 });
 
@@ -84,7 +91,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
         });
         const data = await res.json();
         if (res.ok) {
-            alert('Inscription réussie ! 50 Nonvicoins vous ont été offerts.');
+            alert('Inscription réussie ! 50 Nonvicoins de bienvenue vous ont été crédités.');
             currentUser = data.user;
             updateNavbar();
             showSection('members-section');
@@ -93,7 +100,7 @@ document.getElementById('register-form').addEventListener('submit', async (e) =>
             alert(data.error || 'Échec de l\'inscription');
         }
     } catch (err) {
-        console.error(err);
+        console.error('Erreur inscription:', err);
     }
 });
 
@@ -103,30 +110,42 @@ function logout() {
     showSection('auth-section');
 }
 
-// --- GESTION DES MEMBRES & RECHERCHE ---
+// --- CHARGEMENT ET FILTRAGE DES MEMBRES ---
 async function loadMembers() {
     try {
         const res = await fetch('/api/members');
         const members = await res.json();
         renderMembers(members);
     } catch (err) {
-        console.error(err);
+        console.error('Erreur chargement membres:', err);
     }
 }
 
 function renderMembers(members) {
     const container = document.getElementById('members-container');
     container.innerHTML = members.map(m => `
-        <div class="member-card">
-            <span class="status-badge ${m.online ? 'online' : ''}">${m.online ? 'En ligne' : 'Hors ligne'}</span>
+        <div class="member-card" 
+             data-name="${(m.nom || '').toLowerCase()}"
+             data-country="${(m.pays || '').toLowerCase()}"
+             data-city="${(m.ville || '').toLowerCase()}"
+             data-sex="${m.sexe || ''}"
+             data-interest="${(m.interets || '').toLowerCase()}">
+            
+            <span class="status-badge ${m.online ? 'online' : ''}">${m.online ? '• En ligne' : 'Hors ligne'}</span>
             <img src="${m.photo || '/uploads/default.png'}" alt="${m.nom}">
+            
             <div class="member-info">
                 <h4>${m.nom}, ${m.age} ans</h4>
-                <p style="color: var(--text-muted); font-size: 0.85rem;"><i class="fa-solid fa-location-dot"></i> ${m.ville}</p>
+                <p style="color: var(--text-muted); font-size: 0.85rem;"><i class="fa-solid fa-location-dot"></i> ${m.ville}, ${m.pays || 'Bénin'}</p>
+                ${m.interets ? `<p style="font-size:0.75rem; color:#dc2626; margin-top:4px;"><i class="fa-solid fa-heart"></i> ${m.interets}</p>` : ''}
             </div>
-            <div class="member-actions">
+
+            <div class="member-actions" style="display:flex; justify-content:center; gap:0.5rem; padding:0 0.5rem 0.5rem;">
+                <button class="btn btn-secondary btn-sm" onclick="sendHeart('${m.id}', '${m.nom}')" title="Coup de Cœur (5 Nonvicoins)">
+                    <i class="fa-solid fa-heart" style="color:#ef4444;"></i> ❤️
+                </button>
                 <button class="btn btn-primary btn-sm" onclick="openPrivateChat('${m.id}', '${m.nom}')">
-                    <i class="fa-solid fa-envelope"></i> Message
+                    <i class="fa-solid fa-envelope"></i> Discuter (2 coins)
                 </button>
             </div>
         </div>
@@ -134,16 +153,59 @@ function renderMembers(members) {
 }
 
 function filterUsers() {
-    const query = document.getElementById('search-input').value.toLowerCase();
-    const cards = document.querySelectorAll('.member-card');
-    cards.forEach(card => {
-        const text = card.innerText.toLowerCase();
-        card.style.display = text.includes(query) ? 'block' : 'none';
+    const name = document.getElementById('search-name').value.toLowerCase();
+    const country = document.getElementById('search-country').value.toLowerCase();
+    const city = document.getElementById('search-city').value.toLowerCase();
+    const sex = document.getElementById('search-sex').value;
+    const interest = document.getElementById('search-interest').value.toLowerCase();
+
+    document.querySelectorAll('.member-card').forEach(card => {
+        const matchName = card.dataset.name.includes(name);
+        const matchCountry = card.dataset.country.includes(country);
+        const matchCity = card.dataset.city.includes(city);
+        const matchSex = !sex || card.dataset.sex === sex;
+        const matchInterest = card.dataset.interest.includes(interest);
+
+        if (matchName && matchCountry && matchCity && matchSex && matchInterest) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
     });
 }
 
-// --- TCHAT PRIVÉ ---
+// --- COUP DE CŒUR ---
+async function sendHeart(targetId, targetName) {
+    if (!currentUser || (currentUser.coins < 5 && !currentUser.isVip)) {
+        alert('Solde insuffisant ! Un Coup de Cœur coûte 5 Nonvicoins.');
+        showSection('recharge-section');
+        return;
+    }
+
+    try {
+        const res = await fetch('/api/heart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: currentUser.id, targetId })
+        });
+        if (res.ok) {
+            if (!currentUser.isVip) currentUser.coins -= 5;
+            updateNavbar();
+            alert(`Coup de Cœur ❤️ envoyé à ${targetName} !`);
+        }
+    } catch (err) {
+        console.error('Erreur coup de coeur:', err);
+    }
+}
+
+// --- TCHAT PRIVÉ EN TEMPS RÉEL ---
 function openPrivateChat(targetId, targetName) {
+    if (!currentUser.isVip && currentUser.coins < 2) {
+        alert('Solde insuffisant pour démarrer une discussion (2 Nonvicoins requis).');
+        showSection('recharge-section');
+        return;
+    }
+
     activeChatTargetId = targetId;
     document.getElementById('chat-target-name').innerText = `Discussion avec ${targetName}`;
     document.getElementById('private-messages-viewport').innerHTML = '';
@@ -172,7 +234,7 @@ function appendPrivateMessage(sender, text, isMe) {
     msgDiv.style.marginBottom = '0.75rem';
     msgDiv.style.textAlign = isMe ? 'right' : 'left';
     msgDiv.innerHTML = `
-        <span style="display:inline-block; padding: 0.5rem 1rem; border-radius: 12px; background: ${isMe ? 'var(--primary)' : '#ffffff'}; color: ${isMe ? '#fff' : 'var(--text-main)'}">
+        <span style="display:inline-block; padding: 0.5rem 1rem; border-radius: 12px; max-width:70%; background: ${isMe ? '#dc2626' : '#ffffff'}; color: ${isMe ? '#fff' : 'var(--text-main)'}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <strong>${sender}:</strong> ${text}
         </span>
     `;
@@ -188,7 +250,7 @@ document.getElementById('public-chat-form').addEventListener('submit', (e) => {
     if (!msg) return;
 
     socket.emit('public_message', {
-        user: currentUser.nom,
+        user: currentUser ? currentUser.nom : 'Anonyme',
         text: msg
     });
     input.value = '';
@@ -203,7 +265,7 @@ socket.on('public_message', (data) => {
     viewport.scrollTop = viewport.scrollHeight;
 });
 
-// --- DEMANDE D'ÉCOUTE SOS / SSR ---
+// --- ÉCOUTE SOS / SSR ---
 document.getElementById('ecoute-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const type = document.getElementById('ecoute-type').value;
@@ -216,15 +278,15 @@ document.getElementById('ecoute-form').addEventListener('submit', async (e) => {
             body: JSON.stringify({ userId: currentUser.id, type, message })
         });
         if (res.ok) {
-            alert('Votre demande a été transmise en toute confidentialité.');
+            alert('Votre demande d\'assistance confidentielle a été transmise avec succès.');
             document.getElementById('ecoute-message').value = '';
         }
     } catch (err) {
-        console.error(err);
+        console.error('Erreur demande écoute:', err);
     }
 });
 
-// --- RECHARGE KKIAPAY & VIP ---
+// --- PAIEMENT KKIAPAY ET VIP ---
 function triggerKkiaPay(amount) {
     openKkiapayWidget({
         amount: amount,
@@ -235,9 +297,23 @@ function triggerKkiaPay(amount) {
 
 async function buyVIP() {
     if (!currentUser || currentUser.coins < 500) {
-        alert('Solde insuffisant (500 Nonvicoins requis).');
+        alert('Solde insuffisant ! Le statut VIP requiert 500 Nonvicoins.');
         return;
     }
-    // Transaction VIP
-    alert('Félicitations, vous êtes désormais Membre VIP !');
+
+    try {
+        const res = await fetch('/api/buy-vip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser.id })
+        });
+        if (res.ok) {
+            currentUser.isVip = true;
+            currentUser.coins -= 500;
+            updateNavbar();
+            alert('Félicitations ! Vous êtes désormais un Membre VIP.');
+        }
+    } catch (err) {
+        console.error('Erreur achat VIP:', err);
+    }
 }

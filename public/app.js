@@ -29,21 +29,24 @@ function updateNavbar() {
     const vipBadge = currentUser.isVip ? '<span style="color:#eab308; margin-left:4px;"><i class="fa-solid fa-crown"></i> VIP</span>' : '';
 
     navMenu.innerHTML = `
-        <div class="user-profile-badge" style="display:flex; align-items:center; gap:0.5rem; margin-right:0.5rem; padding:0.3rem 0.8rem; background:var(--border); border-radius:20px; font-weight:600; font-size:0.85rem;">
-            <i class="fa-solid fa-circle-user" style="color:#dc2626; font-size:1.2rem;"></i>
+        <div class="user-profile-badge" style="display:flex; align-items:center; gap:0.4rem; padding:0.3rem 0.7rem; background:var(--border); border-radius:20px; font-weight:600; font-size:0.85rem;">
+            <i class="fa-solid fa-circle-user" style="color:#dc2626; font-size:1.1rem;"></i>
             <span>${currentUser.nom}</span> ${vipBadge}
         </div>
-        <button class="nav-btn" onclick="showSection('members-section')">
+        <button class="nav-btn" onclick="loadAllMembers()">
             <i class="fa-solid fa-users"></i> Membres
+        </button>
+        <button class="nav-btn" onclick="filterMatchesOnly()">
+            <i class="fa-solid fa-fire" style="color:#dc2626;"></i> Mes Matchs
         </button>
         <button class="nav-btn" onclick="showSection('public-chat-section')">
             <i class="fa-solid fa-comments"></i> Salon Public
         </button>
+        <button class="nav-btn coins-btn" onclick="showSection('recharge-section')">
+            <i class="fa-solid fa-crown" style="color:#eab308;"></i> VIP / Coins (${currentUser.coins || 0})
+        </button>
         <button class="nav-btn" onclick="showSection('ecoutes-section')">
             <i class="fa-solid fa-user-nurse"></i> Écoute SOS
-        </button>
-        <button class="nav-btn coins-btn" onclick="showSection('recharge-section')">
-            <i class="fa-solid fa-coins"></i> <span id="nav-coins">${currentUser.coins || 0}</span> Nonvicoins
         </button>
         <button class="nav-btn" onclick="logout()" title="Déconnexion">
             <i class="fa-solid fa-right-from-bracket"></i>
@@ -121,10 +124,15 @@ async function loadMembers() {
     }
 }
 
+function loadAllMembers() {
+    showSection('members-section');
+    document.querySelectorAll('.member-card').forEach(card => card.style.display = 'flex');
+}
+
 function renderMembers(members) {
     const container = document.getElementById('members-container');
     container.innerHTML = members.map(m => {
-        const isMatch = m.isMatch ? '<span style="background:#dc2626; color:#fff; font-size:0.7rem; padding:2px 8px; border-radius:10px; margin-left:5px;">IT\'S A MATCH 🔥</span>' : '';
+        const isMatch = m.isMatch ? '<span class="match-badge" style="background:#dc2626; color:#fff; font-size:0.7rem; padding:2px 8px; border-radius:10px; margin-left:5px;">IT\'S A MATCH 🔥</span>' : '';
         
         return `
             <div class="member-card" 
@@ -143,7 +151,7 @@ function renderMembers(members) {
                     ${m.interets ? `<p style="font-size:0.75rem; color:#dc2626; margin-top:4px;"><i class="fa-solid fa-heart"></i> ${m.interets}</p>` : ''}
                 </div>
 
-                <div class="member-actions" style="display:flex; justify-style:space-between; gap:0.5rem; padding:0.5rem 0.75rem 0.75rem;">
+                <div class="member-actions" style="display:flex; justify-content:space-between; gap:0.5rem; padding:0.5rem 0.75rem 0.75rem;">
                     <button class="btn btn-secondary btn-sm" onclick="sendHeart('${m.id}', '${m.nom}')" title="Coup de Cœur (5 Nonvicoins)" style="flex: 1;">
                         ❤️ Coup de Cœur
                     </button>
@@ -171,7 +179,18 @@ function filterUsers() {
         const matchInterest = card.dataset.interest.includes(interest);
 
         if (matchName && matchCountry && matchCity && matchSex && matchInterest) {
-            card.style.display = 'block';
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function filterMatchesOnly() {
+    showSection('members-section');
+    document.querySelectorAll('.member-card').forEach(card => {
+        if (card.querySelector('.match-badge')) {
+            card.style.display = 'flex';
         } else {
             card.style.display = 'none';
         }

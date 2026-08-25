@@ -110,7 +110,7 @@ function logout() {
     showSection('auth-section');
 }
 
-// --- CHARGEMENT ET FILTRAGE DES MEMBRES ---
+// --- CHARGEMENT DES MEMBRES & FILTRAGE ---
 async function loadMembers() {
     try {
         const res = await fetch('/api/members');
@@ -123,33 +123,37 @@ async function loadMembers() {
 
 function renderMembers(members) {
     const container = document.getElementById('members-container');
-    container.innerHTML = members.map(m => `
-        <div class="member-card" 
-             data-name="${(m.nom || '').toLowerCase()}"
-             data-country="${(m.pays || '').toLowerCase()}"
-             data-city="${(m.ville || '').toLowerCase()}"
-             data-sex="${m.sexe || ''}"
-             data-interest="${(m.interets || '').toLowerCase()}">
-            
-            <span class="status-badge ${m.online ? 'online' : ''}">${m.online ? '• En ligne' : 'Hors ligne'}</span>
-            <img src="${m.photo || '/uploads/default.png'}" alt="${m.nom}">
-            
-            <div class="member-info">
-                <h4>${m.nom}, ${m.age} ans</h4>
-                <p style="color: var(--text-muted); font-size: 0.85rem;"><i class="fa-solid fa-location-dot"></i> ${m.ville}, ${m.pays || 'Bénin'}</p>
-                ${m.interets ? `<p style="font-size:0.75rem; color:#dc2626; margin-top:4px;"><i class="fa-solid fa-heart"></i> ${m.interets}</p>` : ''}
-            </div>
+    container.innerHTML = members.map(m => {
+        const isMatch = m.isMatch ? '<span style="background:#dc2626; color:#fff; font-size:0.7rem; padding:2px 8px; border-radius:10px; margin-left:5px;">IT\'S A MATCH 🔥</span>' : '';
+        
+        return `
+            <div class="member-card" 
+                 data-name="${(m.nom || '').toLowerCase()}"
+                 data-country="${(m.pays || '').toLowerCase()}"
+                 data-city="${(m.ville || '').toLowerCase()}"
+                 data-sex="${m.sexe || ''}"
+                 data-interest="${(m.interets || '').toLowerCase()}">
+                
+                <span class="status-badge ${m.online ? 'online' : ''}">${m.online ? '• En ligne' : 'Hors ligne'}</span>
+                <img src="${m.photo || '/uploads/default.png'}" alt="${m.nom}">
+                
+                <div class="member-info" style="padding: 0.75rem;">
+                    <h4>${m.nom}, ${m.age} ans ${isMatch}</h4>
+                    <p style="color: var(--text-muted); font-size: 0.85rem;"><i class="fa-solid fa-location-dot"></i> ${m.ville}, ${m.pays || 'Bénin'}</p>
+                    ${m.interets ? `<p style="font-size:0.75rem; color:#dc2626; margin-top:4px;"><i class="fa-solid fa-heart"></i> ${m.interets}</p>` : ''}
+                </div>
 
-            <div class="member-actions" style="display:flex; justify-content:center; gap:0.5rem; padding:0 0.5rem 0.5rem;">
-                <button class="btn btn-secondary btn-sm" onclick="sendHeart('${m.id}', '${m.nom}')" title="Coup de Cœur (5 Nonvicoins)">
-                    <i class="fa-solid fa-heart" style="color:#ef4444;"></i> ❤️
-                </button>
-                <button class="btn btn-primary btn-sm" onclick="openPrivateChat('${m.id}', '${m.nom}')">
-                    <i class="fa-solid fa-envelope"></i> Discuter (2 coins)
-                </button>
+                <div class="member-actions" style="display:flex; justify-style:space-between; gap:0.5rem; padding:0.5rem 0.75rem 0.75rem;">
+                    <button class="btn btn-secondary btn-sm" onclick="sendHeart('${m.id}', '${m.nom}')" title="Coup de Cœur (5 Nonvicoins)" style="flex: 1;">
+                        ❤️ Coup de Cœur
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="openPrivateChat('${m.id}', '${m.nom}')" style="flex: 1;">
+                        <i class="fa-solid fa-comments"></i> Discuter (2 coins)
+                    </button>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function filterUsers() {
@@ -198,7 +202,7 @@ async function sendHeart(targetId, targetName) {
     }
 }
 
-// --- TCHAT PRIVÉ EN TEMPS RÉEL ---
+// --- TCHAT PRIVÉ EN TEMPS RÉEL & INDICATEUR D'ÉCRITURE ---
 function openPrivateChat(targetId, targetName) {
     if (!currentUser.isVip && currentUser.coins < 2) {
         alert('Solde insuffisant pour démarrer une discussion (2 Nonvicoins requis).');
@@ -211,6 +215,24 @@ function openPrivateChat(targetId, targetName) {
     document.getElementById('private-messages-viewport').innerHTML = '';
     showSection('private-chat-section');
 }
+
+const chatInput = document.getElementById('private-message-input');
+if (chatInput) {
+    chatInput.addEventListener('input', () => {
+        if (activeChatTargetId && currentUser) {
+            socket.emit('typing', { to: activeChatTargetId, senderName: currentUser.nom, senderId: currentUser.id });
+        }
+    });
+}
+
+socket.on('user_typing', (data) => {
+    const indicator = document.getElementById('typing-indicator');
+    if (indicator && data.senderId === activeChatTargetId) {
+        indicator.innerText = `${data.senderName} est en train d'écrire...`;
+        clearTimeout(window.typingTimeout);
+        window.typingTimeout = setTimeout(() => { indicator.innerText = ''; }, 3000);
+    }
+});
 
 document.getElementById('private-chat-form').addEventListener('submit', (e) => {
     e.preventDefault();

@@ -88,6 +88,27 @@ app.post('/api/register', upload.single('photo'), (req, res) => {
     }
 });
 
+// --- MISE À JOUR DE LA PHOTO DE PROFIL ---
+app.post('/api/update-photo', upload.single('photo'), (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!userId || !req.file) {
+            return res.status(400).json({ error: 'Fichier ou identifiant manquant.' });
+        }
+
+        const user = users.find(u => u.id === userId);
+        if (!user) {
+            return res.status(404).json({ error: 'Utilisateur non trouvé.' });
+        }
+
+        user.photo = `/uploads/${req.file.filename}`;
+        res.json({ success: true, photoUrl: user.photo });
+    } catch (error) {
+        console.error("Erreur mise à jour photo:", error);
+        res.status(500).json({ error: "Impossible d'enregistrer l'image." });
+    }
+});
+
 // --- LISTE DES MEMBRES ET MATCHS ---
 app.get('/api/members', (req, res) => {
     const userId = req.query.userId;

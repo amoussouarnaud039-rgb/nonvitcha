@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs'); // Assurez-vous de faire : npm install bcryptjs
 
 const app = express();
 const server = http.createServer(app);
@@ -68,7 +69,7 @@ const upload = multer({ storage });
 
 // --- ROUTES API ---
 
-// 1. Inscription
+// 1. Inscription (Mots de passe hachés)
 app.post('/api/register', upload.single('photo'), async (req, res) => {
     try {
         const { nom, email, password, age, sexe, pays, ville, interets } = req.body;
@@ -82,12 +83,13 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
             return res.status(400).json({ error: 'Un compte existe déjà avec cet e-mail.' });
         }
 
+        const hashedPassword = await bcrypt.hash(password, 10);
         const photoUrl = req.file ? `/uploads/${req.file.filename}` : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300';
 
         const newUser = new User({
             nom: nom.trim(),
             email: email.toLowerCase().trim(),
-            password,
+            password: hashedPassword,
             age: parseInt(age) || 18,
             sexe: sexe || 'M',
             pays: pays || 'Bénin',
@@ -101,6 +103,7 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         await newUser.save();
 
         const userResponse = newUser.toObject();
+        delete userResponse.password; // Masquer le mot de passe
         userResponse.id = userResponse._id.toString();
 
         res.json({ user: userResponse });
@@ -110,13 +113,18 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
     }
 });
 
-// 2. Connexion
+// 2. Connexion (Vérification bcrypt)
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email: email.toLowerCase().trim(), password });
+        const user = await User.findOne({ email: email.toLowerCase().trim() });
 
         if (!user) {
+            return res.status(401).json({ error: 'Identifiants incorrects' });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
             return res.status(401).json({ error: 'Identifiants incorrects' });
         }
 
@@ -124,6 +132,7 @@ app.post('/api/login', async (req, res) => {
         await user.save();
 
         const userResponse = user.toObject();
+        delete userResponse.password; // Masquer le mot de passe
         userResponse.id = userResponse._id.toString();
 
         res.json({ user: userResponse });
@@ -136,11 +145,11 @@ app.post('/api/login', async (req, res) => {
 app.get('/api/members', async (req, res) => {
     try {
         const currentUserId = req.query.userId;
-        const members = await User.find().lean();
+        const members = await User.find().select('-password').lean();
 
         let currentUser = null;
         if (currentUserId && mongoose.Types.ObjectId.isValid(currentUserId)) {
-            currentUser = await User.findById(currentUserId);
+            currentUser = await User.findById(currentUserId).lean();
         }
 
         const formattedMembers = members.map(m => {
@@ -196,12 +205,13 @@ app.post('/api/heart', async (req, res) => {
 
         if (!sender || !target) return res.status(404).json({ error: 'Utilisateur introuvable' });
 
-        if (!sender.hearts.includes(targetId)) {
+        const hasHearted = sender.hearts.some(id => id.toString() === targetId);
+        if (!hasHearted) {
             sender.hearts.push(targetId);
             await sender.save();
         }
 
-        const isMatch = target.hearts.includes(senderId);
+        const isMatch = target.hearts.some(id => id.toString() === senderId);
 
         res.json({ success: true, isMatch });
     } catch (err) {
@@ -229,8 +239,10 @@ app.post('/api/ecoute', async (req, res) => {
 // 7. Connexion Administration
 app.post('/api/admin/login', async (req, res) => {
     const { password } = req.body;
-    if (password === 'admin123') {
-        const users = await User.find().lean();
+    const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+    
+    if (password === ADMIN_PASSWORD) {
+        const users = await User.find().select('-password').lean();
         const ecoutes = await Ecoute.find().lean();
         res.json({ users, ecoutes });
     } else {
@@ -239,14 +251,15 @@ app.post('/api/admin/login', async (req, res) => {
 });
 
 // --- WEBSOCKETS (SOCKET.IO) ---
-const userSockets = new Map(); // Associe chaque userId à son socket.id actuel
+const userSockets = new Map();
 
 io.on('connection', (socket) => {
-    // 1. Enregistrement du socket connecté
+    // 1. Enregistrement du socket connecté et entrée dans sa propre Room
     socket.on('user_connected', async (userId) => {
         if (mongoose.Types.ObjectId.isValid(userId)) {
             socket.userId = userId;
             userSockets.set(userId, socket.id);
+            socket.join(userId); // Rejoint une room dédiée à l'ID utilisateur
 
             await User.findByIdAndUpdate(userId, { online: true });
             io.emit('update_online_status', { userId, online: true });
@@ -260,29 +273,17 @@ io.on('connection', (socket) => {
 
     // 3. Chat Privé ciblé
     socket.on('private_message', (data) => {
-        const recipientSocketId = userSockets.get(data.toUserId);
-        
-        // Envoi direct au destinataire si en ligne
-        if (recipientSocketId) {
-            io.to(recipientSocketId).emit('private_message', data);
-        }
-        // Confirmation / réémission à l'expéditeur
-        socket.emit('private_message', data);
+        // Émission vers la room du destinataire ET la room de l'expéditeur
+        io.to(data.toUserId).to(data.fromUserId).emit('private_message', data);
     });
 
     // 4. Gestion de "En train d'écrire..."
     socket.on('typing', (data) => {
-        const recipientSocketId = userSockets.get(data.toUserId);
-        if (recipientSocketId) {
-            io.to(recipientSocketId).emit('user_typing', { fromUserId: socket.userId });
-        }
+        socket.to(data.toUserId).emit('user_typing', { fromUserId: socket.userId });
     });
 
     socket.on('stop_typing', (data) => {
-        const recipientSocketId = userSockets.get(data.toUserId);
-        if (recipientSocketId) {
-            io.to(recipientSocketId).emit('user_stop_typing', { fromUserId: socket.userId });
-        }
+        socket.to(data.toUserId).emit('user_stop_typing', { fromUserId: socket.userId });
     });
 
     // 5. Déconnexion

@@ -43,23 +43,23 @@
                 <form id="register-form" enctype="multipart/form-data">
                     <div class="form-group">
                         <label>Nom complet</label>
-                        <input type="text" name="nom" required placeholder="Votre nom">
+                        <input type="text" id="reg-nom" name="nom" required placeholder="Votre nom">
                     </div>
                     <div class="form-group">
                         <label>Email</label>
-                        <input type="email" name="email" required placeholder="votre@email.com">
+                        <input type="email" id="reg-email" name="email" required placeholder="votre@email.com">
                     </div>
                     <div class="form-group">
                         <label>Mot de passe</label>
-                        <input type="password" name="password" required placeholder="••••••••">
+                        <input type="password" id="reg-password" name="password" required placeholder="••••••••">
                     </div>
                     <div class="form-group">
                         <label>Âge</label>
-                        <input type="number" name="age" required min="18" placeholder="25">
+                        <input type="number" id="reg-age" name="age" required min="18" placeholder="25">
                     </div>
                     <div class="form-group">
                         <label>Sexe</label>
-                        <select name="sexe" required>
+                        <select id="reg-sexe" name="sexe" required>
                             <option value="F">Femme</option>
                             <option value="M">Homme</option>
                             <option value="Autre">Autre</option>
@@ -67,19 +67,19 @@
                     </div>
                     <div class="form-group">
                         <label>Pays</label>
-                        <input type="text" name="pays" placeholder="Bénin">
+                        <input type="text" id="reg-pays" name="pays" placeholder="Bénin">
                     </div>
                     <div class="form-group">
                         <label>Ville</label>
-                        <input type="text" name="ville" placeholder="Cotonou">
+                        <input type="text" id="reg-ville" name="ville" placeholder="Cotonou">
                     </div>
                     <div class="form-group">
                         <label>Centres d'intérêt</label>
-                        <input type="text" name="interets" placeholder="Musique, Sport, Lecture...">
+                        <input type="text" id="reg-interets" name="interets" placeholder="Musique, Sport, Lecture...">
                     </div>
                     <div class="form-group">
                         <label>Photo de profil</label>
-                        <input type="file" name="photo" accept="image/*">
+                        <input type="file" id="reg-photo" name="photo" accept="image/*">
                     </div>
                     <button type="submit" class="btn btn-primary">S'inscrire (50 Coins offerts)</button>
                 </form>
@@ -90,23 +90,29 @@
         <section id="members-section" class="page-section" style="display: none;">
             <div class="auth-box">
                 <h3><i class="fa-solid fa-filter"></i> Recherche & Filtres</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem;">
-                    <input type="text" id="search-name" placeholder="Nom..." oninput="filterUsers()">
-                    <input type="text" id="search-country" placeholder="Pays..." oninput="filterUsers()">
-                    <input type="text" id="search-city" placeholder="Ville..." oninput="filterUsers()">
-                    <input type="number" id="search-age" placeholder="Âge max" oninput="filterUsers()">
-                    <select id="search-sex" onchange="filterUsers()">
-                        <option value="">Tous les sexes</option>
-                        <option value="F">Femme</option>
-                        <option value="M">Homme</option>
-                        <option value="Autre">Autre</option>
-                    </select>
-                    <input type="text" id="search-interest" placeholder="Intérêt..." oninput="filterUsers()">
-                </div>
+                <form id="search-form" onsubmit="event.preventDefault(); filterUsers();">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin-bottom: 0.8rem;">
+                        <input type="text" id="search-name" placeholder="Nom..." oninput="filterUsers()">
+                        <input type="text" id="search-country" placeholder="Pays..." oninput="filterUsers()">
+                        <input type="text" id="search-city" placeholder="Ville..." oninput="filterUsers()">
+                        <input type="number" id="search-age" placeholder="Âge max" oninput="filterUsers()">
+                        <select id="search-sex" onchange="filterUsers()">
+                            <option value="">Tous les sexes</option>
+                            <option value="F">Femme</option>
+                            <option value="M">Homme</option>
+                            <option value="Autre">Autre</option>
+                        </select>
+                        <input type="text" id="search-interest" placeholder="Intérêt..." oninput="filterUsers()">
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" onclick="filterUsers()" class="btn btn-primary" style="flex: 2;"><i class="fa-solid fa-magnifying-glass"></i> Rechercher</button>
+                        <button type="button" onclick="resetFilters()" class="btn btn-secondary" style="flex: 1;"><i class="fa-solid fa-rotate-left"></i> Réinitialiser</button>
+                    </div>
+                </form>
             </div>
 
             <div id="members-container" class="cards-grid">
-                <!-- Les cartes membres seront insérées ici par app.js -->
+                <!-- Les cartes membres seront insérées dynamiquement par app.js -->
             </div>
         </section>
 
@@ -167,29 +173,29 @@
                 <p style="margin-bottom: 1rem;">Solde actuel : <strong id="current-coins-display">0</strong> Coins</p>
 
                 <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
-                    <div style="border: 1px solid #e2e8f0; padding: 1rem; border-radius: 8px; flex: 1;">
+                    <div style="border: 1px solid #e2e8f0; padding: 1rem; border-radius: 8px; flex: 1; min-width: 200px;">
                         <h4>Pack 100 Coins</h4>
-                        <p style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0;">500 FCFA</p>
-                        <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(500)">Acheter avec Kkiapay</button>
+                        <p style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0; color: var(--primary-color);">500 FCFA</p>
+                        <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(500)" style="width: 100%;">Acheter avec Kkiapay</button>
                     </div>
-                    <div style="border: 1px solid #e2e8f0; padding: 1rem; border-radius: 8px; flex: 1;">
+                    <div style="border: 1px solid #e2e8f0; padding: 1rem; border-radius: 8px; flex: 1; min-width: 200px;">
                         <h4>Pack 500 Coins</h4>
-                        <p style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0;">2000 FCFA</p>
-                        <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(2000)">Acheter avec Kkiapay</button>
+                        <p style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0; color: var(--primary-color);">2000 FCFA</p>
+                        <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(2000)" style="width: 100%;">Acheter avec Kkiapay</button>
                     </div>
                 </div>
 
                 <div style="border: 1px dashed #dc2626; padding: 1rem; border-radius: 8px; background: #fee2e2;">
-                    <h4>👑 Devenir Membre VIP</h4>
-                    <p style="font-size: 0.85rem; margin: 0.5rem 0;">Bénéficiez des Coups de Cœur illimités et d'une meilleure visibilité.</p>
-                    <button class="btn btn-primary" onclick="buyVIP()">Activer VIP (500 Coins)</button>
+                    <h4 style="color: #b91c1c;"><i class="fa-solid fa-crown"></i> Devenir Membre VIP</h4>
+                    <p style="font-size: 0.85rem; margin: 0.5rem 0; color: #7f1d1d;">Bénéficiez des Coups de Cœur illimités et d'une visibilité prioritaire.</p>
+                    <button class="btn btn-primary" onclick="buyVIP()" style="width: 100%;">Activer VIP (500 Coins)</button>
                 </div>
             </div>
         </section>
 
         <!-- SECTION 7 : Espace Administrateur -->
         <section id="admin-section" class="page-section" style="display: none;">
-            <div id="admin-login-box" class="auth-box">
+            <div id="admin-login-box" class="auth-box" style="max-width: 450px; margin: 0 auto;">
                 <h3><i class="fa-solid fa-user-shield"></i> Connexion Administration</h3>
                 <form id="admin-login-form">
                     <div class="form-group">
@@ -203,31 +209,35 @@
             <div id="admin-dashboard" style="display: none;">
                 <div class="auth-box">
                     <h3><i class="fa-solid fa-users"></i> Gestion des Utilisateurs</h3>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem;">
-                        <thead>
-                            <tr style="background: #f1f5f9; text-align: left;">
-                                <th style="padding: 0.5rem;">Nom</th>
-                                <th style="padding: 0.5rem;">Email</th>
-                                <th style="padding: 0.5rem;">Coins</th>
-                                <th style="padding: 0.5rem;">VIP</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-users-list"></tbody>
-                    </table>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem;">
+                            <thead>
+                                <tr style="background: #f1f5f9; text-align: left;">
+                                    <th style="padding: 0.5rem;">Nom</th>
+                                    <th style="padding: 0.5rem;">Email</th>
+                                    <th style="padding: 0.5rem;">Coins</th>
+                                    <th style="padding: 0.5rem;">VIP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-users-list"></tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div class="auth-box">
                     <h3><i class="fa-solid fa-heart-pulse"></i> Signals & Écoutes (SSR / VBG)</h3>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem;">
-                        <thead>
-                            <tr style="background: #f1f5f9; text-align: left;">
-                                <th style="padding: 0.5rem;">Type</th>
-                                <th style="padding: 0.5rem;">Message</th>
-                                <th style="padding: 0.5rem;">Date</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-ecoutes-list"></tbody>
-                    </table>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem;">
+                            <thead>
+                                <tr style="background: #f1f5f9; text-align: left;">
+                                    <th style="padding: 0.5rem;">Type</th>
+                                    <th style="padding: 0.5rem;">Message</th>
+                                    <th style="padding: 0.5rem;">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-ecoutes-list"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </section>

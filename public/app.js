@@ -629,14 +629,6 @@ function renderAdminData(data) {
 
 
 
-
-
-
-
-
-
-
-
 const socket = io();
 
 // Utilisateur connecté en local

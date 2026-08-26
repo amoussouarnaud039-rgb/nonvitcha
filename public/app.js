@@ -1,122 +1,250 @@
-// Initialisation de Socket.io
 const socket = io();
 
-// État global de l'application
-let currentUser = null;
-let activeChatTargetId = null;
+// Utilisateur connecté localement
+let currentUser = JSON.parse(localStorage.getItem('nonvitcha_user')) || null;
+let activePrivateChatUserId = null;
 
-// --- GESTION DE LA NAVIGATION ---
+document.addEventListener('DOMContentLoaded', () => {
+    updateNav();
+    loadMembers();
+    setupEventListeners();
+
+    if (currentUser) {
+        socket.emit('user_connected', currentUser.id);
+    }
+});
+
+// --- NAVIGATION & INTERFACE ---
+function updateNav() {
+    const navMenu = document.getElementById('nav-menu');
+    if (!navMenu) return;
+
+    if (currentUser) {
+        navMenu.innerHTML = `
+            <button class="nav-btn" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Membres</button>
+            <button class="nav-btn" onclick="showMatchs()"><i class="fa-solid fa-fire text-danger"></i> Mes Matchs</button>
+            <button class="nav-btn" onclick="showSection('public-chat-section')"><i class="fa-solid fa-comments"></i> Salon Public</button>
+            <button class="nav-btn btn-warning" onclick="showSection('recharge-section')"><i class="fa-solid fa-crown"></i> VIP / Coins (<span id="current-coins-display">${currentUser.coins || 0}</span>)</button>
+            <button class="nav-btn" onclick="showSection('ecoutes-section')"><i class="fa-solid fa-user-doctor"></i> Écoute SOS</button>
+            <button class="nav-btn" onclick="showSection('admin-section')"><i class="fa-solid fa-lock"></i> Admin</button>
+            <button class="nav-btn btn-secondary" onclick="logout()"><i class="fa-solid fa-power-off"></i></button>
+        `;
+    } else {
+        navMenu.innerHTML = `
+            <button class="nav-btn" onclick="showSection('auth-section')"><i class="fa-solid fa-right-to-bracket"></i> Connexion / Inscription</button>
+            <button class="nav-btn" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Explorer</button>
+            <button class="nav-btn" onclick="showSection('admin-section')"><i class="fa-solid fa-lock"></i> Admin</button>
+        `;
+    }
+}
+
 function showSection(sectionId) {
     document.querySelectorAll('.page-section').forEach(sec => sec.style.display = 'none');
-    const targetSection = document.getElementById(sectionId);
-    if (targetSection) targetSection.style.display = 'block';
-
-    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+    const target = document.getElementById(sectionId);
+    if (target) {
+        target.style.display = 'block';
+    } else {
+        const authSec = document.getElementById('auth-section');
+        if (authSec) authSec.style.display = 'block';
+    }
 }
-
-// --- MISE À JOUR EN-TÊTE ET BARRE DE NAVIGATION ---
-function updateNavbar() {
-    const navMenu = document.getElementById('nav-menu');
-    if (!currentUser) {
-        navMenu.innerHTML = `
-            <button class="nav-btn active" onclick="showSection('auth-section')">
-                <i class="fa-solid fa-right-to-bracket"></i> Connexion
-            </button>
-        `;
-        return;
-    }
-
-    const vipBadge = currentUser.isVip ? '<span style="color:#eab308; margin-left:4px;"><i class="fa-solid fa-crown"></i> VIP</span>' : '';
-
-    navMenu.innerHTML = `
-        <div class="user-profile-badge" style="display:flex; align-items:center; gap:0.4rem; padding:0.3rem 0.7rem; background:var(--border); border-radius:20px; font-weight:600; font-size:0.85rem;">
-            <i class="fa-solid fa-circle-user" style="color:#dc2626; font-size:1.1rem;"></i>
-            <span>${currentUser.nom}</span> ${vipBadge}
-        </div>
-        <button class="nav-btn" onclick="loadAllMembers()">
-            <i class="fa-solid fa-users"></i> Membres
-        </button>
-        <button class="nav-btn" onclick="filterMatchesOnly()">
-            <i class="fa-solid fa-fire" style="color:#dc2626;"></i> Mes Matchs
-        </button>
-        <button class="nav-btn" onclick="showSection('public-chat-section')">
-            <i class="fa-solid fa-comments"></i> Salon Public
-        </button>
-        <button class="nav-btn coins-btn" onclick="showSection('recharge-section')">
-            <i class="fa-solid fa-crown" style="color:#eab308;"></i> VIP / Coins (${currentUser.coins || 0})
-        </button>
-        <button class="nav-btn" onclick="showSection('ecoutes-section')">
-            <i class="fa-solid fa-user-nurse"></i> Écoute SOS
-        </button>
-        <button class="nav-btn" onclick="logout()" title="Déconnexion">
-            <i class="fa-solid fa-right-from-bracket"></i>
-        </button>
-    `;
-    
-    const coinsDisplay = document.getElementById('current-coins-display');
-    if (coinsDisplay) coinsDisplay.innerText = currentUser.coins || 0;
-}
-
-// --- AUTHENTIFICATION & INSCRIPTION ---
-document.getElementById('login-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('login-email').value;
-    const password = document.getElementById('login-password').value;
-
-    try {
-        const res = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            currentUser = data.user;
-            updateNavbar();
-            showSection('members-section');
-            loadMembers();
-        } else {
-            alert(data.error || 'Identifiants incorrects');
-        }
-    } catch (err) {
-        console.error('Erreur connexion:', err);
-    }
-});
-
-document.getElementById('register-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const formData = new FormData(e.target);
-
-    try {
-        const res = await fetch('/api/register', {
-            method: 'POST',
-            body: formData
-        });
-        const data = await res.json();
-        if (res.ok) {
-            alert('Inscription réussie ! 50 Nonvicoins de bienvenue vous ont été crédités.');
-            currentUser = data.user;
-            updateNavbar();
-            showSection('members-section');
-            loadMembers();
-        } else {
-            alert(data.error || 'Échec de l\'inscription');
-        }
-    } catch (err) {
-        console.error('Erreur inscription:', err);
-    }
-});
 
 function logout() {
+    localStorage.removeItem('nonvitcha_user');
     currentUser = null;
-    updateNavbar();
+    updateNav();
     showSection('auth-section');
+    loadMembers();
 }
 
-// --- CHARGEMENT DES MEMBRES & FILTRAGE ---
+// --- GESTION DES EVENEMENTS ---
+function setupEventListeners() {
+    // Connexion
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    currentUser = data.user;
+                    localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+                    socket.emit('user_connected', currentUser.id);
+                    updateNav();
+                    showSection('members-section');
+                    loadMembers();
+                } else {
+                    alert(data.error || 'Erreur de connexion');
+                }
+            } catch (err) {
+                console.error('Erreur réseau login:', err);
+            }
+        });
+    }
+
+    // Inscription
+    const registerForm = document.getElementById('register-form');
+    if (registerForm) {
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(registerForm);
+
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert('Inscription réussie ! 50 Coins offerts 🎉. Vous pouvez vous connecter.');
+                    registerForm.reset();
+                } else {
+                    alert(data.error || 'Erreur lors de l’inscription');
+                }
+            } catch (err) {
+                console.error('Erreur réseau register:', err);
+            }
+        });
+    }
+
+    // Chat Public
+    const publicForm = document.getElementById('public-chat-form');
+    if (publicForm) {
+        publicForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('public-message-input');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const senderName = currentUser ? currentUser.nom : 'Anonyme';
+            socket.emit('public_message', { 
+                sender: senderName, 
+                message, 
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+            });
+            input.value = '';
+        });
+    }
+
+    // Chat Privé
+    const privateForm = document.getElementById('private-chat-form');
+    if (privateForm) {
+        privateForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('private-message-input');
+            const message = input.value.trim();
+            if (!message || !activePrivateChatUserId || !currentUser) return;
+
+            socket.emit('private_message', { 
+                from: currentUser.id, 
+                to: activePrivateChatUserId, 
+                senderName: currentUser.nom, 
+                message 
+            });
+            appendPrivateMessage(currentUser.nom, message, true);
+            input.value = '';
+        });
+    }
+
+    // Formulaire d'Écoute
+    const ecouteForm = document.getElementById('ecoute-form');
+    if (ecouteForm) {
+        ecouteForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const type = document.getElementById('ecoute-type').value;
+            const message = document.getElementById('ecoute-message').value;
+
+            try {
+                const res = await fetch('/api/ecoute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, message, userId: currentUser ? currentUser.id : null })
+                });
+                if (res.ok) {
+                    alert('Votre message a été transmis en toute confidentialité.');
+                    ecouteForm.reset();
+                } else {
+                    alert('Erreur lors de l’envoi');
+                }
+            } catch (err) {
+                console.error('Erreur écoute:', err);
+            }
+        });
+    }
+
+    // Admin Login
+    const adminForm = document.getElementById('admin-login-form');
+    if (adminForm) {
+        adminForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const password = document.getElementById('admin-password').value;
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    const loginBox = document.getElementById('admin-login-box');
+                    const dashboard = document.getElementById('admin-dashboard');
+                    if (loginBox) loginBox.style.display = 'none';
+                    if (dashboard) dashboard.style.display = 'block';
+                    renderAdminData(data);
+                } else {
+                    alert(data.error || 'Mot de passe incorrect');
+                }
+            } catch (err) {
+                console.error('Erreur admin login:', err);
+            }
+        });
+    }
+}
+
+// --- SOCKET.IO MESSAGE RECEIVERS ---
+socket.on('public_message', (data) => {
+    const viewport = document.getElementById('public-messages-viewport');
+    if (viewport) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'chat-msg';
+        msgDiv.innerHTML = `<strong>${data.sender}</strong> <span style="font-size:0.75rem; color:#94a3b8;">${data.time}</span><br>${data.message}`;
+        viewport.appendChild(msgDiv);
+        viewport.scrollTop = viewport.scrollHeight;
+    }
+});
+
+socket.on('private_message', (data) => {
+    if (activePrivateChatUserId === data.from) {
+        appendPrivateMessage(data.senderName, data.message, false);
+    } else {
+        alert(`Nouveau message privé de ${data.senderName}`);
+    }
+});
+
+function appendPrivateMessage(sender, text, isOwn) {
+    const viewport = document.getElementById('private-messages-viewport');
+    if (viewport) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-msg ${isOwn ? 'own-msg' : ''}`;
+        msgDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+        viewport.appendChild(msgDiv);
+        viewport.scrollTop = viewport.scrollHeight;
+    }
+}
+
+// --- ACTIONS MEMBRES ---
 async function loadMembers() {
     try {
-        const res = await fetch('/api/members');
+        const query = currentUser ? `?userId=${currentUser.id}` : '';
+        const res = await fetch(`/api/members${query}`);
         const members = await res.json();
         renderMembers(members);
     } catch (err) {
@@ -124,237 +252,174 @@ async function loadMembers() {
     }
 }
 
-function loadAllMembers() {
-    showSection('members-section');
-    document.querySelectorAll('.member-card').forEach(card => card.style.display = 'flex');
-}
-
 function renderMembers(members) {
     const container = document.getElementById('members-container');
-    container.innerHTML = members.map(m => {
-        const isMatch = m.isMatch ? '<span class="match-badge" style="background:#dc2626; color:#fff; font-size:0.7rem; padding:2px 8px; border-radius:10px; margin-left:5px;">IT\'S A MATCH 🔥</span>' : '';
-        
-        return `
-            <div class="member-card" 
-                 data-name="${(m.nom || '').toLowerCase()}"
-                 data-country="${(m.pays || '').toLowerCase()}"
-                 data-city="${(m.ville || '').toLowerCase()}"
-                 data-sex="${m.sexe || ''}"
-                 data-interest="${(m.interets || '').toLowerCase()}">
-                
-                <span class="status-badge ${m.online ? 'online' : ''}">${m.online ? '• En ligne' : 'Hors ligne'}</span>
-                <img src="${m.photo || '/uploads/default.png'}" alt="${m.nom}">
-                
-                <div class="member-info" style="padding: 0.75rem;">
-                    <h4>${m.nom}, ${m.age} ans ${isMatch}</h4>
-                    <p style="color: var(--text-muted); font-size: 0.85rem;"><i class="fa-solid fa-location-dot"></i> ${m.ville}, ${m.pays || 'Bénin'}</p>
-                    ${m.interets ? `<p style="font-size:0.75rem; color:#dc2626; margin-top:4px;"><i class="fa-solid fa-heart"></i> ${m.interets}</p>` : ''}
-                </div>
+    if (!container) return;
 
-                <div class="member-actions" style="display:flex; justify-content:space-between; gap:0.5rem; padding:0.5rem 0.75rem 0.75rem;">
-                    <button class="btn btn-secondary btn-sm" onclick="sendHeart('${m.id}', '${m.nom}')" title="Coup de Cœur (5 Nonvicoins)" style="flex: 1;">
-                        ❤️ Coup de Cœur
-                    </button>
-                    <button class="btn btn-primary btn-sm" onclick="openPrivateChat('${m.id}', '${m.nom}')" style="flex: 1;">
-                        <i class="fa-solid fa-comments"></i> Discuter (2 coins)
-                    </button>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-
-function filterUsers() {
-    const name = document.getElementById('search-name').value.toLowerCase();
-    const country = document.getElementById('search-country').value.toLowerCase();
-    const city = document.getElementById('search-city').value.toLowerCase();
-    const sex = document.getElementById('search-sex').value;
-    const interest = document.getElementById('search-interest').value.toLowerCase();
-
-    document.querySelectorAll('.member-card').forEach(card => {
-        const matchName = card.dataset.name.includes(name);
-        const matchCountry = card.dataset.country.includes(country);
-        const matchCity = card.dataset.city.includes(city);
-        const matchSex = !sex || card.dataset.sex === sex;
-        const matchInterest = card.dataset.interest.includes(interest);
-
-        if (matchName && matchCountry && matchCity && matchSex && matchInterest) {
-            card.style.display = 'flex';
-        } else {
-            card.style.display = 'none';
-        }
-    });
-}
-
-function filterMatchesOnly() {
-    showSection('members-section');
-    document.querySelectorAll('.member-card').forEach(card => {
-        if (card.querySelector('.match-badge')) {
-            card.style.display = 'flex';
-        } else {
-            card.style.display = 'none';
-        }
-    });
-}
-
-// --- COUP DE CŒUR ---
-async function sendHeart(targetId, targetName) {
-    if (!currentUser || (currentUser.coins < 5 && !currentUser.isVip)) {
-        alert('Solde insuffisant ! Un Coup de Cœur coûte 5 Nonvicoins.');
-        showSection('recharge-section');
+    if (!members || members.length === 0) {
+        container.innerHTML = '<p style="padding:1rem; text-align:center; color:#64748b; width:100%;">Aucun membre à afficher.</p>';
         return;
     }
 
+    container.innerHTML = members.map(m => `
+        <div class="member-card" 
+             style="display: flex !important;"
+             data-name="${(m.nom || '').toLowerCase()}"
+             data-country="${(m.pays || '').toLowerCase()}"
+             data-city="${(m.ville || '').toLowerCase()}"
+             data-age="${m.age || 0}"
+             data-sex="${m.sexe || ''}"
+             data-interest="${(m.interets || '').toLowerCase()}">
+            <span class="status-badge ${m.online ? 'online' : ''}">${m.online ? 'En ligne' : 'Hors ligne'}</span>
+            <img src="${m.photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300'}" alt="${m.nom}">
+            <div class="card-body">
+                <h4 style="font-size:1rem; font-weight:700; margin-bottom:0.3rem;">
+                    ${m.nom}, ${m.age} ans 
+                    ${m.isMatch ? '<span class="badge-match">MATCH 🔥</span>' : ''}
+                </h4>
+                <p style="font-size:0.85rem; color:#64748b;"><i class="fa-solid fa-location-dot"></i> ${m.ville}, ${m.pays || 'Bénin'}</p>
+                <p style="font-size:0.8rem; color:#ef4444; margin-top:0.4rem;"><i class="fa-solid fa-heart"></i> ${m.interets || 'Intérêts non spécifiés'}</p>
+            </div>
+            <div class="card-actions">
+                <button class="btn btn-secondary btn-sm" onclick="sendLike('${m.id}')">👍 Like</button>
+                <button class="btn btn-heart btn-sm" onclick="sendHeart('${m.id}')">❤️ Cœur</button>
+                <button class="btn btn-primary btn-sm" onclick="openPrivateChat('${m.id}', '${m.nom}')">💬 Chat</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function filterUsers() {
+    const nameInput = document.getElementById('search-name');
+    const countryInput = document.getElementById('search-country');
+    const cityInput = document.getElementById('search-city');
+    const ageInput = document.getElementById('search-age');
+    const sexInput = document.getElementById('search-sex');
+    const interestInput = document.getElementById('search-interest');
+
+    const nameVal = nameInput ? nameInput.value.toLowerCase() : '';
+    const countryVal = countryInput ? countryInput.value.toLowerCase() : '';
+    const cityVal = cityInput ? cityInput.value.toLowerCase() : '';
+    const ageVal = ageInput && ageInput.value ? parseInt(ageInput.value) : 999;
+    const sexVal = sexInput ? sexInput.value : '';
+    const interestVal = interestInput ? interestInput.value.toLowerCase() : '';
+
+    document.querySelectorAll('.member-card').forEach(card => {
+        const matchesName = card.dataset.name.includes(nameVal);
+        const matchesCountry = card.dataset.country.includes(countryVal);
+        const matchesCity = card.dataset.city.includes(cityVal);
+        const matchesAge = parseInt(card.dataset.age) <= ageVal;
+        const matchesSex = sexVal === '' || card.dataset.sex === sexVal;
+        const matchesInterest = card.dataset.interest.includes(interestVal);
+
+        if (matchesName && matchesCountry && matchesCity && matchesAge && matchesSex && matchesInterest) {
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function resetFilters() {
+    const fields = ['search-name', 'search-country', 'search-city', 'search-age', 'search-interest'];
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    const sexSelect = document.getElementById('search-sex');
+    if (sexSelect) sexSelect.value = '';
+
+    filterUsers();
+}
+
+async function showMatchs() {
+    if (!currentUser) return alert('Veuillez vous connecter pour voir vos matchs.');
+    try {
+        const res = await fetch(`/api/members?userId=${currentUser.id}`);
+        const members = await res.json();
+        const matchesOnly = members.filter(m => m.isMatch);
+        showSection('members-section');
+        renderMembers(matchesOnly);
+    } catch (err) {
+        console.error('Erreur chargement matchs:', err);
+    }
+}
+
+function openPrivateChat(targetId, targetName) {
+    if (!currentUser) return alert('Veuillez vous connecter pour chatter.');
+    activePrivateChatUserId = targetId;
+    const titleEl = document.getElementById('chat-target-name');
+    const viewport = document.getElementById('private-messages-viewport');
+    if (titleEl) titleEl.innerText = `Discussion privée avec ${targetName}`;
+    if (viewport) viewport.innerHTML = '';
+    showSection('private-chat-section');
+}
+
+async function sendLike(targetId) {
+    if (!currentUser) return alert('Veuillez vous connecter.');
+    try {
+        const res = await fetch('/api/like', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: currentUser.id, targetId })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            alert('Like envoyé avec succès ! 👍');
+        } else {
+            alert(data.error || 'Erreur lors du like');
+        }
+    } catch (err) {
+        console.error('Erreur like:', err);
+    }
+}
+
+async function sendHeart(targetId) {
+    if (!currentUser) return alert('Veuillez vous connecter.');
     try {
         const res = await fetch('/api/heart', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ senderId: currentUser.id, targetId })
         });
+        const data = await res.json();
         if (res.ok) {
-            if (!currentUser.isVip) currentUser.coins -= 5;
-            updateNavbar();
-            alert(`Coup de Cœur ❤️ envoyé à ${targetName} !`);
+            if (data.isMatch) {
+                alert("🎉 C'est un MATCH ! Vous pouvez désormais discuter.");
+            } else {
+                alert('Coup de cœur envoyé ! ❤️');
+            }
+            loadMembers();
+        } else {
+            alert(data.error || 'Erreur lors de l\'envoi du cœur');
         }
     } catch (err) {
-        console.error('Erreur coup de coeur:', err);
+        console.error('Erreur heart:', err);
     }
 }
 
-// --- TCHAT PRIVÉ EN TEMPS RÉEL & INDICATEUR D'ÉCRITURE ---
-function openPrivateChat(targetId, targetName) {
-    if (!currentUser.isVip && currentUser.coins < 2) {
-        alert('Solde insuffisant pour démarrer une discussion (2 Nonvicoins requis).');
-        showSection('recharge-section');
-        return;
+// --- ADMIN DASHBOARD ---
+function renderAdminData(data) {
+    const usersList = document.getElementById('admin-users-list');
+    if (usersList && data.users) {
+        usersList.innerHTML = data.users.map(u => `
+            <tr>
+                <td style="padding:0.6rem;">${u.nom}</td>
+                <td style="padding:0.6rem;">${u.email}</td>
+                <td style="padding:0.6rem;">${u.coins}</td>
+                <td style="padding:0.6rem;">${u.isVip ? 'Oui' : 'Non'}</td>
+            </tr>
+        `).join('');
     }
 
-    activeChatTargetId = targetId;
-    document.getElementById('chat-target-name').innerText = `Discussion avec ${targetName}`;
-    document.getElementById('private-messages-viewport').innerHTML = '';
-    showSection('private-chat-section');
-}
-
-const chatInput = document.getElementById('private-message-input');
-if (chatInput) {
-    chatInput.addEventListener('input', () => {
-        if (activeChatTargetId && currentUser) {
-            socket.emit('typing', { to: activeChatTargetId, senderName: currentUser.nom, senderId: currentUser.id });
-        }
-    });
-}
-
-socket.on('user_typing', (data) => {
-    const indicator = document.getElementById('typing-indicator');
-    if (indicator && data.senderId === activeChatTargetId) {
-        indicator.innerText = `${data.senderName} est en train d'écrire...`;
-        clearTimeout(window.typingTimeout);
-        window.typingTimeout = setTimeout(() => { indicator.innerText = ''; }, 3000);
-    }
-});
-
-document.getElementById('private-chat-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = document.getElementById('private-message-input');
-    const msg = input.value.trim();
-    if (!msg || !activeChatTargetId) return;
-
-    socket.emit('private_message', {
-        to: activeChatTargetId,
-        from: currentUser.id,
-        text: msg
-    });
-
-    appendPrivateMessage(currentUser.nom, msg, true);
-    input.value = '';
-});
-
-function appendPrivateMessage(sender, text, isMe) {
-    const viewport = document.getElementById('private-messages-viewport');
-    const msgDiv = document.createElement('div');
-    msgDiv.style.marginBottom = '0.75rem';
-    msgDiv.style.textAlign = isMe ? 'right' : 'left';
-    msgDiv.innerHTML = `
-        <span style="display:inline-block; padding: 0.5rem 1rem; border-radius: 12px; max-width:70%; background: ${isMe ? '#dc2626' : '#ffffff'}; color: ${isMe ? '#fff' : 'var(--text-main)'}; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-            <strong>${sender}:</strong> ${text}
-        </span>
-    `;
-    viewport.appendChild(msgDiv);
-    viewport.scrollTop = viewport.scrollHeight;
-}
-
-// --- TCHAT PUBLIC ---
-document.getElementById('public-chat-form').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const input = document.getElementById('public-message-input');
-    const msg = input.value.trim();
-    if (!msg) return;
-
-    socket.emit('public_message', {
-        user: currentUser ? currentUser.nom : 'Anonyme',
-        text: msg
-    });
-    input.value = '';
-});
-
-socket.on('public_message', (data) => {
-    const viewport = document.getElementById('public-messages-viewport');
-    const msgDiv = document.createElement('div');
-    msgDiv.style.marginBottom = '0.5rem';
-    msgDiv.innerHTML = `<strong>${data.user}:</strong> ${data.text}`;
-    viewport.appendChild(msgDiv);
-    viewport.scrollTop = viewport.scrollHeight;
-});
-
-// --- ÉCOUTE SOS / SSR ---
-document.getElementById('ecoute-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const type = document.getElementById('ecoute-type').value;
-    const message = document.getElementById('ecoute-message').value;
-
-    try {
-        const res = await fetch('/api/ecoutes', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUser.id, type, message })
-        });
-        if (res.ok) {
-            alert('Votre demande d\'assistance confidentielle a été transmise avec succès.');
-            document.getElementById('ecoute-message').value = '';
-        }
-    } catch (err) {
-        console.error('Erreur demande écoute:', err);
-    }
-});
-
-// --- PAIEMENT KKIAPAY ET VIP ---
-function triggerKkiaPay(amount) {
-    openKkiapayWidget({
-        amount: amount,
-        position: "center",
-        callback: "/api/kkiapay-callback"
-    });
-}
-
-async function buyVIP() {
-    if (!currentUser || currentUser.coins < 500) {
-        alert('Solde insuffisant ! Le statut VIP requiert 500 Nonvicoins.');
-        return;
-    }
-
-    try {
-        const res = await fetch('/api/buy-vip', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUser.id })
-        });
-        if (res.ok) {
-            currentUser.isVip = true;
-            currentUser.coins -= 500;
-            updateNavbar();
-            alert('Félicitations ! Vous êtes désormais un Membre VIP.');
-        }
-    } catch (err) {
-        console.error('Erreur achat VIP:', err);
+    const ecoutesList = document.getElementById('admin-ecoutes-list');
+    if (ecoutesList && data.ecoutes) {
+        ecoutesList.innerHTML = data.ecoutes.map(e => `
+            <tr>
+                <td style="padding:0.6rem;">${e.type}</td>
+                <td style="padding:0.6rem;">${e.message}</td>
+                <td style="padding:0.6rem;">${new Date(e.date).toLocaleString()}</td>
+            </tr>
+        `).join('');
     }
 }

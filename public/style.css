@@ -2,11 +2,16 @@
     --primary-color: #ef4444;
     --primary-hover: #dc2626;
     --secondary-color: #64748b;
+    --secondary-hover: #475569;
     --bg-color: #f8fafc;
     --card-bg: #ffffff;
     --text-color: #0f172a;
     --text-muted: #64748b;
     --border-color: #e2e8f0;
+    --warning-color: #f59e0b;
+    --heart-color: #ec4899;
+    --heart-hover: #db2777;
+    --success-color: #22c55e;
 }
 
 * {
@@ -22,7 +27,7 @@ body {
     line-height: 1.5;
 }
 
-/* Navbar */
+/* Navbar & Header */
 .navbar {
     background: #ffffff;
     padding: 1rem 2rem;
@@ -83,7 +88,7 @@ body {
     gap: 0.5rem;
 }
 
-/* Forms */
+/* Formulaires & Contrôles */
 .form-group {
     margin-bottom: 1rem;
 }
@@ -104,6 +109,7 @@ body {
     border-radius: 6px;
     font-size: 0.95rem;
     outline: none;
+    transition: border-color 0.2s;
 }
 
 .form-group input:focus, 
@@ -112,7 +118,30 @@ body {
     border-color: var(--primary-color);
 }
 
-/* Buttons */
+/* Filtres de Recherche */
+.search-filter-box {
+    background: var(--card-bg);
+    padding: 1.2rem;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 1rem;
+}
+
+.filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+/* Boutons */
 .btn {
     padding: 0.6rem 1.2rem;
     border: none;
@@ -120,13 +149,16 @@ body {
     cursor: pointer;
     font-weight: 600;
     transition: background 0.2s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
 }
 
 .btn:active {
     transform: scale(0.98);
 }
 
-/* Full width uniquement sur les formulaires d'authentification et administration */
 .auth-box .btn-primary,
 #ecoute-form .btn-primary,
 #admin-login-form .btn-primary { 
@@ -137,9 +169,14 @@ body {
 .btn-primary:hover { background: var(--primary-hover); }
 
 .btn-secondary { background: var(--secondary-color); color: white; }
-.btn-warning { background: #f59e0b; color: white; }
-.btn-heart { background: #ec4899; color: white; }
-.btn-heart:hover { background: #db2777; }
+.btn-secondary:hover { background: var(--secondary-hover); }
+
+.btn-warning { background: var(--warning-color); color: white; }
+.btn-warning:hover { background: #d97706; }
+
+.btn-heart { background: var(--heart-color); color: white; }
+.btn-heart:hover { background: var(--heart-hover); }
+
 .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.85rem; }
 
 .nav-btn {
@@ -148,12 +185,16 @@ body {
     padding: 0.5rem 0.8rem;
     border-radius: 6px;
     cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-color);
+    transition: background 0.2s;
 }
+
 .nav-btn:hover {
     background: #f1f5f9;
 }
 
-/* Member Cards Grid */
+/* Cartes Membres & Grille */
 .cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
@@ -189,10 +230,10 @@ body {
     font-size: 0.75rem;
 }
 
-.status-badge.online { background: #22c55e; }
+.status-badge.online { background: var(--success-color); }
 
 .badge-match {
-    background: #ef4444;
+    background: var(--primary-color);
     color: white;
     font-size: 0.7rem;
     padding: 0.15rem 0.4rem;
@@ -214,7 +255,7 @@ body {
     background: #fafafa;
 }
 
-/* Chat Layout (Public et Privé) */
+/* Chat Layout (Public & Privé) */
 .chat-window {
     background: white;
     border-radius: 10px;
@@ -273,6 +314,14 @@ body {
     color: #b91c1c;
 }
 
+.typing-indicator {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-style: italic;
+    padding: 0.2rem 1rem;
+    height: 1.2rem;
+}
+
 .chat-input-row {
     display: flex;
     padding: 0.8rem;
@@ -295,8 +344,82 @@ body {
     padding: 0.6rem 1.2rem;
 }
 
-/* Admin Tables */
+/* Offres VIP & Packages Coins */
+.recharge-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-top: 1rem;
+}
+
+.recharge-card {
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 1.5rem;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+}
+
+.recharge-card h4 {
+    color: var(--warning-color);
+    margin-bottom: 0.5rem;
+}
+
+.recharge-card .price {
+    font-size: 1.4rem;
+    font-weight: bold;
+    margin: 0.8rem 0;
+}
+
+/* Panneau Administration & Tables */
+.admin-table-container {
+    overflow-x: auto;
+    background: white;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-top: 1rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.9rem;
+}
+
+table th {
+    background: #f8fafc;
+    font-weight: 600;
+    color: var(--text-color);
+}
+
 table th, table td {
-    padding: 0.6rem;
+    padding: 0.75rem 1rem;
     border-bottom: 1px solid var(--border-color);
+}
+
+table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Responsivité Mobile */
+@media (max-width: 768px) {
+    .navbar {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    #nav-menu {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    .cards-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .chat-msg {
+        max-width: 88%;
+    }
 }

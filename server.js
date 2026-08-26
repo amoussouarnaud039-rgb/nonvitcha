@@ -20,7 +20,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(uploadDir));
 
-// Storage Multer pour les photos
+// Storage Multer pour les photos de profil
 const storage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, uploadDir),
     filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
@@ -35,15 +35,16 @@ let users = [
     { id: '4', nom: 'Yves', email: 'yves@test.com', password: '123', age: 30, sexe: 'M', pays: 'Bénin', ville: 'Parakou', interets: 'Art, Cinéma', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300', coins: 150, isVip: true, online: false }
 ];
 
-let ecoutes = []; // Sensibilisation SSR / VBG / Minorités
+let ecoutes = []; // Messages Sensibilisation SOS / VBG
 let hearts = [];  // Coups de cœur enregistrés
 let likes = [];   // Likes enregistrés
 
 // --- AUTHENTIFICATION ---
 app.post('/api/login', (req, res) => {
     const { email, password } = req.body;
-    const user = users.find(u => u.email === email && u.password === password);
+    const user = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
     if (!user) return res.status(401).json({ error: 'Identifiants incorrects' });
+    
     user.online = true;
     res.json({ user });
 });
@@ -52,8 +53,12 @@ app.post('/api/register', upload.single('photo'), (req, res) => {
     try {
         const { nom, email, password, age, sexe, pays, ville, interets } = req.body;
 
+        if (!email || !nom || !password) {
+            return res.status(400).json({ error: 'Veuillez remplir tous les champs obligatoires.' });
+        }
+
         // 1. Contrôle d'existence de l'e-mail
-        const existingUser = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+        const existingUser = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase().trim());
         if (existingUser) {
             return res.status(400).json({ error: 'Cet e-mail est déjà utilisé. Veuillez vous connecter.' });
         }
@@ -61,11 +66,11 @@ app.post('/api/register', upload.single('photo'), (req, res) => {
         // 2. Création du nouvel utilisateur
         const newUser = {
             id: Date.now().toString(),
-            nom, 
-            email, 
+            nom: nom.trim(), 
+            email: email.toLowerCase().trim(), 
             password, 
             age: parseInt(age) || 18, 
-            sexe, 
+            sexe: sexe || 'M', 
             pays: pays || 'Bénin', 
             ville: ville || 'Cotonou', 
             interets: interets || '',
@@ -86,6 +91,7 @@ app.post('/api/register', upload.single('photo'), (req, res) => {
 // --- LISTE DES MEMBRES ET MATCHS ---
 app.get('/api/members', (req, res) => {
     const userId = req.query.userId;
+    
     const membersWithMatch = users.map(user => {
         let isMatch = false;
         if (userId) {
@@ -93,8 +99,12 @@ app.get('/api/members', (req, res) => {
             const receivedHeart = hearts.some(h => h.senderId === user.id && h.targetId === userId);
             if (sentHeart && receivedHeart) isMatch = true;
         }
-        return { ...user, isMatch };
+        
+        // Sécurisation : Exclusion du mot de passe dans le retour
+        const { password, ...safeUser } = user;
+        return { ...safeUser, isMatch };
     });
+    
     res.json(membersWithMatch);
 });
 
@@ -117,8 +127,8 @@ app.post('/api/heart', (req, res) => {
     res.json({ success: true, isMatch });
 });
 
-// --- ESPACE SENSIBILISATION (SSR, VBG, MINORITÉ) ---
-app.post('/api/ecoute', (req, res) => { // Alignement du chemin avec public/app.js
+// --- ESPACE SENSIBILISATION (SSR / VBG / SOS) ---
+app.post('/api/ecoute', (req, res) => {
     const { userId, type, message } = req.body;
     ecoutes.push({ id: Date.now(), userId, type, message, date: new Date() });
     res.json({ success: true });
@@ -128,7 +138,7 @@ app.post('/api/ecoute', (req, res) => { // Alignement du chemin avec public/app.
 app.post('/api/buy-vip', (req, res) => {
     const { userId } = req.body;
     const user = users.find(u => u.id === userId);
-    if (!user || user.coins < 500) return res.status(400).json({ error: 'Nonvicoins insuffisants' });
+    if (!user || user.coins < 500) return res.status(400).json({ error: 'Coins insuffisants pour passer VIP' });
     user.coins -= 500;
     user.isVip = true;
     res.json({ success: true, user });

@@ -1,29 +1,60 @@
 const socket = io();
 
-// Utilisateur connecté localement
-let currentUser = JSON.parse(localStorage.getItem('nonvitcha_user')) || null;
-let activePrivateChatUserId = null;
+// Utilisateur connecté en local
+let currentUser = null;
+try {
+    currentUser = JSON.parse(localStorage.getItem('nonvitcha_user'));
+} catch (e) {
+    currentUser = null;
+}
 
-document.addEventListener('DOMContentLoaded', () => {
+let activePrivateChatUserId = null;
+let typingTimeout = null;
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Rafraîchissement des informations utilisateur si connecté
+    if (currentUser && currentUser.id) {
+        await refreshUserData();
+    }
+    
     updateNav();
     loadMembers();
     setupEventListeners();
 
-    if (currentUser) {
+    if (currentUser && currentUser.id) {
         socket.emit('user_connected', currentUser.id);
     }
 });
+
+// --- RAFRAÎCHISSEMENT DE SESSION ---
+async function refreshUserData() {
+    if (!currentUser || !currentUser.id) return;
+    try {
+        const res = await fetch(`/api/members?userId=${currentUser.id}`);
+        if (res.ok) {
+            const members = await res.json();
+            const me = members.find(m => m.id === currentUser.id);
+            if (me) {
+                currentUser = { ...currentUser, ...me };
+                localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+            }
+        }
+    } catch (e) {
+        console.warn('Impossible de rafraîchir le profil local:', e);
+    }
+}
 
 // --- NAVIGATION & INTERFACE ---
 function updateNav() {
     const navMenu = document.getElementById('nav-menu');
     if (!navMenu) return;
 
-    if (currentUser) {
+    if (currentUser && currentUser.nom) {
         navMenu.innerHTML = `
-            <span style="color:#fff; font-weight:bold; margin-right:0.8rem; font-size:0.9rem; background:rgba(255,255,255,0.15); padding:0.4rem 0.8rem; border-radius:20px; display:inline-flex; align-items:center; gap:0.4rem;">
-                <i class="fa-solid fa-circle-user"></i> ${currentUser.nom}
-            </span>
+            <div style="display:inline-flex; align-items:center; background:#f1f5f9; padding:0.4rem 0.8rem; border-radius:20px; margin-right:0.5rem; color:var(--text-color); font-weight:bold; font-size:0.85rem; border:1px solid var(--border-color);">
+                <i class="fa-solid fa-circle-user" style="margin-right:0.4rem; color:var(--primary-color);"></i> 
+                <span>${currentUser.nom}</span>
+            </div>
             <button class="nav-btn" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Membres</button>
             <button class="nav-btn" onclick="showMatchs()"><i class="fa-solid fa-fire text-danger"></i> Mes Matchs</button>
             <button class="nav-btn" onclick="showSection('public-chat-section')"><i class="fa-solid fa-comments"></i> Salon Public</button>
@@ -48,7 +79,7 @@ function showSection(sectionId) {
         target.style.display = 'block';
     } else {
         const authSec = document.getElementById('auth-section');
-        if (authSec) authSec.style.display = 'block';
+        if (authSec) authSec.style.display = 'grid';
     }
 }
 
@@ -60,7 +91,7 @@ function logout() {
     loadMembers();
 }
 
-// --- GESTION DES EVENEMENTS ---
+// --- GESTION DES ÉVÉNEMENTS & FORMULAIRES ---
 function setupEventListeners() {
     // Connexion
     const loginForm = document.getElementById('login-form');
@@ -144,7 +175,16 @@ function setupEventListeners() {
         });
     }
 
-    // Chat Privé
+    // Chat Privé avec gestion de la saisie (typing)
+    const privateInput = document.getElementById('private-message-input');
+    if (privateInput) {
+        privateInput.addEventListener('input', () => {
+            if (activePrivateChatUserId && currentUser) {
+                socket.emit('typing', { from: currentUser.id, to: activePrivateChatUserId, senderName: currentUser.nom });
+            }
+        });
+    }
+
     const privateForm = document.getElementById('private-chat-form');
     if (privateForm) {
         privateForm.addEventListener('submit', (e) => {
@@ -219,13 +259,13 @@ function setupEventListeners() {
     }
 }
 
-// --- SOCKET.IO MESSAGE RECEIVERS ---
+// --- RECEPTION DES MESSAGES TEMPS REEL ---
 socket.on('public_message', (data) => {
     const viewport = document.getElementById('public-messages-viewport');
     if (viewport) {
         const msgDiv = document.createElement('div');
         msgDiv.className = 'chat-msg';
-        msgDiv.innerHTML = `<strong>${data.sender}</strong> <span style="font-size:0.75rem; color:#94a3b8;">${data.time}</span><br>${data.message}`;
+        msgDiv.innerHTML = `<strong>${data.sender} <span style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;">${data.time}</span></strong>${data.message}`;
         viewport.appendChild(msgDiv);
         viewport.scrollTop = viewport.scrollHeight;
     }
@@ -239,18 +279,45 @@ socket.on('private_message', (data) => {
     }
 });
 
+socket.on('user_typing', (data) => {
+    if (activePrivateChatUserId === data.from) {
+        const indicator = document.getElementById('typing-indicator');
+        if (indicator) {
+            indicator.innerText = `${data.senderName} est en train d'écrire...`;
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => { indicator.innerText = ''; }, 3000);
+        }
+    }
+});
+
+socket.on('update_online_status', (data) => {
+    const card = document.querySelector(`.member-card[data-id="${data.userId}"]`);
+    if (card) {
+        const badge = card.querySelector('.status-badge');
+        if (badge) {
+            if (data.online) {
+                badge.classList.add('online');
+                badge.innerText = 'En ligne';
+            } else {
+                badge.classList.remove('online');
+                badge.innerText = 'Hors ligne';
+            }
+        }
+    }
+});
+
 function appendPrivateMessage(sender, text, isOwn) {
     const viewport = document.getElementById('private-messages-viewport');
     if (viewport) {
         const msgDiv = document.createElement('div');
         msgDiv.className = `chat-msg ${isOwn ? 'own-msg' : ''}`;
-        msgDiv.innerHTML = `<strong>${sender}:</strong> ${text}`;
+        msgDiv.innerHTML = `<strong>${sender}</strong>${text}`;
         viewport.appendChild(msgDiv);
         viewport.scrollTop = viewport.scrollHeight;
     }
 }
 
-// --- ACTIONS MEMBRES ---
+// --- AFFICHAGE & FILTRAGE DES MEMBRES ---
 async function loadMembers() {
     try {
         const query = currentUser ? `?userId=${currentUser.id}` : '';
@@ -267,13 +334,13 @@ function renderMembers(members) {
     if (!container) return;
 
     if (!members || members.length === 0) {
-        container.innerHTML = '<p style="padding:1rem; text-align:center; color:#64748b; width:100%;">Aucun membre à afficher.</p>';
+        container.innerHTML = '<p style="padding:1rem; text-align:center; color:var(--text-muted); width:100%;">Aucun membre à afficher.</p>';
         return;
     }
 
     container.innerHTML = members.map(m => `
         <div class="member-card" 
-             style="display: flex !important;"
+             data-id="${m.id}"
              data-name="${(m.nom || '').toLowerCase()}"
              data-country="${(m.pays || '').toLowerCase()}"
              data-city="${(m.ville || '').toLowerCase()}"
@@ -287,8 +354,8 @@ function renderMembers(members) {
                     ${m.nom}, ${m.age} ans 
                     ${m.isMatch ? '<span class="badge-match">MATCH 🔥</span>' : ''}
                 </h4>
-                <p style="font-size:0.85rem; color:#64748b;"><i class="fa-solid fa-location-dot"></i> ${m.ville}, ${m.pays || 'Bénin'}</p>
-                <p style="font-size:0.8rem; color:#ef4444; margin-top:0.4rem;"><i class="fa-solid fa-heart"></i> ${m.interets || 'Intérêts non spécifiés'}</p>
+                <p style="font-size:0.85rem; color:var(--text-muted);"><i class="fa-solid fa-location-dot"></i> ${m.ville}, ${m.pays || 'Bénin'}</p>
+                <p style="font-size:0.8rem; color:var(--primary-color); margin-top:0.4rem;"><i class="fa-solid fa-heart"></i> ${m.interets || 'Intérêts non spécifiés'}</p>
             </div>
             <div class="card-actions">
                 <button class="btn btn-secondary btn-sm" onclick="sendLike('${m.id}')">👍 Like</button>
@@ -300,19 +367,12 @@ function renderMembers(members) {
 }
 
 function filterUsers() {
-    const nameInput = document.getElementById('search-name');
-    const countryInput = document.getElementById('search-country');
-    const cityInput = document.getElementById('search-city');
-    const ageInput = document.getElementById('search-age');
-    const sexInput = document.getElementById('search-sex');
-    const interestInput = document.getElementById('search-interest');
-
-    const nameVal = nameInput ? nameInput.value.toLowerCase() : '';
-    const countryVal = countryInput ? countryInput.value.toLowerCase() : '';
-    const cityVal = cityInput ? cityInput.value.toLowerCase() : '';
-    const ageVal = ageInput && ageInput.value ? parseInt(ageInput.value) : 999;
-    const sexVal = sexInput ? sexInput.value : '';
-    const interestVal = interestInput ? interestInput.value.toLowerCase() : '';
+    const nameVal = (document.getElementById('search-name')?.value || '').toLowerCase();
+    const countryVal = (document.getElementById('search-country')?.value || '').toLowerCase();
+    const cityVal = (document.getElementById('search-city')?.value || '').toLowerCase();
+    const ageVal = parseInt(document.getElementById('search-age')?.value) || 999;
+    const sexVal = document.getElementById('search-sex')?.value || '';
+    const interestVal = (document.getElementById('search-interest')?.value || '').toLowerCase();
 
     document.querySelectorAll('.member-card').forEach(card => {
         const matchesName = card.dataset.name.includes(nameVal);
@@ -331,8 +391,7 @@ function filterUsers() {
 }
 
 function resetFilters() {
-    const fields = ['search-name', 'search-country', 'search-city', 'search-age', 'search-interest'];
-    fields.forEach(id => {
+    ['search-name', 'search-country', 'search-city', 'search-age', 'search-interest'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
     });
@@ -408,16 +467,55 @@ async function sendHeart(targetId) {
     }
 }
 
-// --- ADMIN DASHBOARD ---
+// --- MONÉTISATION & KKIAPAY ---
+function triggerKkiaPay(amount) {
+    if (!currentUser) return alert('Veuillez vous connecter pour recharger votre compte.');
+    
+    openKkiapayWidget({
+        amount: amount,
+        position: "center",
+        callback: "/api/kkiapay-callback",
+        data: JSON.stringify({ userId: currentUser.id, amount }),
+        key: "PUBLIC_API_KEY" // Remplacez par votre clé publique Kkiapay
+    });
+}
+
+async function buyVIP() {
+    if (!currentUser) return alert('Veuillez vous connecter.');
+    if ((currentUser.coins || 0) < 500) {
+        return alert('Coins insuffisants. Veuillez recharger votre compte.');
+    }
+
+    try {
+        const res = await fetch('/api/buy-vip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser.id })
+        });
+        const data = await res.json();
+        if (res.ok) {
+            currentUser = data.user;
+            localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+            updateNav();
+            alert('Félicitations ! Vous êtes désormais un membre VIP 👑');
+        } else {
+            alert(data.error || 'Erreur lors de la mise à jour VIP');
+        }
+    } catch (err) {
+        console.error('Erreur achat VIP:', err);
+    }
+}
+
+// --- TABLEAU DE BORD ADMIN ---
 function renderAdminData(data) {
     const usersList = document.getElementById('admin-users-list');
     if (usersList && data.users) {
         usersList.innerHTML = data.users.map(u => `
             <tr>
-                <td style="padding:0.6rem;">${u.nom}</td>
-                <td style="padding:0.6rem;">${u.email}</td>
-                <td style="padding:0.6rem;">${u.coins}</td>
-                <td style="padding:0.6rem;">${u.isVip ? 'Oui' : 'Non'}</td>
+                <td>${u.nom}</td>
+                <td>${u.email}</td>
+                <td>${u.coins}</td>
+                <td>${u.isVip ? 'Oui 👑' : 'Non'}</td>
             </tr>
         `).join('');
     }
@@ -426,9 +524,9 @@ function renderAdminData(data) {
     if (ecoutesList && data.ecoutes) {
         ecoutesList.innerHTML = data.ecoutes.map(e => `
             <tr>
-                <td style="padding:0.6rem;">${e.type}</td>
-                <td style="padding:0.6rem;">${e.message}</td>
-                <td style="padding:0.6rem;">${new Date(e.date).toLocaleString()}</td>
+                <td><strong>${e.type}</strong></td>
+                <td>${e.message}</td>
+                <td>${new Date(e.date).toLocaleString()}</td>
             </tr>
         `).join('');
     }

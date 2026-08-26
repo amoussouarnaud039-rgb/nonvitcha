@@ -1,225 +1,301 @@
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
-const path = require('path');
+const mongoose = require('mongoose');
 const multer = require('multer');
+const path = require('path');
 const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    cors: { origin: "*" }
+});
 
-// --- ASSURER L'EXISTENCE DU DOSSIER UPLOADS SUR RENDER ---
-const uploadDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
+const PORT = process.env.PORT || 3000;
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/nonvitcha';
 
+// --- CONNEXION BASE DE DONNÉES MONGODB ---
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('✅ Connecté avec succès à MongoDB Atlas !'))
+    .catch(err => console.error('❌ Erreur de connexion MongoDB :', err));
+
+// --- MODÈLES MONGODB ---
+const userSchema = new mongoose.Schema({
+    nom: { type: String, required: true },
+    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    password: { type: String, required: true },
+    age: { type: Number, default: 18 },
+    sexe: { type: String, default: 'M' },
+    pays: { type: String, default: 'Bénin' },
+    ville: { type: String, default: 'Cotonou' },
+    interets: { type: String, default: '' },
+    photo: { type: String, default: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300' },
+    coins: { type: Number, default: 50 },
+    isVip: { type: Boolean, default: false },
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    hearts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    online: { type: Boolean, default: false }
+}, { timestamps: true });
+
+const ecouteSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    type: { type: String, required: true },
+    message: { type: String, required: true },
+    date: { type: Date, default: Date.now }
+});
+
+const User = mongoose.model('User', userSchema);
+const Ecoute = mongoose.model('Ecoute', ecouteSchema);
+
+// --- MIDDLEWARES & STATIQUES ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(uploadDir));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Storage Multer pour les photos de profil
+// Dossier pour stockage local des photos
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
+    destination: (req, file, cb) => cb(null, 'uploads/'),
+    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
 });
 const upload = multer({ storage });
 
-// Base de données temporaire en mémoire
-let users = [
-    { id: '1', nom: 'Aïcha', email: 'aicha@test.com', password: '123', age: 24, sexe: 'F', pays: 'Bénin', ville: 'Cotonou', interets: 'Musique, Voyage', photo: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300', coins: 100, isVip: true, online: true },
-    { id: '2', nom: 'Koffi', email: 'koffi@test.com', password: '123', age: 28, sexe: 'M', pays: 'Bénin', ville: 'Porto-Novo', interets: 'Sport, Tech', photo: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300', coins: 50, isVip: false, online: true },
-    { id: '3', nom: 'Sonia', email: 'sonia@test.com', password: '123', age: 22, sexe: 'F', pays: 'Togo', ville: 'Lomé', interets: 'Cuisine, Mode', photo: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300', coins: 80, isVip: false, online: false },
-    { id: '4', nom: 'Yves', email: 'yves@test.com', password: '123', age: 30, sexe: 'M', pays: 'Bénin', ville: 'Parakou', interets: 'Art, Cinéma', photo: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300', coins: 150, isVip: true, online: false }
-];
+// --- ROUTES API ---
 
-let ecoutes = []; // Messages Sensibilisation SOS / VBG
-let hearts = [];  // Coups de cœur enregistrés
-let likes = [];   // Likes enregistrés
-
-// --- AUTHENTIFICATION ---
-app.post('/api/login', (req, res) => {
-    const { email, password } = req.body;
-    const user = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase().trim() && u.password === password);
-    if (!user) return res.status(401).json({ error: 'Identifiants incorrects' });
-    
-    user.online = true;
-    res.json({ user });
-});
-
-app.post('/api/register', upload.single('photo'), (req, res) => {
+// 1. Inscription
+app.post('/api/register', upload.single('photo'), async (req, res) => {
     try {
         const { nom, email, password, age, sexe, pays, ville, interets } = req.body;
 
         if (!email || !nom || !password) {
-            return res.status(400).json({ error: 'Veuillez remplir tous les champs obligatoires.' });
+            return res.status(400).json({ error: 'Tous les champs obligatoires doivent être remplis.' });
         }
 
-        // 1. Contrôle d'existence de l'e-mail
-        const existingUser = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase().trim());
+        const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
         if (existingUser) {
-            return res.status(400).json({ error: 'Cet e-mail est déjà utilisé. Veuillez vous connecter.' });
+            return res.status(400).json({ error: 'Un compte existe déjà avec cet e-mail.' });
         }
 
-        // 2. Création du nouvel utilisateur
-        const newUser = {
-            id: Date.now().toString(),
-            nom: nom.trim(), 
-            email: email.toLowerCase().trim(), 
-            password, 
-            age: parseInt(age) || 18, 
-            sexe: sexe || 'M', 
-            pays: pays || 'Bénin', 
-            ville: ville || 'Cotonou', 
-            interets: interets || '',
-            photo: req.file ? `/uploads/${req.file.filename}` : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300',
-            coins: 50, 
-            isVip: false, 
-            online: true
-        };
+        const photoUrl = req.file ? `/uploads/${req.file.filename}` : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300';
 
-        users.push(newUser);
-        res.json({ user: newUser });
-    } catch (error) {
-        console.error("Erreur serveur inscription:", error);
+        const newUser = new User({
+            nom: nom.trim(),
+            email: email.toLowerCase().trim(),
+            password,
+            age: parseInt(age) || 18,
+            sexe: sexe || 'M',
+            pays: pays || 'Bénin',
+            ville: ville || 'Cotonou',
+            interets: interets || '',
+            photo: photoUrl,
+            coins: 50,
+            online: true
+        });
+
+        await newUser.save();
+
+        const userResponse = newUser.toObject();
+        userResponse.id = userResponse._id.toString();
+
+        res.json({ user: userResponse });
+    } catch (err) {
+        console.error('Erreur Inscription :', err);
         res.status(500).json({ error: "Erreur lors de la création du compte." });
     }
 });
 
-// --- MISE À JOUR DE LA PHOTO DE PROFIL ---
-app.post('/api/update-photo', upload.single('photo'), (req, res) => {
+// 2. Connexion
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email: email.toLowerCase().trim(), password });
+
+        if (!user) {
+            return res.status(401).json({ error: 'Identifiants incorrects' });
+        }
+
+        user.online = true;
+        await user.save();
+
+        const userResponse = user.toObject();
+        userResponse.id = userResponse._id.toString();
+
+        res.json({ user: userResponse });
+    } catch (err) {
+        res.status(500).json({ error: 'Erreur lors de la connexion' });
+    }
+});
+
+// 3. Liste des membres
+app.get('/api/members', async (req, res) => {
+    try {
+        const currentUserId = req.query.userId;
+        const members = await User.find().lean();
+
+        let currentUser = null;
+        if (currentUserId && mongoose.Types.ObjectId.isValid(currentUserId)) {
+            currentUser = await User.findById(currentUserId);
+        }
+
+        const formattedMembers = members.map(m => {
+            const memberId = m._id.toString();
+            let isMatch = false;
+
+            if (currentUser && currentUser.hearts) {
+                const iHeart = currentUser.hearts.some(h => h.toString() === memberId);
+                const heHeartsMe = m.hearts && m.hearts.some(h => h.toString() === currentUserId);
+                isMatch = iHeart && heHeartsMe;
+            }
+
+            return {
+                ...m,
+                id: memberId,
+                isMatch
+            };
+        });
+
+        res.json(formattedMembers);
+    } catch (err) {
+        res.status(500).json({ error: 'Erreur lors du chargement des membres' });
+    }
+});
+
+// 4. Mise à jour de la photo de profil
+app.post('/api/update-photo', upload.single('photo'), async (req, res) => {
     try {
         const { userId } = req.body;
-        if (!userId || !req.file) {
-            return res.status(400).json({ error: 'Fichier ou identifiant manquant.' });
+        if (!req.file || !userId) {
+            return res.status(400).json({ error: 'Fichier ou ID utilisateur manquant' });
         }
 
-        const user = users.find(u => u.id === userId);
-        if (!user) {
-            return res.status(404).json({ error: 'Utilisateur non trouvé.' });
-        }
+        const photoUrl = `/uploads/${req.file.filename}`;
+        const user = await User.findByIdAndUpdate(userId, { photo: photoUrl }, { new: true });
 
-        user.photo = `/uploads/${req.file.filename}`;
-        res.json({ success: true, photoUrl: user.photo });
-    } catch (error) {
-        console.error("Erreur mise à jour photo:", error);
-        res.status(500).json({ error: "Impossible d'enregistrer l'image." });
+        if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+
+        res.json({ photoUrl });
+    } catch (err) {
+        res.status(500).json({ error: 'Erreur mise à jour photo' });
     }
 });
 
-// --- LISTE DES MEMBRES ET MATCHS ---
-app.get('/api/members', (req, res) => {
-    const userId = req.query.userId;
-    
-    const membersWithMatch = users.map(user => {
-        let isMatch = false;
-        if (userId) {
-            const sentHeart = hearts.some(h => h.senderId === userId && h.targetId === user.id);
-            const receivedHeart = hearts.some(h => h.senderId === user.id && h.targetId === userId);
-            if (sentHeart && receivedHeart) isMatch = true;
+// 5. Envoyer un Coup de Cœur / Match
+app.post('/api/heart', async (req, res) => {
+    try {
+        const { senderId, targetId } = req.body;
+        if (!senderId || !targetId) return res.status(400).json({ error: 'IDs manquants' });
+
+        const sender = await User.findById(senderId);
+        const target = await User.findById(targetId);
+
+        if (!sender || !target) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+        if (!sender.hearts.includes(targetId)) {
+            sender.hearts.push(targetId);
+            await sender.save();
         }
-        
-        // Sécurisation : Exclusion du mot de passe dans le retour
-        const { password, ...safeUser } = user;
-        return { ...safeUser, isMatch };
-    });
-    
-    res.json(membersWithMatch);
-});
 
-// --- INTERACTIONS (LIKE & COUP DE CŒUR) ---
-app.post('/api/like', (req, res) => {
-    const { senderId, targetId } = req.body;
-    if (!likes.some(l => l.senderId === senderId && l.targetId === targetId)) {
-        likes.push({ senderId, targetId });
+        const isMatch = target.hearts.includes(senderId);
+
+        res.json({ success: true, isMatch });
+    } catch (err) {
+        res.status(500).json({ error: 'Erreur lors de l’envoi du cœur' });
     }
-    res.json({ success: true });
 });
 
-app.post('/api/heart', (req, res) => {
-    const { senderId, targetId } = req.body;
-    const existing = hearts.find(h => h.senderId === senderId && h.targetId === targetId);
-    if (!existing) hearts.push({ senderId, targetId });
+// 6. Demande d'Écoute SOS / VBG
+app.post('/api/ecoute', async (req, res) => {
+    try {
+        const { type, message, userId } = req.body;
+        const newEcoute = new Ecoute({
+            userId: userId && mongoose.Types.ObjectId.isValid(userId) ? userId : null,
+            type,
+            message
+        });
 
-    // Vérification du Match réciproque
-    const isMatch = hearts.some(h => h.senderId === targetId && h.targetId === senderId);
-    res.json({ success: true, isMatch });
+        await newEcoute.save();
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Erreur envoi demande d’écoute' });
+    }
 });
 
-// --- ESPACE SENSIBILISATION (SSR / VBG / SOS) ---
-app.post('/api/ecoute', (req, res) => {
-    const { userId, type, message } = req.body;
-    ecoutes.push({ id: Date.now(), userId, type, message, date: new Date() });
-    res.json({ success: true });
-});
-
-// --- STATUT VIP ET MONÉTISATION ---
-app.post('/api/buy-vip', (req, res) => {
-    const { userId } = req.body;
-    const user = users.find(u => u.id === userId);
-    if (!user || user.coins < 500) return res.status(400).json({ error: 'Coins insuffisants pour passer VIP' });
-    user.coins -= 500;
-    user.isVip = true;
-    res.json({ success: true, user });
-});
-
-app.get('/api/kkiapay-callback', (req, res) => {
-    res.redirect('/?payment=success');
-});
-
-// --- ESPACE ADMIN (Mot de passe: NONVITCHA2026) ---
-app.post('/api/admin/login', (req, res) => {
+// 7. Connexion Administration
+app.post('/api/admin/login', async (req, res) => {
     const { password } = req.body;
-    if (password === 'NONVITCHA2026') {
-        res.json({ success: true, users, ecoutes, hearts, likes });
+    if (password === 'admin123') {
+        const users = await User.find().lean();
+        const ecoutes = await Ecoute.find().lean();
+        res.json({ users, ecoutes });
     } else {
         res.status(401).json({ error: 'Mot de passe administrateur incorrect' });
     }
 });
 
-// --- TEMPS RÉEL (SOCKET.IO) ---
-const onlineUsers = new Map();
+// --- WEBSOCKETS (SOCKET.IO) ---
+const userSockets = new Map(); // Associe chaque userId à son socket.id actuel
 
 io.on('connection', (socket) => {
-    socket.on('user_connected', (userId) => {
-        onlineUsers.set(userId, socket.id);
-        const user = users.find(u => u.id === userId);
-        if (user) user.online = true;
-        io.emit('update_online_status', { userId, online: true });
+    // 1. Enregistrement du socket connecté
+    socket.on('user_connected', async (userId) => {
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+            socket.userId = userId;
+            userSockets.set(userId, socket.id);
+
+            await User.findByIdAndUpdate(userId, { online: true });
+            io.emit('update_online_status', { userId, online: true });
+        }
     });
 
+    // 2. Chat Public
     socket.on('public_message', (data) => {
         io.emit('public_message', data);
     });
 
+    // 3. Chat Privé ciblé
     socket.on('private_message', (data) => {
-        const targetSocketId = onlineUsers.get(data.to);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('private_message', data);
+        const recipientSocketId = userSockets.get(data.toUserId);
+        
+        // Envoi direct au destinataire si en ligne
+        if (recipientSocketId) {
+            io.to(recipientSocketId).emit('private_message', data);
         }
+        // Confirmation / réémission à l'expéditeur
+        socket.emit('private_message', data);
     });
 
+    // 4. Gestion de "En train d'écrire..."
     socket.on('typing', (data) => {
-        const targetSocketId = onlineUsers.get(data.to);
-        if (targetSocketId) {
-            io.to(targetSocketId).emit('user_typing', data);
+        const recipientSocketId = userSockets.get(data.toUserId);
+        if (recipientSocketId) {
+            io.to(recipientSocketId).emit('user_typing', { fromUserId: socket.userId });
         }
     });
 
-    socket.on('disconnect', () => {
-        for (let [userId, socketId] of onlineUsers.entries()) {
-            if (socketId === socket.id) {
-                onlineUsers.delete(userId);
-                const user = users.find(u => u.id === userId);
-                if (user) user.online = false;
-                io.emit('update_online_status', { userId, online: false });
-                break;
-            }
+    socket.on('stop_typing', (data) => {
+        const recipientSocketId = userSockets.get(data.toUserId);
+        if (recipientSocketId) {
+            io.to(recipientSocketId).emit('user_stop_typing', { fromUserId: socket.userId });
+        }
+    });
+
+    // 5. Déconnexion
+    socket.on('disconnect', async () => {
+        if (socket.userId) {
+            userSockets.delete(socket.userId);
+            await User.findByIdAndUpdate(socket.userId, { online: false });
+            io.emit('update_online_status', { userId: socket.userId, online: false });
         }
     });
 });
 
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Serveur Nonvitcha prêt sur le port ${PORT}`));
+// --- DÉMARRAGE DU SERVEUR ---
+server.listen(PORT, () => {
+    console.log(`🚀 Serveur Nonvitcha démarré sur le port ${PORT}`);
+});

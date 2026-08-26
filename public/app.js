@@ -21,6 +21,9 @@ function updateNav() {
 
     if (currentUser) {
         navMenu.innerHTML = `
+            <span style="color:#fff; font-weight:bold; margin-right:0.8rem; font-size:0.9rem; background:rgba(255,255,255,0.15); padding:0.4rem 0.8rem; border-radius:20px; display:inline-flex; align-items:center; gap:0.4rem;">
+                <i class="fa-solid fa-circle-user"></i> ${currentUser.nom}
+            </span>
             <button class="nav-btn" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Membres</button>
             <button class="nav-btn" onclick="showMatchs()"><i class="fa-solid fa-fire text-danger"></i> Mes Matchs</button>
             <button class="nav-btn" onclick="showSection('public-chat-section')"><i class="fa-solid fa-comments"></i> Salon Public</button>
@@ -90,7 +93,7 @@ function setupEventListeners() {
         });
     }
 
-    // Inscription
+    // Inscription avec auto-connexion
     const registerForm = document.getElementById('register-form');
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
@@ -104,8 +107,15 @@ function setupEventListeners() {
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    alert('Inscription réussie ! 50 Coins offerts 🎉. Vous pouvez vous connecter.');
+                    currentUser = data.user;
+                    localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+                    socket.emit('user_connected', currentUser.id);
+
+                    alert(`Bienvenue ${currentUser.nom} ! Inscription réussie 🎉 50 Coins vous ont été offerts.`);
                     registerForm.reset();
+                    updateNav();
+                    showSection('members-section');
+                    loadMembers();
                 } else {
                     alert(data.error || 'Erreur lors de l’inscription');
                 }
@@ -154,7 +164,7 @@ function setupEventListeners() {
         });
     }
 
-    // Formulaire d'Écoute
+    // Formulaire d'Écoute SOS
     const ecouteForm = document.getElementById('ecoute-form');
     if (ecouteForm) {
         ecouteForm.addEventListener('submit', async (e) => {

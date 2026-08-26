@@ -1,3 +1,47 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 const socket = io();
 
 // Utilisateur connecté en local
@@ -50,25 +94,68 @@ function updateNav() {
     if (!navMenu) return;
 
     if (currentUser && currentUser.nom) {
+        const userPhoto = currentUser.photo || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100';
+
         navMenu.innerHTML = `
-            <div style="display:inline-flex; align-items:center; background:#f1f5f9; padding:0.4rem 0.8rem; border-radius:20px; margin-right:0.5rem; color:var(--text-color); font-weight:bold; font-size:0.85rem; border:1px solid var(--border-color);">
-                <i class="fa-solid fa-circle-user" style="margin-right:0.4rem; color:var(--primary-color);"></i> 
-                <span>${currentUser.nom}</span>
+            <div class="user-nav-profile" onclick="triggerPhotoChange()" title="Cliquer pour changer de photo" style="cursor:pointer; display:inline-flex; align-items:center; background:#f1f5f9; padding:0.4rem 0.8rem; border-radius:20px; margin-right:0.5rem; border:1px solid var(--border-color, #e2e8f0);">
+                <div style="position:relative; display:inline-block; margin-right:0.5rem;">
+                    <img src="${userPhoto}" alt="${currentUser.nom}" style="width:26px; height:26px; border-radius:50%; object-fit:cover; vertical-align:middle;">
+                    <span style="position:absolute; bottom:-2px; right:-2px; background:var(--primary-color, #e11d48); color:white; border-radius:50%; width:11px; height:11px; font-size:7px; display:flex; align-items:center; justify-content:center;"><i class="fa-solid fa-camera"></i></span>
+                </div>
+                <span style="font-weight:700; font-size:0.85rem; color:var(--text-color, #1e293b);">${currentUser.nom}</span>
             </div>
-            <button class="nav-btn" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Membres</button>
-            <button class="nav-btn" onclick="showMatchs()"><i class="fa-solid fa-fire text-danger"></i> Mes Matchs</button>
-            <button class="nav-btn" onclick="showSection('public-chat-section')"><i class="fa-solid fa-comments"></i> Salon Public</button>
-            <button class="nav-btn btn-warning" onclick="showSection('recharge-section')"><i class="fa-solid fa-crown"></i> VIP / Coins (<span id="current-coins-display">${currentUser.coins || 0}</span>)</button>
-            <button class="nav-btn" onclick="showSection('ecoutes-section')"><i class="fa-solid fa-user-doctor"></i> Écoute SOS</button>
-            <button class="nav-btn" onclick="showSection('admin-section')"><i class="fa-solid fa-lock"></i> Admin</button>
-            <button class="nav-btn btn-secondary" onclick="logout()"><i class="fa-solid fa-power-off"></i></button>
+            <input type="file" id="nav-photo-input" accept="image/*" style="display:none;" onchange="uploadNewPhoto(event)">
+
+            <button class="nav-btn nav-btn-members" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Membres</button>
+            <button class="nav-btn nav-btn-matchs" onclick="showMatchs()"><i class="fa-solid fa-fire text-danger"></i> Mes Matchs</button>
+            <button class="nav-btn nav-btn-chat" onclick="showSection('public-chat-section')"><i class="fa-solid fa-comments"></i> Salon Public</button>
+            <button class="nav-btn nav-btn-vip btn-warning" onclick="showSection('recharge-section')"><i class="fa-solid fa-crown"></i> VIP / Coins (<span id="current-coins-display">${currentUser.coins || 0}</span>)</button>
+            <button class="nav-btn nav-btn-sos" onclick="showSection('ecoutes-section')"><i class="fa-solid fa-user-doctor"></i> Écoute SOS</button>
+            <button class="nav-btn nav-btn-admin" onclick="showSection('admin-section')"><i class="fa-solid fa-lock"></i> Admin</button>
+            <button class="nav-btn nav-btn-logout btn-secondary" onclick="logout()"><i class="fa-solid fa-power-off"></i></button>
         `;
     } else {
         navMenu.innerHTML = `
-            <button class="nav-btn" onclick="showSection('auth-section')"><i class="fa-solid fa-right-to-bracket"></i> Connexion / Inscription</button>
-            <button class="nav-btn" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Explorer</button>
-            <button class="nav-btn" onclick="showSection('admin-section')"><i class="fa-solid fa-lock"></i> Admin</button>
+            <button class="nav-btn nav-btn-matchs" onclick="showSection('auth-section')"><i class="fa-solid fa-right-to-bracket"></i> Connexion / Inscription</button>
+            <button class="nav-btn nav-btn-members" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Explorer</button>
+            <button class="nav-btn nav-btn-admin" onclick="showSection('admin-section')"><i class="fa-solid fa-lock"></i> Admin</button>
         `;
+    }
+}
+
+// --- MODIFICATION PHOTO DE PROFIL ---
+function triggerPhotoChange() {
+    const input = document.getElementById('nav-photo-input');
+    if (input) input.click();
+}
+
+async function uploadNewPhoto(event) {
+    const file = event.target.files[0];
+    if (!file || !currentUser) return;
+
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('userId', currentUser.id);
+
+    try {
+        const res = await fetch('/api/update-photo', {
+            method: 'POST',
+            body: formData
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+            currentUser.photo = data.photoUrl;
+            localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+            updateNav();
+            loadMembers();
+            alert('Photo de profil mise à jour avec succès ! 📸');
+        } else {
+            alert(data.error || 'Erreur lors du changement de photo');
+        }
+    } catch (err) {
+        console.error('Erreur upload photo:', err);
+        alert('Erreur réseau lors de l\'envoi de la photo');
     }
 }
 

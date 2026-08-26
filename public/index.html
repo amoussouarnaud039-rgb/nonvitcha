@@ -27,14 +27,14 @@
                 <h3><i class="fa-solid fa-right-to-bracket"></i> Connexion</h3>
                 <form id="login-form">
                     <div class="form-group">
-                        <label>Email</label>
+                        <label for="login-email">Email</label>
                         <input type="email" id="login-email" required placeholder="votre@email.com">
                     </div>
                     <div class="form-group">
-                        <label>Mot de passe</label>
+                        <label for="login-password">Mot de passe</label>
                         <input type="password" id="login-password" required placeholder="••••••••">
                     </div>
-                    <button type="submit" class="btn btn-primary">Se connecter</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-sign-in-alt"></i> Se connecter</button>
                 </form>
             </div>
 
@@ -42,56 +42,60 @@
                 <h3><i class="fa-solid fa-user-plus"></i> Créer un compte</h3>
                 <form id="register-form" enctype="multipart/form-data">
                     <div class="form-group">
-                        <label>Nom complet</label>
-                        <input type="text" id="reg-nom" name="nom" required placeholder="Votre nom">
+                        <label for="reg-nom">Nom complet / Pseudo</label>
+                        <input type="text" id="reg-nom" name="nom" required placeholder="Votre nom ou pseudo">
                     </div>
                     <div class="form-group">
-                        <label>Email</label>
+                        <label for="reg-email">Email</label>
                         <input type="email" id="reg-email" name="email" required placeholder="votre@email.com">
                     </div>
                     <div class="form-group">
-                        <label>Mot de passe</label>
+                        <label for="reg-password">Mot de passe</label>
                         <input type="password" id="reg-password" name="password" required placeholder="••••••••">
                     </div>
-                    <div class="form-group">
-                        <label>Âge</label>
-                        <input type="number" id="reg-age" name="age" required min="18" placeholder="25">
+                    <div class="filter-grid" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                        <div class="form-group">
+                            <label for="reg-age">Âge</label>
+                            <input type="number" id="reg-age" name="age" required min="18" max="99" placeholder="25">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-sexe">Sexe</label>
+                            <select id="reg-sexe" name="sexe" required>
+                                <option value="F">Femme</option>
+                                <option value="H">Homme</option>
+                                <option value="Autre">Autre</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-grid" style="grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0;">
+                        <div class="form-group">
+                            <label for="reg-pays">Pays</label>
+                            <input type="text" id="reg-pays" name="pays" placeholder="Bénin" value="Bénin">
+                        </div>
+                        <div class="form-group">
+                            <label for="reg-ville">Ville</label>
+                            <input type="text" id="reg-ville" name="ville" placeholder="Cotonou">
+                        </div>
                     </div>
                     <div class="form-group">
-                        <label>Sexe</label>
-                        <select id="reg-sexe" name="sexe" required>
-                            <option value="F">Femme</option>
-                            <option value="M">Homme</option>
-                            <option value="Autre">Autre</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Pays</label>
-                        <input type="text" id="reg-pays" name="pays" placeholder="Bénin">
-                    </div>
-                    <div class="form-group">
-                        <label>Ville</label>
-                        <input type="text" id="reg-ville" name="ville" placeholder="Cotonou">
-                    </div>
-                    <div class="form-group">
-                        <label>Centres d'intérêt</label>
+                        <label for="reg-interets">Centres d'intérêt</label>
                         <input type="text" id="reg-interets" name="interets" placeholder="Musique, Sport, Lecture...">
                     </div>
                     <div class="form-group">
-                        <label>Photo de profil</label>
+                        <label for="reg-photo">Photo de profil</label>
                         <input type="file" id="reg-photo" name="photo" accept="image/*">
                     </div>
-                    <button type="submit" class="btn btn-primary">S'inscrire (50 Coins offerts)</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check-circle"></i> S'inscrire (50 Coins offerts)</button>
                 </form>
             </div>
         </section>
 
         <!-- SECTION 2 : Liste des Membres & Recherche -->
         <section id="members-section" class="page-section" style="display: none;">
-            <div class="auth-box">
-                <h3><i class="fa-solid fa-filter"></i> Recherche & Filtres</h3>
+            <div class="search-filter-box">
+                <h3 style="margin-bottom: 0.8rem; color: var(--primary-color);"><i class="fa-solid fa-filter"></i> Recherche & Filtres</h3>
                 <form id="search-form" onsubmit="event.preventDefault(); filterUsers();">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.5rem; margin-bottom: 0.8rem;">
+                    <div class="filter-grid">
                         <input type="text" id="search-name" placeholder="Nom..." oninput="filterUsers()">
                         <input type="text" id="search-country" placeholder="Pays..." oninput="filterUsers()">
                         <input type="text" id="search-city" placeholder="Ville..." oninput="filterUsers()">
@@ -99,31 +103,38 @@
                         <select id="search-sex" onchange="filterUsers()">
                             <option value="">Tous les sexes</option>
                             <option value="F">Femme</option>
-                            <option value="M">Homme</option>
+                            <option value="H">Homme</option>
                             <option value="Autre">Autre</option>
                         </select>
                         <input type="text" id="search-interest" placeholder="Intérêt..." oninput="filterUsers()">
                     </div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" onclick="filterUsers()" class="btn btn-primary" style="flex: 2;"><i class="fa-solid fa-magnifying-glass"></i> Rechercher</button>
-                        <button type="button" onclick="resetFilters()" class="btn btn-secondary" style="flex: 1;"><i class="fa-solid fa-rotate-left"></i> Réinitialiser</button>
+                    <div class="filter-actions">
+                        <button type="button" onclick="filterUsers()" class="btn btn-primary btn-sm"><i class="fa-solid fa-magnifying-glass"></i> Rechercher</button>
+                        <button type="button" onclick="resetFilters()" class="btn btn-secondary btn-sm"><i class="fa-solid fa-rotate-left"></i> Réinitialiser</button>
                     </div>
                 </form>
             </div>
 
             <div id="members-container" class="cards-grid">
-                <!-- Les cartes membres seront insérées dynamiquement par app.js -->
+                <!-- Les cartes membres avec compteurs Likes & Coups de Cœur s'affichent ici -->
             </div>
         </section>
 
-        <!-- SECTION 3 : Chat Privé -->
+        <!-- SECTION 3 : Chat Privé (avec indicateur de frappe et action Coup de Cœur) -->
         <section id="private-chat-section" class="page-section" style="display: none;">
             <div class="chat-window">
-                <div class="chat-header" id="chat-target-name">Discussion privée</div>
-                <div id="typing-indicator" style="padding: 0 1rem; font-size: 0.8rem; color: #dc2626; font-style: italic;"></div>
+                <div class="chat-header">
+                    <span id="chat-target-name"><i class="fa-solid fa-user-lock"></i> Discussion privée</span>
+                    <button class="btn btn-secondary btn-sm" onclick="showSection('members-section')"><i class="fa-solid fa-xmark"></i></button>
+                </div>
                 <div class="chat-messages" id="private-messages-viewport"></div>
+                <div id="typing-indicator" class="typing-indicator"></div>
+                
                 <form id="private-chat-form" class="chat-input-row">
                     <input type="text" id="private-message-input" placeholder="Écrivez un message privé..." required autocomplete="off">
+                    <button type="button" id="btn-coup-de-coeur" class="btn btn-warning" title="Envoyer un Coup de Cœur (10 Coins)" onclick="sendCoupDeCoeur()">
+                        <i class="fa-solid fa-heart"></i>
+                    </button>
                     <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
                 </form>
             </div>
@@ -145,23 +156,24 @@
         <section id="ecoutes-section" class="page-section" style="display: none;">
             <div class="auth-box">
                 <h3><i class="fa-solid fa-hand-holding-heart"></i> Espace de Sensibilisation & Écoute</h3>
-                <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;">
+                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
                     Un espace d'écoute confidentiel et sécurisé concernant la Santé Sexuelle et Reproductive (SSR), les Violences Basées sur le Genre (VBG) et le soutien aux minorités.
                 </p>
                 <form id="ecoute-form">
                     <div class="form-group">
-                        <label>Thématique</label>
+                        <label for="ecoute-type">Thématique</label>
                         <select id="ecoute-type" required>
-                            <option value="SSR">Santé Sexuelle et Reproductive (SSR)</option>
-                            <option value="VBG">Violences Basées sur le Genre (VBG)</option>
-                            <option value="Minorité">Soutien aux Minorités / Inclusivité</option>
+                            <option value="Santé Sexuelle et Reproductive (SSR)">Santé Sexuelle et Reproductive (SSR)</option>
+                            <option value="Violences Basées sur le Genre (VBG)">Violences Basées sur le Genre (VBG)</option>
+                            <option value="Soutien aux Minorités / Inclusivité">Soutien aux Minorités / Inclusivité</option>
+                            <option value="Conseil Relationnel">Conseil Relationnel</option>
                         </select>
                     </div>
                     <div class="form-group">
-                        <label>Votre message / Demande d'assistance</label>
+                        <label for="ecoute-message">Votre message / Demande d'assistance</label>
                         <textarea id="ecoute-message" rows="4" required placeholder="Exprimez-vous en toute confidentialité..."></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary">Envoyer le message d'écoute</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Envoyer le message d'écoute</button>
                 </form>
             </div>
         </section>
@@ -172,23 +184,28 @@
                 <h3><i class="fa-solid fa-coins text-warning"></i> Recharge de Nonvicoins & Statut VIP</h3>
                 <p style="margin-bottom: 1rem;">Solde actuel : <strong id="current-coins-display">0</strong> Coins</p>
 
-                <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.5rem;">
-                    <div style="border: 1px solid #e2e8f0; padding: 1rem; border-radius: 8px; flex: 1; min-width: 200px;">
+                <div class="recharge-grid">
+                    <div class="recharge-card">
                         <h4>Pack 100 Coins</h4>
-                        <p style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0; color: var(--primary-color);">500 FCFA</p>
+                        <div class="price">500 FCFA</div>
                         <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(500)" style="width: 100%;">Acheter avec Kkiapay</button>
                     </div>
-                    <div style="border: 1px solid #e2e8f0; padding: 1rem; border-radius: 8px; flex: 1; min-width: 200px;">
+                    <div class="recharge-card">
                         <h4>Pack 500 Coins</h4>
-                        <p style="font-size: 1.2rem; font-weight: bold; margin: 0.5rem 0; color: var(--primary-color);">2000 FCFA</p>
+                        <div class="price">2000 FCFA</div>
                         <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(2000)" style="width: 100%;">Acheter avec Kkiapay</button>
+                    </div>
+                    <div class="recharge-card">
+                        <h4>Pack 1500 Coins</h4>
+                        <div class="price">5000 FCFA</div>
+                        <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(5000)" style="width: 100%;">Acheter avec Kkiapay</button>
                     </div>
                 </div>
 
-                <div style="border: 1px dashed #dc2626; padding: 1rem; border-radius: 8px; background: #fee2e2;">
+                <div style="border: 1px dashed var(--primary-color); padding: 1.2rem; border-radius: 8px; background: #fee2e2; margin-top: 1.5rem;">
                     <h4 style="color: #b91c1c;"><i class="fa-solid fa-crown"></i> Devenir Membre VIP</h4>
-                    <p style="font-size: 0.85rem; margin: 0.5rem 0; color: #7f1d1d;">Bénéficiez des Coups de Cœur illimités et d'une visibilité prioritaire.</p>
-                    <button class="btn btn-primary" onclick="buyVIP()" style="width: 100%;">Activer VIP (500 Coins)</button>
+                    <p style="font-size: 0.85rem; margin: 0.5rem 0; color: #7f1d1d;">Bénéficiez des Coups de Cœur illimités, du badge 👑 et d'une visibilité prioritaire.</p>
+                    <button class="btn btn-warning" onclick="buyVIP()" style="width: 100%;"><i class="fa-solid fa-crown"></i> Activer VIP (500 Coins)</button>
                 </div>
             </div>
         </section>
@@ -199,24 +216,26 @@
                 <h3><i class="fa-solid fa-user-shield"></i> Connexion Administration</h3>
                 <form id="admin-login-form">
                     <div class="form-group">
-                        <label>Mot de passe Administrateur</label>
+                        <label for="admin-password">Mot de passe Administrateur</label>
                         <input type="password" id="admin-password" placeholder="Mot de passe requis" required>
                     </div>
-                    <button type="submit" class="btn btn-primary">Accéder au Dashboard</button>
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-key"></i> Accéder au Dashboard</button>
                 </form>
             </div>
 
             <div id="admin-dashboard" style="display: none;">
                 <div class="auth-box">
-                    <h3><i class="fa-solid fa-users"></i> Gestion des Utilisateurs</h3>
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem;">
+                    <h3><i class="fa-solid fa-users"></i> Gestion des Utilisateurs & Statistiques</h3>
+                    <div class="admin-table-container">
+                        <table>
                             <thead>
-                                <tr style="background: #f1f5f9; text-align: left;">
-                                    <th style="padding: 0.5rem;">Nom</th>
-                                    <th style="padding: 0.5rem;">Email</th>
-                                    <th style="padding: 0.5rem;">Coins</th>
-                                    <th style="padding: 0.5rem;">VIP</th>
+                                <tr>
+                                    <th>Nom</th>
+                                    <th>Email</th>
+                                    <th>Coins</th>
+                                    <th>VIP</th>
+                                    <th><i class="fa-solid fa-thumbs-up" title="Likes reçus"></i> Likes</th>
+                                    <th><i class="fa-solid fa-heart" title="Coups de Cœur reçus"></i> Coups de Cœur</th>
                                 </tr>
                             </thead>
                             <tbody id="admin-users-list"></tbody>
@@ -225,14 +244,14 @@
                 </div>
 
                 <div class="auth-box">
-                    <h3><i class="fa-solid fa-heart-pulse"></i> Signals & Écoutes (SSR / VBG)</h3>
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem; font-size: 0.85rem;">
+                    <h3><i class="fa-solid fa-heart-pulse"></i> Demandes & Écoutes (SSR / VBG)</h3>
+                    <div class="admin-table-container">
+                        <table>
                             <thead>
-                                <tr style="background: #f1f5f9; text-align: left;">
-                                    <th style="padding: 0.5rem;">Type</th>
-                                    <th style="padding: 0.5rem;">Message</th>
-                                    <th style="padding: 0.5rem;">Date</th>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Message</th>
+                                    <th>Date</th>
                                 </tr>
                             </thead>
                             <tbody id="admin-ecoutes-list"></tbody>
@@ -245,7 +264,7 @@
     </div>
 
     <!-- Scripts CDN & Fichiers applicatifs -->
-    <script src="https://cdn.kkiapay.me/kkiapay@2.0.0/kkiapay.js"></script>
+    <script src="https://cdn.kkiapay.me/k.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/app.js"></script>
 </body>

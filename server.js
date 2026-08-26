@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const bcrypt = require('bcryptjs'); // Assurez-vous de faire : npm install bcryptjs
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const server = http.createServer(app);
@@ -36,7 +36,20 @@ const userSchema = new mongoose.Schema({
     isVip: { type: Boolean, default: false },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
     hearts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+    likesCount: { type: Number, default: 0 },
+    heartsCount: { type: Number, default: 0 },
+    messageCount: { type: Number, default: 0 },
     online: { type: Boolean, default: false }
+}, { timestamps: true });
+
+const messageSchema = new mongoose.Schema({
+    fromUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    toUserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    fromUserName: { type: String },
+    fromUserPhoto: { type: String },
+    text: { type: String, required: true },
+    read: { type: Boolean, default: false },
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }, { timestamps: true });
 
 const ecouteSchema = new mongoose.Schema({
@@ -47,6 +60,7 @@ const ecouteSchema = new mongoose.Schema({
 });
 
 const User = mongoose.model('User', userSchema);
+const Message = mongoose.model('Message', messageSchema);
 const Ecoute = mongoose.model('Ecoute', ecouteSchema);
 
 // --- MIDDLEWARES & STATIQUES ---
@@ -55,7 +69,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Dossier pour stockage local des photos
 const uploadsDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
@@ -69,7 +82,7 @@ const upload = multer({ storage });
 
 // --- ROUTES API ---
 
-// 1. Inscription (Mots de passe hachés)
+// 1. Inscription
 app.post('/api/register', upload.single('photo'), async (req, res) => {
     try {
         const { nom, email, password, age, sexe, pays, ville, interets } = req.body;
@@ -103,7 +116,7 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         await newUser.save();
 
         const userResponse = newUser.toObject();
-        delete userResponse.password; // Masquer le mot de passe
+        delete userResponse.password;
         userResponse.id = userResponse._id.toString();
 
         res.json({ user: userResponse });
@@ -113,7 +126,7 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
     }
 });
 
-// 2. Connexion (Vérification bcrypt)
+// 2. Connexion
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -132,7 +145,7 @@ app.post('/api/login', async (req, res) => {
         await user.save();
 
         const userResponse = user.toObject();
-        delete userResponse.password; // Masquer le mot de passe
+        delete userResponse.password;
         userResponse.id = userResponse._id.toString();
 
         res.json({ user: userResponse });
@@ -175,26 +188,60 @@ app.get('/api/members', async (req, res) => {
     }
 });
 
-// 4. Mise à jour de la photo de profil
-app.post('/api/update-photo', upload.single('photo'), async (req, res) => {
+// 4. Récupérer l'historique des messages privés entre deux utilisateurs
+app.get('/api/messages/:userId/:targetId', async (req, res) => {
     try {
-        const { userId } = req.body;
-        if (!req.file || !userId) {
-            return res.status(400).json({ error: 'Fichier ou ID utilisateur manquant' });
+        const { userId, targetId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(targetId)) {
+            return res.status(400).json({ error: 'IDs invalides' });
         }
 
-        const photoUrl = `/uploads/${req.file.filename}`;
-        const user = await User.findByIdAndUpdate(userId, { photo: photoUrl }, { new: true });
+        const messages = await Message.find({
+            $or: [
+                { fromUserId: userId, toUserId: targetId },
+                { fromUserId: targetId, toUserId: userId }
+            ]
+        }).sort({ createdAt: 1 }).lean();
 
-        if (!user) return res.status(404).json({ error: 'Utilisateur non trouvé' });
+        // Marquer comme lus les messages reçus
+        await Message.updateMany(
+            { fromUserId: targetId, toUserId: userId, read: false },
+            { $set: { read: true } }
+        );
 
-        res.json({ photoUrl });
+        res.json(messages);
     } catch (err) {
-        res.status(500).json({ error: 'Erreur mise à jour photo' });
+        res.status(500).json({ error: 'Erreur chargement messages' });
     }
 });
 
-// 5. Envoyer un Coup de Cœur / Match
+// 5. Envoyer un Like
+app.post('/api/like', async (req, res) => {
+    try {
+        const { senderId, targetId } = req.body;
+        if (!senderId || !targetId) return res.status(400).json({ error: 'IDs manquants' });
+
+        const sender = await User.findById(senderId);
+        const target = await User.findById(targetId);
+
+        if (!sender || !target) return res.status(404).json({ error: 'Utilisateur introuvable' });
+
+        const hasLiked = sender.likes.some(id => id.toString() === targetId);
+        if (!hasLiked) {
+            sender.likes.push(targetId);
+            target.likesCount = (target.likesCount || 0) + 1;
+            await sender.save();
+            await target.save();
+        }
+
+        res.json({ success: true, likesCount: target.likesCount });
+    } catch (err) {
+        res.status(500).json({ error: 'Erreur lors de l’envoi du like' });
+    }
+});
+
+// 6. Envoyer un Coup de Cœur / Match
 app.post('/api/heart', async (req, res) => {
     try {
         const { senderId, targetId } = req.body;
@@ -208,18 +255,20 @@ app.post('/api/heart', async (req, res) => {
         const hasHearted = sender.hearts.some(id => id.toString() === targetId);
         if (!hasHearted) {
             sender.hearts.push(targetId);
+            target.heartsCount = (target.heartsCount || 0) + 1;
             await sender.save();
+            await target.save();
         }
 
         const isMatch = target.hearts.some(id => id.toString() === senderId);
 
-        res.json({ success: true, isMatch });
+        res.json({ success: true, isMatch, heartsCount: target.heartsCount });
     } catch (err) {
         res.status(500).json({ error: 'Erreur lors de l’envoi du cœur' });
     }
 });
 
-// 6. Demande d'Écoute SOS / VBG
+// 7. Demande d'Écoute SOS / VBG
 app.post('/api/ecoute', async (req, res) => {
     try {
         const { type, message, userId } = req.body;
@@ -236,7 +285,7 @@ app.post('/api/ecoute', async (req, res) => {
     }
 });
 
-// 7. Connexion Administration
+// 8. Connexion Administration
 app.post('/api/admin/login', async (req, res) => {
     const { password } = req.body;
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
@@ -254,12 +303,12 @@ app.post('/api/admin/login', async (req, res) => {
 const userSockets = new Map();
 
 io.on('connection', (socket) => {
-    // 1. Enregistrement du socket connecté et entrée dans sa propre Room
+    // 1. Enregistrement de l'utilisateur
     socket.on('user_connected', async (userId) => {
         if (mongoose.Types.ObjectId.isValid(userId)) {
             socket.userId = userId;
             userSockets.set(userId, socket.id);
-            socket.join(userId); // Rejoint une room dédiée à l'ID utilisateur
+            socket.join(userId);
 
             await User.findByIdAndUpdate(userId, { online: true });
             io.emit('update_online_status', { userId, online: true });
@@ -271,13 +320,44 @@ io.on('connection', (socket) => {
         io.emit('public_message', data);
     });
 
-    // 3. Chat Privé ciblé
-    socket.on('private_message', (data) => {
-        // Émission vers la room du destinataire ET la room de l'expéditeur
-        io.to(data.toUserId).to(data.fromUserId).emit('private_message', data);
+    // 3. Chat Privé (Sauvegarde MongoDB + Temps Réel / Hors-ligne)
+    socket.on('private_message', async (data) => {
+        try {
+            const { fromUserId, toUserId, text, fromUserName, fromUserPhoto } = data;
+
+            if (!fromUserId || !toUserId || !text) return;
+
+            // Sauvegarde systématique dans MongoDB
+            const newMessage = new Message({
+                fromUserId,
+                toUserId,
+                fromUserName,
+                fromUserPhoto,
+                text
+            });
+            await newMessage.save();
+
+            // Incrémentation du compteur de messages envoyés
+            await User.findByIdAndUpdate(fromUserId, { $inc: { messageCount: 1 } });
+
+            const payload = {
+                _id: newMessage._id,
+                fromUserId,
+                toUserId,
+                fromUserName,
+                fromUserPhoto,
+                text,
+                createdAt: newMessage.createdAt
+            };
+
+            // Émission immédiate aux rooms (si en ligne, réception directe et ouverture)
+            io.to(toUserId).to(fromUserId).emit('private_message', payload);
+        } catch (err) {
+            console.error('Erreur sauvegarde message privé :', err);
+        }
     });
 
-    // 4. Gestion de "En train d'écrire..."
+    // 4. Indicateur "En train d'écrire..."
     socket.on('typing', (data) => {
         socket.to(data.toUserId).emit('user_typing', { fromUserId: socket.userId });
     });

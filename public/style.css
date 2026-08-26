@@ -53,28 +53,6 @@ body {
     align-items: center;
 }
 
-/* Profil Utilisateur dans la Navigation */
-.user-nav-profile {
-    display: inline-flex;
-    align-items: center;
-    background: #ffffff;
-    padding: 0.3rem 0.7rem;
-    border-radius: 20px;
-    margin-right: 0.4rem;
-    border: 1px solid var(--border-color);
-    cursor: pointer;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    transition: background-color 0.2s, transform 0.1s;
-}
-
-.user-nav-profile:hover {
-    background: #f1f5f9;
-}
-
-.user-nav-profile:active {
-    transform: scale(0.98);
-}
-
 /* Layout Main Container */
 .container {
     max-width: 1100px;
@@ -140,7 +118,7 @@ body {
     border-color: var(--primary-color);
 }
 
-/* Filtres de Recherche (Optimisé pour Mobile/Tablette) */
+/* Filtres de Recherche */
 .search-filter-box {
     background: var(--card-bg);
     padding: 1.2rem;
@@ -152,24 +130,15 @@ body {
 
 .filter-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
     gap: 0.8rem;
     margin-bottom: 1rem;
-}
-
-.filter-grid input,
-.filter-grid select {
-    width: 100%;
 }
 
 .filter-actions {
     display: flex;
     justify-content: flex-end;
-    gap: 0.8rem;
-}
-
-.filter-actions .btn {
-    flex: 1;
+    gap: 0.5rem;
 }
 
 /* Boutons */
@@ -218,63 +187,12 @@ body {
     cursor: pointer;
     font-size: 0.85rem;
     color: var(--text-color);
-    transition: background 0.2s, transform 0.1s;
+    transition: background 0.2s;
 }
 
 .nav-btn:hover {
     background: #f1f5f9;
 }
-
-/* Styles des Boutons Colorés du Menu de Navigation */
-.nav-btn-members {
-    background-color: #e0f2fe !important;
-    color: #0369a1 !important;
-    border: 1px solid #bae6fd !important;
-}
-.nav-btn-members:hover { background-color: #bae6fd !important; }
-
-.nav-btn-matchs {
-    background-color: #ffe4e6 !important;
-    color: #e11d48 !important;
-    border: 1px solid #fecdd3 !important;
-}
-.nav-btn-matchs:hover { background-color: #fecdd3 !important; }
-
-.nav-btn-chat {
-    background-color: #f3e8ff !important;
-    color: #6b21a8 !important;
-    border: 1px solid #e9d5ff !important;
-}
-.nav-btn-chat:hover { background-color: #e9d5ff !important; }
-
-.nav-btn-vip {
-    background: linear-gradient(135deg, #fef3c7, #fde68a) !important;
-    color: #92400e !important;
-    border: 1px solid #fcd34d !important;
-    font-weight: bold;
-}
-.nav-btn-vip:hover { background: #fde68a !important; }
-
-.nav-btn-sos {
-    background-color: #dcfce7 !important;
-    color: #15803d !important;
-    border: 1px solid #bbf7d0 !important;
-}
-.nav-btn-sos:hover { background-color: #bbf7d0 !important; }
-
-.nav-btn-admin {
-    background-color: #f1f5f9 !important;
-    color: #475569 !important;
-    border: 1px solid #cbd5e1 !important;
-}
-.nav-btn-admin:hover { background-color: #e2e8f0 !important; }
-
-.nav-btn-logout {
-    background-color: #fee2e2 !important;
-    color: #b91c1c !important;
-    border: 1px solid #fca5a5 !important;
-}
-.nav-btn-logout:hover { background-color: #fca5a5 !important; }
 
 /* Cartes Membres & Grille */
 .cards-grid {
@@ -297,9 +215,8 @@ body {
 
 .member-card img {
     width: 100%;
-    height: 220px;
+    height: 200px;
     object-fit: cover;
-    object-position: center;
 }
 
 .status-badge {
@@ -336,6 +253,11 @@ body {
     gap: 0.3rem;
     border-top: 1px solid var(--border-color);
     background: #fafafa;
+}
+
+.card-actions .btn span {
+    font-weight: 700;
+    margin-left: 0.15rem;
 }
 
 /* Chat Layout (Public & Privé) */
@@ -398,11 +320,13 @@ body {
 }
 
 .typing-indicator {
-    font-size: 0.8rem;
+    font-size: 0.85rem;
     color: var(--text-muted);
     font-style: italic;
     padding: 0.2rem 1rem;
-    height: 1.2rem;
+    min-height: 1.4rem;
+    background: #fafafa;
+    transition: all 0.2s ease-in-out;
 }
 
 .chat-input-row {
@@ -486,7 +410,7 @@ table tr:last-child td {
     border-bottom: none;
 }
 
-/* Responsivité Mobile & Tablette */
+/* Responsivité Mobile */
 @media (max-width: 768px) {
     .navbar {
         flex-direction: column;

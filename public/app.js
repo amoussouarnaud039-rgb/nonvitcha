@@ -244,8 +244,8 @@ function setupEventListeners() {
             socket.emit('private_message', { 
                 fromUserId: currentUser.id, 
                 toUserId: activePrivateChatUserId, 
-                senderName: currentUser.nom, 
-                message 
+                fromUserName: currentUser.nom, 
+                text: message 
             });
 
             socket.emit('stop_typing', { toUserId: activePrivateChatUserId });
@@ -308,7 +308,7 @@ function setupEventListeners() {
     }
 }
 
-// --- RECEPTION DES MESSAGES TEMPS REEL ---
+// --- RÉCEPTION DES MESSAGES TEMPS RÉEL ---
 socket.on('public_message', (data) => {
     const viewport = document.getElementById('public-messages-viewport');
     if (viewport) {
@@ -325,9 +325,12 @@ socket.on('private_message', (data) => {
     const isChattingWithSender = (activePrivateChatUserId === data.fromUserId || activePrivateChatUserId === data.toUserId);
 
     if (isChattingWithSender || isOwn) {
-        appendPrivateMessage(data.senderName, data.message, isOwn);
+        const sender = data.fromUserName || data.senderName || 'Membre';
+        const text = data.text || data.message || '';
+        appendPrivateMessage(sender, text, isOwn);
     } else {
-        alert(`Nouveau message privé de ${data.senderName}`);
+        const senderName = data.fromUserName || data.senderName || 'un membre';
+        alert(`Nouveau message privé de ${senderName}`);
     }
 });
 
@@ -417,8 +420,8 @@ function renderMembers(members) {
                 <p style="font-size:0.8rem; color:var(--primary-color); margin-top:0.4rem;"><i class="fa-solid fa-heart"></i> ${m.interets || 'Intérêts non spécifiés'}</p>
             </div>
             <div class="card-actions">
-                <button class="btn btn-secondary btn-sm" onclick="sendLike('${m.id}')">👍 Like</button>
-                <button class="btn btn-heart btn-sm" onclick="sendHeart('${m.id}')">❤️ Cœur</button>
+                <button class="btn btn-secondary btn-sm" onclick="sendLike('${m.id}')">👍 Like (<span id="likes-count-${m.id}">${m.likesCount || 0}</span>)</button>
+                <button class="btn btn-heart btn-sm" onclick="sendHeart('${m.id}')">❤️ Cœur (<span id="hearts-count-${m.id}">${m.heartsCount || 0}</span>)</button>
                 <button class="btn btn-primary btn-sm" onclick="openPrivateChat('${m.id}', '${m.nom}')">💬 Chat</button>
             </div>
         </div>
@@ -473,14 +476,36 @@ async function showMatchs() {
     }
 }
 
-function openPrivateChat(targetId, targetName) {
+// --- OUVERTURE DE DISCUSSION PRIVÉE AVEC CHARGEMENT DE L'HISTORIQUE MONGODB ---
+async function openPrivateChat(targetId, targetName) {
     if (!currentUser) return alert('Veuillez vous connecter pour chatter.');
+    
     activePrivateChatUserId = targetId;
     const titleEl = document.getElementById('chat-target-name');
     const viewport = document.getElementById('private-messages-viewport');
+    
     if (titleEl) titleEl.innerText = `Discussion privée avec ${targetName}`;
-    if (viewport) viewport.innerHTML = '';
+    if (viewport) viewport.innerHTML = '<p style="text-align:center; color:var(--text-muted); padding:1rem;">Chargement des messages...</p>';
+    
     showSection('private-chat-section');
+
+    try {
+        const res = await fetch(`/api/messages/${currentUser.id}/${targetId}`);
+        if (res.ok) {
+            const messages = await res.json();
+            if (viewport) {
+                viewport.innerHTML = '';
+                messages.forEach(msg => {
+                    const isOwn = msg.fromUserId === currentUser.id;
+                    const sender = msg.fromUserName || (isOwn ? currentUser.nom : targetName);
+                    appendPrivateMessage(sender, msg.text, isOwn);
+                });
+            }
+        }
+    } catch (err) {
+        console.error('Erreur lors du chargement de l\'historique des messages :', err);
+        if (viewport) viewport.innerHTML = '<p style="text-align:center; color:red;">Erreur de chargement de la discussion.</p>';
+    }
 }
 
 async function sendLike(targetId) {
@@ -493,6 +518,10 @@ async function sendLike(targetId) {
         });
         const data = await res.json();
         if (res.ok) {
+            const countElem = document.getElementById(`likes-count-${targetId}`);
+            if (countElem && data.likesCount !== undefined) {
+                countElem.innerText = data.likesCount;
+            }
             alert('Like envoyé avec succès ! 👍');
         } else {
             alert(data.error || 'Erreur lors du like');
@@ -512,6 +541,11 @@ async function sendHeart(targetId) {
         });
         const data = await res.json();
         if (res.ok) {
+            const countElem = document.getElementById(`hearts-count-${targetId}`);
+            if (countElem && data.heartsCount !== undefined) {
+                countElem.innerText = data.heartsCount;
+            }
+
             if (data.isMatch) {
                 alert("🎉 C'est un MATCH ! Vous pouvez désormais discuter.");
             } else {

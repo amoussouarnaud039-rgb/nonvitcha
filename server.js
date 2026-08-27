@@ -17,7 +17,7 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/nonvitcha';
 
-// --- CONNEXION MONGO DB ---
+// --- CONNEXION MONGODB ---
 mongoose.connect(MONGO_URI)
     .then(() => console.log('✅ Base de données MongoDB connectée.'))
     .catch(err => console.error('❌ Erreur MongoDB :', err));
@@ -103,7 +103,6 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        // Stockage direct de l'URL HTTPS retournée par Cloudinary
         const photoUrl = req.file ? req.file.path : '';
 
         const newUser = new User({

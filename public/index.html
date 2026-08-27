@@ -81,6 +81,16 @@
             border-radius: 5px; 
             font-size: 1rem; 
         }
+        .filter-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .filter-bar input {
+            flex: 1;
+            min-width: 200px;
+        }
         .members-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
@@ -245,6 +255,10 @@
         <!-- MEMBERS SECTION -->
         <div id="membersSection" class="section">
             <h2>Membres de la communauté</h2>
+            <div class="filter-bar">
+                <input type="text" id="filterInterest" placeholder="Filtrer par centre d'intérêt..." oninput="loadMembers()">
+                <input type="text" id="filterCity" placeholder="Filtrer par ville..." oninput="loadMembers()">
+            </div>
             <div id="membersGrid" class="members-grid"></div>
         </div>
 
@@ -358,7 +372,6 @@
                 document.getElementById('authSection').classList.remove('active');
                 switchSection('membersSection');
                 document.getElementById('mainNav').style.display = 'flex';
-                document.getElementById('userInfoBarinnerHTML = `${currentUser.nom} ${currentUser.isVip ? '⭐ VIP' : ''} | J'aime: ${currentUser.likesCount || 0} | Msgs: ${currentUser.messagesCount || 0}`;`; // géré proprement ci-dessous
                 document.getElementById('userInfoBar').innerHTML = `${currentUser.nom} ${currentUser.isVip ? '⭐ VIP' : ''} | J'aime: ${currentUser.likesCount || 0} | Msgs: ${currentUser.messagesCount || 0}`;
                 loadProfile();
                 loadVipStatus();
@@ -409,7 +422,9 @@
                     body: JSON.stringify({ email, password })
                 });
                 const data = await res.json();
-                if (res.ok) {
+                console.log("Réponse login:", data);
+
+                if (res.ok && data.token) {
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('currentUser', JSON.stringify(data.user));
                     window.location.reload();
@@ -417,8 +432,8 @@
                     alert(data.error || 'Erreur de connexion');
                 }
             } catch (err) {
-                console.error(err);
-                alert('Erreur réseau');
+                console.error("Erreur réseau login:", err);
+                alert('Erreur réseau ou serveur inaccessible');
             }
         });
 
@@ -468,15 +483,25 @@
             }
         }
 
-        // --- MEMBRES ---
+        // --- MEMBRES & FILTRES ---
         async function loadMembers() {
             try {
                 const res = await authFetch('/api/members');
                 const members = await res.json();
                 if (res.ok) {
+                    const interestFilter = document.getElementById('filterInterest').value.toLowerCase();
+                    const cityFilter = document.getElementById('filterCity').value.toLowerCase();
+
+                    const filteredMembers = members.filter(m => {
+                        const matchesInterest = !interestFilter || (m.interets && m.interets.toLowerCase().includes(interestFilter));
+                        const matchesCity = !cityFilter || (m.ville && m.ville.toLowerCase().includes(cityFilter));
+                        return matchesInterest && matchesCity;
+                    });
+
                     const grid = document.getElementById('membersGrid');
                     grid.innerHTML = '';
-                    members.forEach(m => {
+                    
+                    filteredMembers.forEach(m => {
                         const card = document.createElement('div');
                         card.className = 'member-card';
                         card.innerHTML = `

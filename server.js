@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -6,56 +7,71 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const axios = require('axios');
 const path = require('path');
+const cloudinary = require('cloudinary').v2;
+
+// --- CONFIGURATION CLOUDINARY ---
+if (process.env.CLOUDINARY_URL) {
+  cloudinary.config({ connection_string: process.env.CLOUDINARY_URL });
+} else {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  });
+}
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: {
-    origin: "*",
-    methods: ["GET", "POST", "PUT", "DELETE"]
-  }
+  cors: { origin: "*", methods: ["GET", "POST", "PUT", "DELETE"] }
 });
 
-// Middleware
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Clé secrète JWT
-const JWT_SECRET = process.env.JWT_SECRET || 'votre_secret_jwt_tres_securise_changez_moi';
+const JWT_SECRET = process.env.JWT_SECRET || 'votre_cle_secrete_par_defaut';
+const MONGO_URI = process.env.MONGO_URI;
 
-// --- CONNEXION MONGODB (Corrigée) ---
-mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/nonvitcha')
-.then(() => console.log('✅ Connecté à MongoDB (nonvitcha)'))
-.catch(err => console.error('❌ Erreur de connexion MongoDB :', err));
+if (!MONGO_URI) {
+  console.error('❌ ERREUR FATALE : La variable d\'environnement MONGO_URI est manquante.');
+  process.exit(1);
+}
 
-// --- SCHÉMAS & MODÈLES ---
+// --- CONNEXION MONGODB ATLAS ---
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('✅ Connecté à MongoDB Atlas avec succès (Données persistantes)'))
+  .catch(err => {
+    console.error('❌ Erreur de connexion MongoDB :', err);
+    process.exit(1);
+  });
+
+// --- SCHÉMAS & MODÈLES MONGOOSE ---
 const userSchema = new mongoose.Schema({
-  nom: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
+  nom: { type: String, required: true, trim: true },
+  email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   password: { type: String, required: true },
-  age: Number,
-  pays: String,
-  ville: String,
-  sexe: String,
-  interets: String,
+  age: { type: Number, min: 13, max: 120 },
+  pays: { type: String, trim: true },
+  ville: { type: String, trim: true },
+  sexe: { type: String, enum: ['Homme', 'Femme', 'Autre', ''] },
+  interets: { type: String, trim: true },
   photo: { type: String, default: '' },
   isVip: { type: Boolean, default: false },
-  solde: { type: Number, default: 0 },
+  solde: { type: Number, default: 0, min: 0 },
   likesCount: { type: Number, default: 0 },
   messagesCount: { type: Number, default: 0 },
   createdAt: { type: Date, default: Date.now }
 });
 
 const messageSchema = new mongoose.Schema({
-  senderId: { type: String, required: true },
-  receiverId: { type: String, required: true },
-  text: { type: String, required: true },
+  senderId: { type: String, required: true, index: true },
+  receiverId: { type: String, required: true, index: true },
+  text: { type: String, required: true, trim: true },
   isRead: { type: Boolean, default: false },
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now, index: true }
 });
 
 const likeSchema = new mongoose.Schema({
@@ -65,19 +81,29 @@ const likeSchema = new mongoose.Schema({
 });
 
 const transactionSchema = new mongoose.Schema({
-  userId: String,
-  type: String,
-  amount: Number,
+  userId: { type: String, required: true },
+  type: { type: String, required: true }, // 'recharge', 'vip', 'pub'
+  amount: { type: Number, required: true },
   status: { type: String, default: 'completed' },
-  reference: String,
   createdAt: { type: Date, default: Date.now }
 });
 
 const sosSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   type: { type: String, required: true },
-  message: { type: String, required: true },
+  message: { type: String, required: true, trim: true },
   status: { type: String, default: 'pending' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const adSchema = new mongoose.Schema({
+  userId: { type: String, required: true },
+  title: { type: String, required: true, trim: true },
+  description: { type: String, required: true, trim: true },
+  imageUrl: { type: String, default: '' },
+  targetUrl: { type: String, default: '' },
+  cost: { type: Number, required: true },
+  active: { type: Boolean, default: true },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -86,443 +112,428 @@ const Message = mongoose.model('Message', messageSchema);
 const Like = mongoose.model('Like', likeSchema);
 const Transaction = mongoose.model('Transaction', transactionSchema);
 const SOSRequest = mongoose.model('SOSRequest', sosSchema);
+const Ad = mongoose.model('Ad', adSchema);
 
-// --- MIDDLEWARE D'AUTHENTIFICATION ---
+// --- MIDDLEWARES D'AUTHENTIFICATION ---
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
-  
-  if (!token) {
-    return res.status(401).json({ error: 'Token manquant' });
-  }
+  if (!token) return res.status(401).json({ error: 'Accès refusé : Token manquant' });
   
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ error: 'Token invalide' });
-    }
+    if (err) return res.status(403).json({ error: 'Token invalide ou expiré' });
     req.user = user;
     next();
   });
 };
 
-// --- ROUTES API ---
+const authenticateAdmin = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.status(401).json({ error: 'Accès administrateur refusé : Token manquant' });
 
-// 1. INSCRIPTION
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err || !user.isAdmin) return res.status(403).json({ error: 'Accès non autorisé : Droits admin requis' });
+    req.user = user;
+    next();
+  });
+};
+
+// --- ROUTES API UTILISATEURS ---
+
+// Inscription
 app.post('/api/register', async (req, res) => {
   try {
-    const { nom, email, password, age, pays, ville, sexe, interets, photoBase64 } = req.body;
-    
+    let { nom, email, password, age, pays, ville, sexe, interets, photoBase64 } = req.body;
     if (!nom || !email || !password) {
-      return res.status(400).json({ error: 'Nom, email et mot de passe sont requis' });
+      return res.status(400).json({ error: 'Nom, email et mot de passe requis' });
     }
     
+    email = email.toLowerCase().trim();
     const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+    if (existingUser) return res.status(400).json({ error: 'Cet email est déjà utilisé' });
+
+    let photoUrl = '';
+    if (photoBase64) {
+      try {
+        const uploadResponse = await cloudinary.uploader.upload(photoBase64, {
+          folder: 'nonvitcha_profiles',
+          transformation: [{ width: 500, height: 500, crop: 'limit' }]
+        });
+        photoUrl = uploadResponse.secure_url;
+      } catch (cloudErr) {
+        console.error('Erreur upload Cloudinary:', cloudErr);
+      }
     }
-    
-    const hashedPassword = await bcrypt.hash(password, 10);
-    
+
+    const hashedPassword = await bcrypt.hash(password, 12);
     const user = new User({
-      nom,
+      nom: nom.trim(),
       email,
       password: hashedPassword,
-      age: age || null,
-      pays: pays || '',
-      ville: ville || '',
+      age: age ? Number(age) : null,
+      pays: pays ? pays.trim() : '',
+      ville: ville ? ville.trim() : '',
       sexe: sexe || '',
-      interets: interets || '',
-      photo: photoBase64 || ''
+      interets: interets ? interets.trim() : '',
+      photo: photoUrl
     });
-    
+
     await user.save();
-    
     const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
-    
-    res.status(201).json({
-      success: true,
-      user: {
-        id: user._id,
-        nom: user.nom,
-        email: user.email,
-        age: user.age,
-        pays: user.pays,
-        ville: user.ville,
-        sexe: user.sexe,
-        interets: user.interets,
-        photo: user.photo,
-        isVip: user.isVip,
-        solde: user.solde,
-        likesCount: user.likesCount,
-        messagesCount: user.messagesCount
-      },
-      token
-    });
+
+    res.status(201).json({ success: true, user: sanitizeUser(user), token });
   } catch (err) {
     console.error('Erreur inscription:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
-// 2. CONNEXION
+// Connexion
 app.post('/api/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    
+    let { email, password } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email et mot de passe requis' });
+
+    email = email.toLowerCase().trim();
     const user = await User.findOne({ email });
-    if (!user) {
+    if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
     }
-    
-    const validPassword = await bcrypt.compare(password, user.password);
-    if (!validPassword) {
-      return res.status(401).json({ error: 'Email ou mot de passe incorrect' });
-    }
-    
+
     const token = jwt.sign({ userId: user._id, email: user.email }, JWT_SECRET, { expiresIn: '24h' });
-    
-    res.json({
-      success: true,
-      user: {
-        id: user._id,
-        nom: user.nom,
-        email: user.email,
-        age: user.age,
-        pays: user.pays,
-        ville: user.ville,
-        sexe: user.sexe,
-        interets: user.interets,
-        photo: user.photo,
-        isVip: user.isVip,
-        solde: user.solde,
-        likesCount: user.likesCount,
-        messagesCount: user.messagesCount
-      },
-      token
-    });
+    res.json({ success: true, user: sanitizeUser(user), token });
   } catch (err) {
     console.error('Erreur connexion:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
-// 3. RÉCUPÉRER TOUS LES MEMBRES
+// Liste des membres (avec indicateur de statut en ligne dynamique)
 app.get('/api/members', authenticateToken, async (req, res) => {
   try {
-    const users = await User.find()
-      .select('-password -__v')
-      .sort({ createdAt: -1 });
-    
-    const members = users.map(u => ({
-      id: u._id,
-      nom: u.nom,
-      age: u.age,
-      pays: u.pays,
-      ville: u.ville,
-      sexe: u.sexe,
-      interets: u.interets,
-      photo: u.photo,
-      isVip: u.isVip,
-      likesCount: u.likesCount,
-      messagesCount: u.messagesCount,
-      createdAt: u.createdAt
-    }));
-    
-    res.json(members);
+    const users = await User.find().select('-password -__v').sort({ createdAt: -1 });
+    // On associe la propriété isOnline en vérifiant la mémoire active des websockets
+    const membersList = users.map(u => {
+      const uObj = sanitizeUser(u);
+      return {
+        ...uObj,
+        isOnline: activeUsers.has(u._id.toString())
+      };
+    });
+    res.json(membersList);
   } catch (err) {
-    console.error('Erreur récupération membres:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
-// 4. ENVOYER UN LIKE (COUP DE CŒUR)
+// Changement / Mise à jour de la photo de profil
+app.post('/api/update-photo', authenticateToken, async (req, res) => {
+  try {
+    const { photoBase64 } = req.body;
+    if (!photoBase64) return res.status(400).json({ error: 'Photo requise' });
+
+    const uploadResponse = await cloudinary.uploader.upload(photoBase64, {
+      folder: 'nonvitcha_profiles',
+      transformation: [{ width: 500, height: 500, crop: 'limit' }]
+    });
+
+    const user = await User.findByIdAndUpdate(
+      req.user.userId, 
+      { photo: uploadResponse.secure_url }, 
+      { new: true }
+    );
+
+    res.json({ success: true, photo: user.photo, user: sanitizeUser(user), message: 'Photo de profil mise à jour avec succès !' });
+  } catch (err) {
+    console.error('Erreur Cloudinary photo:', err);
+    res.status(500).json({ error: 'Erreur lors du téléversement de l\'image' });
+  }
+});
+
+// Système de Likes / Coups de cœur (Incrémentation & Comptage)
 app.post('/api/like', authenticateToken, async (req, res) => {
   try {
     const { targetUserId } = req.body;
     const fromUserId = req.user.userId;
-    
-    if (!targetUserId) {
-      return res.status(400).json({ error: 'ID utilisateur cible requis' });
-    }
-    
-    if (fromUserId === targetUserId) {
-      return res.status(400).json({ error: 'Vous ne pouvez pas vous liker vous-même' });
-    }
-    
+    if (!targetUserId || fromUserId === targetUserId) return res.status(400).json({ error: 'Action invalide' });
+
     const existingLike = await Like.findOne({ fromUserId, toUserId: targetUserId });
-    if (existingLike) {
-      return res.status(400).json({ error: 'Vous avez déjà envoyé un coup de cœur à cette personne' });
-    }
-    
-    const like = new Like({ fromUserId, toUserId: targetUserId });
-    await like.save();
-    
-    const targetUser = await User.findByIdAndUpdate(
-      targetUserId,
-      { $inc: { likesCount: 1 } },
-      { new: true }
-    );
-    
-    res.json({
-      success: true,
-      likesCount: targetUser.likesCount,
-      message: 'Coup de cœur envoyé avec succès !'
-    });
+    if (existingLike) return res.status(400).json({ error: 'Vous avez déjà envoyé un coup de cœur à ce profil' });
+
+    await new Like({ fromUserId, toUserId: targetUserId }).save();
+    const targetUser = await User.findByIdAndUpdate(targetUserId, { $inc: { likesCount: 1 } }, { new: true });
+
+    res.json({ success: true, likesCount: targetUser.likesCount, message: 'Coup de cœur (Like) envoyé avec succès !' });
   } catch (err) {
-    console.error('Erreur like:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
-// 5. RÉCUPÉRER L'HISTORIQUE DES MESSAGES
+// Historique des messages privés
 app.get('/api/messages/:userId/:otherUserId', authenticateToken, async (req, res) => {
   try {
     const { userId, otherUserId } = req.params;
-    
+    if (req.user.userId !== userId) return res.status(403).json({ error: 'Accès non autorisé' });
+
     const messages = await Message.find({
       $or: [
         { senderId: userId, receiverId: otherUserId },
         { senderId: otherUserId, receiverId: userId }
       ]
     }).sort({ timestamp: 1 });
-    
-    await Message.updateMany(
-      { senderId: otherUserId, receiverId: userId, isRead: false },
-      { isRead: true }
-    );
-    
+
     res.json(messages);
   } catch (err) {
-    console.error('Erreur récupération messages:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
-// 6. PASSER VIP
+// Passage VIP (5000 FCFA)
 app.post('/api/vip', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.userId;
-    const user = await User.findById(userId);
-    
-    if (!user) {
-      return res.status(404).json({ error: 'Utilisateur non trouvé' });
-    }
-    
-    if (user.isVip) {
-      return res.status(400).json({ error: 'Vous êtes déjà VIP' });
-    }
-    
-    if (user.solde < 5000) {
-      return res.status(400).json({ error: 'Solde insuffisant. Rechargez votre compte d\'abord.' });
-    }
-    
+    const user = await User.findById(req.user.userId);
+    if (user.isVip) return res.status(400).json({ error: 'Vous êtes déjà VIP' });
+    if (user.solde < 5000) return res.status(400).json({ error: 'Solde insuffisant (5000 FCFA requis)' });
+
     user.solde -= 5000;
     user.isVip = true;
     await user.save();
-    
-    await Transaction.create({
-      userId,
-      type: 'vip',
-      amount: 5000,
-      status: 'completed'
-    });
-    
-    res.json({
-      success: true,
-      user: {
-        id: user._id,
-        nom: user.nom,
-        email: user.email,
-        isVip: user.isVip,
-        solde: user.solde,
-        likesCount: user.likesCount,
-        messagesCount: user.messagesCount
-      }
-    });
+    await Transaction.create({ userId: user._id, type: 'vip', amount: 5000 });
+
+    res.json({ success: true, user: sanitizeUser(user), message: 'Félicitations, vous êtes désormais membre VIP !' });
   } catch (err) {
-    console.error('Erreur VIP:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
-// 7. RECHARGER LE SOLDE
+// Recharge de solde (Monétisation)
 app.post('/api/monetization', authenticateToken, async (req, res) => {
   try {
     const { amount } = req.body;
-    const userId = req.user.userId;
-    
-    if (!amount || amount <= 0) {
-      return res.status(400).json({ error: 'Montant invalide' });
-    }
-    
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { $inc: { solde: amount } },
-      { new: true }
-    );
-    
-    await Transaction.create({
-      userId,
-      type: 'recharge',
-      amount,
-      status: 'completed'
-    });
-    
-    res.json({
-      success: true,
-      user: {
-        id: user._id,
-        solde: user.solde
-      },
-      message: `Rechargement de ${amount} FCFA réussi !`
-    });
+    if (!amount || amount <= 0) return res.status(400).json({ error: 'Montant invalide' });
+
+    const user = await User.findByIdAndUpdate(req.user.userId, { $inc: { solde: amount } }, { new: true });
+    await Transaction.create({ userId: req.user.userId, type: 'recharge', amount });
+
+    res.json({ success: true, user: sanitizeUser(user), message: `Recharge de ${amount} FCFA réussie !` });
   } catch (err) {
-    console.error('Erreur rechargement:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
-// 8. METTRE À JOUR LA PHOTO
-app.post('/api/update-photo', authenticateToken, async (req, res) => {
+// --- ESPACE PUBLICITAIRE PAYANT ---
+app.get('/api/ads', async (req, res) => {
   try {
-    const { photoBase64 } = req.body;
-    const userId = req.user.userId;
-    
-    if (!photoBase64) {
-      return res.status(400).json({ error: 'Photo requise' });
-    }
-    
-    const user = await User.findByIdAndUpdate(
-      userId,
-      { photo: photoBase64 },
-      { new: true }
-    );
-    
-    res.json({
-      success: true,
-      photo: user.photo,
-      message: 'Photo mise à jour avec succès !'
-    });
+    const ads = await Ad.find({ active: true }).sort({ createdAt: -1 });
+    res.json({ success: true, ads });
   } catch (err) {
-    console.error('Erreur mise à jour photo:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erreur serveur' });
   }
 });
 
-// 9. ENVOYER UNE DEMANDE SOS
+app.post('/api/ads/create', authenticateToken, async (req, res) => {
+  try {
+    const { title, description, targetUrl, imageBase64, cost } = req.body;
+    const adCost = Number(cost) || 1000; // Coût par défaut de la campagne publicitaire
+
+    const user = await User.findById(req.user.userId);
+    if (user.solde < adCost) {
+      return res.status(400).json({ error: `Solde insuffisant. La diffusion publicitaire coûte ${adCost} FCFA.` });
+    }
+
+    let imageUrl = '';
+    if (imageBase64) {
+      try {
+        const uploadRes = await cloudinary.uploader.upload(imageBase64, { folder: 'nonvitcha_ads' });
+        imageUrl = uploadRes.secure_url;
+      } catch (e) {
+        console.error('Erreur image pub:', e);
+      }
+    }
+
+    // Déduction du solde et enregistrement
+    user.solde -= adCost;
+    await user.save();
+
+    const newAd = await Ad.create({
+      userId: user._id,
+      title: title.trim(),
+      description: description.trim(),
+      imageUrl,
+      targetUrl: targetUrl ? targetUrl.trim() : '',
+      cost: adCost
+    });
+
+    await Transaction.create({ userId: user._id, type: 'pub', amount: adCost });
+
+    res.json({ success: true, ad: newAd, user: sanitizeUser(user), message: 'Publicité publiée avec succès !' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur lors de la création de la publicité' });
+  }
+});
+
+// Espace SOS
 app.post('/api/ecoute', authenticateToken, async (req, res) => {
   try {
     const { type, message } = req.body;
-    const userId = req.user.userId;
-    
-    if (!type || !message) {
-      return res.status(400).json({ error: 'Type et message sont requis' });
-    }
-    
-    const sosRequest = new SOSRequest({
-      userId,
-      type,
-      message
-    });
-    
-    await sosRequest.save();
-    
-    res.json({
-      success: true,
-      message: 'Votre demande a bien été transmise. Notre équipe vous contactera.'
-    });
+    if (!type || !message) return res.status(400).json({ error: 'Champs requis' });
+    await SOSRequest.create({ userId: req.user.userId, type, message });
+    res.json({ success: true, message: 'Votre demande SOS a été transmise en toute confidentialité.' });
   } catch (err) {
-    console.error('Erreur SOS:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
 
-// --- GESTION WEBSOCKET (SOCKET.IO) ---
-const activeUsers = new Map();
+// --- ESPACE ADMIN (Mot de passe : NONVITCHA 2026) ---
+app.post('/api/admin/login', (req, res) => {
+  const { password } = req.body;
+  if (password === 'NONVITCHA 2026') {
+    const adminToken = jwt.sign({ isAdmin: true, role: 'superadmin' }, JWT_SECRET, { expiresIn: '12h' });
+    return res.json({ success: true, token: adminToken, message: 'Connexion administrateur réussie' });
+  }
+  res.status(401).json({ error: 'Mot de passe administrateur incorrect' });
+});
+
+app.get('/api/admin/stats', authenticateAdmin, async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments();
+    const totalMessages = await Message.countDocuments();
+    const totalSos = await SOSRequest.countDocuments();
+    const vipUsers = await User.countDocuments({ isVip: true });
+    const totalAds = await Ad.countDocuments();
+    
+    res.json({
+      success: true,
+      stats: { totalUsers, totalMessages, totalSos, vipUsers, totalAds }
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur lors de la récupération des stats' });
+  }
+});
+
+app.get('/api/admin/users', authenticateAdmin, async (req, res) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    res.json({ success: true, users });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+app.delete('/api/admin/users/:id', authenticateAdmin, async (req, res) => {
+  try {
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: 'Utilisateur supprimé avec succès par l\'administrateur' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur lors de la suppression' });
+  }
+});
+
+app.get('/api/admin/sos', authenticateAdmin, async (req, res) => {
+  try {
+    const sosList = await SOSRequest.find().sort({ createdAt: -1 });
+    res.json({ success: true, sosList });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+function sanitizeUser(u) {
+  return {
+    id: u._id,
+    nom: u.nom,
+    email: u.email,
+    age: u.age,
+    pays: u.pays,
+    ville: u.ville,
+    sexe: u.sexe,
+    interets: u.interets,
+    photo: u.photo,
+    isVip: u.isVip,
+    solde: u.solde,
+    likesCount: u.likesCount,
+    messagesCount: u.messagesCount
+  };
+}
+
+// --- WEBSOCKETS (Temps réel, Présence en ligne & Typing) ---
+const activeUsers = new Map(); // userId -> socketId
 
 io.on('connection', (socket) => {
-  console.log('🔌 Nouvelle connexion:', socket.id);
-  
   socket.on('user_connected', (userId) => {
-    activeUsers.set(userId, socket.id);
-    console.log(`✅ Utilisateur ${userId} connecté (${socket.id})`);
+    if (userId) {
+      activeUsers.set(userId, socket.id);
+      io.emit('user_status_changed', { userId, isOnline: true });
+    }
   });
-  
-  socket.on('join_room', (roomId) => {
-    socket.join(roomId);
+
+  // Chat Public
+  socket.on('public_message', async (data) => {
+    if (data && data.text) {
+      if (data.senderId) {
+        await User.findByIdAndUpdate(data.senderId, { $inc: { messagesCount: 1 } });
+      }
+      io.emit('public_message', { 
+        senderId: data.senderId,
+        senderName: data.senderName, 
+        text: data.text.trim(), 
+        timestamp: new Date() 
+      });
+    }
   });
-  
-  socket.on('public_message', (data) => {
-    io.emit('public_message', {
-      ...data,
-      timestamp: new Date()
-    });
-  });
-  
-  socket.on('typing_public', (data) => {
-    socket.broadcast.emit('display_typing_public', data);
-  });
-  
-  socket.on('stop_typing_public', () => {
-    socket.broadcast.emit('hide_typing_public');
-  });
-  
+
+  // Chat Privé 1-to-1
   socket.on('private_message', async (data) => {
     try {
       const { senderId, receiverId, text } = data;
-      
-      const message = new Message({
-        senderId,
-        receiverId,
-        text
-      });
+      if (!senderId || !receiverId || !text) return;
+
+      const message = new Message({ senderId, receiverId, text: text.trim() });
       await message.save();
-      
       await User.findByIdAndUpdate(senderId, { $inc: { messagesCount: 1 } });
-      
+
       const receiverSocketId = activeUsers.get(receiverId);
       if (receiverSocketId) {
         io.to(receiverSocketId).emit('private_message', message);
       }
-      
       socket.emit('private_message', message);
     } catch (err) {
-      console.error('Erreur message privé:', err);
+      console.error('Erreur WebSocket message privé:', err);
     }
   });
+
+  // Indicateurs de frappe ("... est en train d'écrire")
+  socket.on('typing_public', (data) => socket.broadcast.emit('display_typing_public', data));
+  socket.on('stop_typing_public', () => socket.broadcast.emit('hide_typing_public'));
   
   socket.on('typing_private', (data) => {
-    const receiverSocketId = activeUsers.get(data.receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit('display_typing_private', {
-        senderId: data.senderId,
-        senderName: data.senderName
-      });
-    }
+    const rSocketId = activeUsers.get(data.receiverId);
+    if (rSocketId) io.to(rSocketId).emit('display_typing_private', data);
   });
   
   socket.on('stop_typing_private', (data) => {
-    const receiverSocketId = activeUsers.get(data.receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit('hide_typing_private', {
-        senderId: data.senderId
-      });
-    }
+    const rSocketId = activeUsers.get(data.receiverId);
+    if (rSocketId) io.to(rSocketId).emit('hide_typing_private', data);
   });
-  
+
+  // Déconnexion
   socket.on('disconnect', () => {
-    for (const [userId, socketId] of activeUsers.entries()) {
-      if (socketId === socket.id) {
+    let disconnectedUserId = null;
+    for (const [userId, sId] of activeUsers.entries()) {
+      if (sId === socket.id) {
+        disconnectedUserId = userId;
         activeUsers.delete(userId);
-        console.log(`👋 Utilisateur ${userId} déconnecté`);
         break;
       }
+    }
+    if (disconnectedUserId) {
+      io.emit('user_status_changed', { userId: disconnectedUserId, isOnline: false });
     }
   });
 });
 
-// --- DÉMARRAGE DU SERVEUR (Corrigé pour Render) ---
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Serveur Nonvitcha démarré sur le port ${PORT}`);
+  console.log(`🚀 Serveur Nonvitcha opérationnel sur le port ${PORT}`);
 });

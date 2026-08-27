@@ -12,6 +12,10 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
+// Augmentation des limites de taille pour éviter les erreurs réseau lors de l'envoi d'images
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 // Configuration Cloudinary
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -71,7 +75,6 @@ const ecouteSchema = new mongoose.Schema({
 const Ecoute = mongoose.model('Ecoute', ecouteSchema);
 
 // Middlewares Express
-app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Routes API Auth & Membres

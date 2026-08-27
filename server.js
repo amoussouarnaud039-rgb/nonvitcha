@@ -82,7 +82,7 @@ const likeSchema = new mongoose.Schema({
 
 const transactionSchema = new mongoose.Schema({
   userId: { type: String, required: true },
-  type: { type: String, required: true }, // 'recharge', 'vip', 'pub'
+  type: { type: String, required: true },
   amount: { type: Number, required: true },
   status: { type: String, default: 'completed' },
   createdAt: { type: Date, default: Date.now }
@@ -140,8 +140,6 @@ const authenticateAdmin = (req, res, next) => {
 };
 
 // --- ROUTES API UTILISATEURS ---
-
-// Inscription
 app.post('/api/register', async (req, res) => {
   try {
     let { nom, email, password, age, pays, ville, sexe, interets, photoBase64 } = req.body;
@@ -189,7 +187,6 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// Connexion
 app.post('/api/login', async (req, res) => {
   try {
     let { email, password } = req.body;
@@ -209,11 +206,9 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Liste des membres (avec indicateur de statut en ligne dynamique)
 app.get('/api/members', authenticateToken, async (req, res) => {
   try {
     const users = await User.find().select('-password -__v').sort({ createdAt: -1 });
-    // On associe la propriété isOnline en vérifiant la mémoire active des websockets
     const membersList = users.map(u => {
       const uObj = sanitizeUser(u);
       return {
@@ -227,7 +222,6 @@ app.get('/api/members', authenticateToken, async (req, res) => {
   }
 });
 
-// Changement / Mise à jour de la photo de profil
 app.post('/api/update-photo', authenticateToken, async (req, res) => {
   try {
     const { photoBase64 } = req.body;
@@ -251,7 +245,6 @@ app.post('/api/update-photo', authenticateToken, async (req, res) => {
   }
 });
 
-// Système de Likes / Coups de cœur (Incrémentation & Comptage)
 app.post('/api/like', authenticateToken, async (req, res) => {
   try {
     const { targetUserId } = req.body;
@@ -270,7 +263,6 @@ app.post('/api/like', authenticateToken, async (req, res) => {
   }
 });
 
-// Historique des messages privés
 app.get('/api/messages/:userId/:otherUserId', authenticateToken, async (req, res) => {
   try {
     const { userId, otherUserId } = req.params;
@@ -289,7 +281,6 @@ app.get('/api/messages/:userId/:otherUserId', authenticateToken, async (req, res
   }
 });
 
-// Passage VIP (5000 FCFA)
 app.post('/api/vip', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId);
@@ -307,7 +298,6 @@ app.post('/api/vip', authenticateToken, async (req, res) => {
   }
 });
 
-// Recharge de solde (Monétisation)
 app.post('/api/monetization', authenticateToken, async (req, res) => {
   try {
     const { amount } = req.body;
@@ -322,7 +312,6 @@ app.post('/api/monetization', authenticateToken, async (req, res) => {
   }
 });
 
-// --- ESPACE PUBLICITAIRE PAYANT ---
 app.get('/api/ads', async (req, res) => {
   try {
     const ads = await Ad.find({ active: true }).sort({ createdAt: -1 });
@@ -335,7 +324,7 @@ app.get('/api/ads', async (req, res) => {
 app.post('/api/ads/create', authenticateToken, async (req, res) => {
   try {
     const { title, description, targetUrl, imageBase64, cost } = req.body;
-    const adCost = Number(cost) || 1000; // Coût par défaut de la campagne publicitaire
+    const adCost = Number(cost) || 1000;
 
     const user = await User.findById(req.user.userId);
     if (user.solde < adCost) {
@@ -352,7 +341,6 @@ app.post('/api/ads/create', authenticateToken, async (req, res) => {
       }
     }
 
-    // Déduction du solde et enregistrement
     user.solde -= adCost;
     await user.save();
 
@@ -373,7 +361,6 @@ app.post('/api/ads/create', authenticateToken, async (req, res) => {
   }
 });
 
-// Espace SOS
 app.post('/api/ecoute', authenticateToken, async (req, res) => {
   try {
     const { type, message } = req.body;
@@ -385,7 +372,6 @@ app.post('/api/ecoute', authenticateToken, async (req, res) => {
   }
 });
 
-// --- ESPACE ADMIN (Mot de passe : NONVITCHA 2026) ---
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body;
   if (password === 'NONVITCHA 2026') {
@@ -457,8 +443,8 @@ function sanitizeUser(u) {
   };
 }
 
-// --- WEBSOCKETS (Temps réel, Présence en ligne & Typing) ---
-const activeUsers = new Map(); // userId -> socketId
+// --- WEBSOCKETS ---
+const activeUsers = new Map();
 
 io.on('connection', (socket) => {
   socket.on('user_connected', (userId) => {
@@ -468,7 +454,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Chat Public
   socket.on('public_message', async (data) => {
     if (data && data.text) {
       if (data.senderId) {
@@ -483,7 +468,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Chat Privé 1-to-1
   socket.on('private_message', async (data) => {
     try {
       const { senderId, receiverId, text } = data;
@@ -503,7 +487,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Indicateurs de frappe ("... est en train d'écrire")
   socket.on('typing_public', (data) => socket.broadcast.emit('display_typing_public', data));
   socket.on('stop_typing_public', () => socket.broadcast.emit('hide_typing_public'));
   
@@ -517,7 +500,6 @@ io.on('connection', (socket) => {
     if (rSocketId) io.to(rSocketId).emit('hide_typing_private', data);
   });
 
-  // Déconnexion
   socket.on('disconnect', () => {
     let disconnectedUserId = null;
     for (const [userId, sId] of activeUsers.entries()) {

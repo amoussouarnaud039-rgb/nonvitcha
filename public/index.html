@@ -10,6 +10,7 @@
         :root {
             --primary-color: #e74c3c;
             --primary-dark: #c0392b;
+            --primary-pressed: #962d22;
             --bg-color: #fdfbf7;
             --text-color: #333333;
             --white: #ffffff;
@@ -69,11 +70,16 @@
             border-radius: 6px;
             cursor: pointer;
             font-weight: bold;
-            transition: background 0.2s;
+            transition: background 0.15s ease, transform 0.1s ease;
         }
 
         nav button:hover, .btn:hover {
             background-color: var(--primary-dark);
+        }
+
+        nav button:active, .btn:active, nav button.active-nav {
+            background-color: var(--primary-pressed);
+            transform: scale(0.97);
         }
 
         .container {
@@ -93,7 +99,6 @@
             display: block;
         }
 
-        /* Formulaires */
         form {
             display: flex;
             flex-direction: column;
@@ -107,9 +112,14 @@
             border: 1px solid #ccc;
             border-radius: 5px;
             font-size: 1rem;
+            transition: border-color 0.2s;
         }
 
-        /* Grille des membres */
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary-color);
+            outline: none;
+        }
+
         .members-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -124,15 +134,33 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             border-left: 4px solid var(--primary-color);
             text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
+        }
+
+        .member-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .member-card:active {
+            background-color: #f9ebea;
+            transform: scale(0.98);
         }
 
         .member-card img {
-            width: 80px;
-            height: 80px;
-            object-fit: cover;
-            border-radius: 50%;
+            width: 80px !important;
+            height: 80px !important;
+            min-width: 80px !important;
+            min-height: 80px !important;
+            max-width: 80px !important;
+            max-height: 80px !important;
+            object-fit: cover !important;
+            border-radius: 50% !important;
             border: 2px solid var(--primary-color);
             margin-bottom: 10px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .member-card h3 {
@@ -157,6 +185,10 @@
             cursor: pointer;
             font-weight: bold;
         }
+
+        .auth-toggle:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
 <body>
@@ -172,15 +204,14 @@
     </header>
 
     <nav id="mainNav" style="display:none;">
-        <button onclick="switchSection('membersSection')">Membres</button>
-        <button onclick="switchSection('chatSection')">Chat Public</button>
-        <button onclick="switchSection('profileSection')">Mon Profil</button>
-        <button onclick="switchSection('sosSection')">Écoute SOS</button>
+        <button id="btn-membersSection" onclick="switchSection('membersSection')">Membres</button>
+        <button id="btn-chatSection" onclick="switchSection('chatSection')">Chat Public</button>
+        <button id="btn-profileSection" onclick="switchSection('profileSection')">Mon Profil</button>
+        <button id="btn-sosSection" onclick="switchSection('sosSection')">Écoute SOS</button>
         <button onclick="logout()" style="background-color: #7f8c8d;">Déconnexion</button>
     </nav>
 
     <div class="container">
-        <!-- SECTION CONNEXION / INSCRIPTION -->
         <div id="authSection" class="section active">
             <div id="loginFormContainer">
                 <h2 style="text-align: center; color: var(--primary-color);">Connexion à Nonvitcha</h2>
@@ -215,15 +246,11 @@
             </div>
         </div>
 
-        <!-- SECTION MEMBRES -->
         <div id="membersSection" class="section">
             <h2>Membres de la communauté</h2>
-            <div id="membersGrid" class="members-grid">
-                <!-- Chargé dynamiquement -->
-            </div>
+            <div id="membersGrid" class="members-grid"></div>
         </div>
 
-        <!-- SECTION CHAT PUBLIC -->
         <div id="chatSection" class="section">
             <h2>Chat Public de la communauté</h2>
             <div id="chatBox" style="height: 300px; border: 1px solid #ddd; border-radius: 5px; padding: 10px; overflow-y: scroll; margin-bottom: 10px; background: #fafafa;"></div>
@@ -233,15 +260,11 @@
             </form>
         </div>
 
-        <!-- SECTION PROFIL -->
         <div id="profileSection" class="section">
             <h2>Mon Profil</h2>
-            <div id="profileDetails" style="text-align: center;">
-                <!-- Chargé dynamiquement -->
-            </div>
+            <div id="profileDetails" style="text-align: center;"></div>
         </div>
 
-        <!-- SECTION ECOUTE SOS -->
         <div id="sosSection" class="section">
             <h2>Espace Écoute SOS</h2>
             <p>Besoin d'aide ou d'une écoute confidentielle ? Envoyez votre message à l'équipe d'assistance.</p>
@@ -260,6 +283,7 @@
     <script>
         const socket = io();
         let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+        const defaultAvatar = 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg';
 
         document.addEventListener('DOMContentLoaded', () => {
             checkAuth();
@@ -272,7 +296,7 @@
         function checkAuth() {
             if (currentUser) {
                 document.getElementById('authSection').classList.remove('active');
-                document.getElementById('membersSection').classList.add('active');
+                switchSection('membersSection');
                 document.getElementById('mainNav').style.display = 'flex';
                 document.getElementById('userInfoBar').innerText = `${currentUser.nom} | Messages: ${currentUser.messagesCount || 0}`;
                 loadProfile();
@@ -298,10 +322,14 @@
         function switchSection(sectionId) {
             document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
             document.getElementById(sectionId).classList.add('active');
+            
+            document.querySelectorAll('nav button').forEach(btn => btn.classList.remove('active-nav'));
+            const activeBtn = document.getElementById('btn-' + sectionId);
+            if (activeBtn) activeBtn.classList.add('active-nav');
+
             if (sectionId === 'membersSection') loadMembers();
         }
 
-        // Inscription
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
@@ -321,7 +349,6 @@
             }
         });
 
-        // Connexion
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const email = document.getElementById('loginEmail').value;
@@ -351,7 +378,6 @@
             window.location.reload();
         }
 
-        // Chargement des membres avec support Cloudinary
         async function loadMembers() {
             try {
                 const res = await fetch('/api/members');
@@ -359,10 +385,11 @@
                 const grid = document.getElementById('membersGrid');
                 grid.innerHTML = '';
                 members.forEach(m => {
-                    const photoUrl = m.photo ? m.photo : 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg';
+                    const photoUrl = (m.photo && m.photo.trim() !== '') ? m.photo : defaultAvatar;
+                    
                     grid.innerHTML += `
                         <div class="member-card">
-                            <img src="${photoUrl}" alt="${m.nom}">
+                            <img src="${photoUrl}" alt="${m.nom}" onerror="this.src='${defaultAvatar}'">
                             <h3>${m.nom}</h3>
                             <p style="color: var(--gray); font-size: 0.9rem;">${m.ville || ''}, ${m.pays || ''}</p>
                             <p style="font-size: 0.85rem;">Intérêts : ${m.interets || 'Non renseigné'}</p>
@@ -377,16 +404,16 @@
 
         function loadProfile() {
             const container = document.getElementById('profileDetails');
-            const photoUrl = currentUser.photo ? currentUser.photo : 'https://res.cloudinary.com/demo/image/upload/v1312461204/sample.jpg';
+            const photoUrl = (currentUser.photo && currentUser.photo.trim() !== '') ? currentUser.photo : defaultAvatar;
+            
             container.innerHTML = `
-                <img src="${photoUrl}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 50%; border: 3px solid var(--primary-color);">
+                <img src="${photoUrl}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 50%; border: 3px solid var(--primary-color); display: block; margin: 0 auto 10px auto;" onerror="this.src='${defaultAvatar}'">
                 <h3>${currentUser.nom}</h3>
                 <p>Email : ${currentUser.email}</p>
                 <p>J'aime reçus : ${currentUser.likesCount || 0} | Messages envoyés : ${currentUser.messagesCount || 0}</p>
             `;
         }
 
-        // Chat Public WebSockets
         document.getElementById('chatForm').addEventListener('submit', (e) => {
             e.preventDefault();
             const input = document.getElementById('chatInput');
@@ -402,7 +429,6 @@
             chatBox.scrollTop = chatBox.scrollHeight;
         });
 
-        // SOS Form
         document.getElementById('sosForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const type = document.getElementById('sosType').value;

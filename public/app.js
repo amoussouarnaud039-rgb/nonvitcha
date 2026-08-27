@@ -1,46 +1,46 @@
-Const socket = io();
+const socket = io();
 
-Let currentUser = JSON.parse(localStorage.getItem('nonvitcha_user')) || null;
-Let allMembers = [];
-Let activeChatTargetId = null;
-Let typingTimeout = null;
+let currentUser = JSON.parse(localStorage.getItem('nonvitcha_user')) || null;
+let allMembers = [];
+let activeChatTargetId = null;
+let typingTimeout = null;
 
-Document.addEventListener('DOMContentLoaded', () => {
-    InitApp();
-    SetupEventListeners();
-    SetupSocketListeners();
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    setupEventListeners();
+    setupSocketListeners();
 });
 
-Function initApp() {
-    RenderNavigation();
-    UpdateCoinsDisplay();
-    If (currentUser) {
-        Socket.emit('user_connected', currentUser.id || currentUser._id);
-        LoadMembers();
-        ShowSection('members-section');
+function initApp() {
+    renderNavigation();
+    updateCoinsDisplay();
+    if (currentUser) {
+        socket.emit('user_connected', currentUser.id || currentUser._id);
+        loadMembers();
+        showSection('members-section');
     } else {
-        ShowSection('auth-section');
+        showSection('auth-section');
     }
 }
 
-Function showSection(sectionId) {
-    Document.querySelectorAll('.page-section').forEach(sec => sec.style.display = 'none');
-    Const target = document.getElementById(sectionId);
-    If (target) target.style.display = 'block';
+function showSection(sectionId) {
+    document.querySelectorAll('.page-section').forEach(sec => sec.style.display = 'none');
+    const target = document.getElementById(sectionId);
+    if (target) target.style.display = 'block';
 
-    If (sectionId === 'members-section') loadMembers();
+    if (sectionId === 'members-section') loadMembers();
 }
 
-Function renderNavigation() {
-    Const nav = document.getElementById('nav-menu');
-    If (!currentUser) {
-        Nav.innerHTML = `
+function renderNavigation() {
+    const nav = document.getElementById('nav-menu');
+    if (!currentUser) {
+        nav.innerHTML = `
             <button class="nav-btn nav-btn-members" onclick="showSection('auth-section')"><i class="fa-solid fa-right-to-bracket"></i> Connexion / Inscription</button>
             <button class="nav-btn nav-btn-ecoute" onclick="showSection('ecoutes-section')"><i class="fa-solid fa-hand-holding-heart"></i> Écoute SOS / SSR</button>
             <button class="nav-btn nav-btn-admin" onclick="showSection('admin-section')"><i class="fa-solid fa-shield-halved"></i> Admin</button>
         `;
     } else {
-        Nav.innerHTML = `
+        nav.innerHTML = `
             <button class="nav-btn nav-btn-members" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Membres</button>
             <button class="nav-btn nav-btn-public" onclick="showSection('public-chat-section')"><i class="fa-solid fa-comments"></i> Chat Public</button>
             <button class="nav-btn nav-btn-coins" onclick="showSection('recharge-section')"><i class="fa-solid fa-coins"></i> ${currentUser.coins || 0} Coins ${currentUser.isVip ? '👑 VIP' : ''}</button>
@@ -51,175 +51,175 @@ Function renderNavigation() {
     }
 }
 
-Function updateCoinsDisplay() {
-    Const coinsEl = document.getElementById('current-coins-display');
-    If (coinsEl && currentUser) {
-        CoinsEl.innerText = currentUser.coins || 0;
+function updateCoinsDisplay() {
+    const coinsEl = document.getElementById('current-coins-display');
+    if (coinsEl && currentUser) {
+        coinsEl.innerText = currentUser.coins || 0;
     }
 }
 
-Function setupEventListeners() {
-    Document.getElementById('login-form')?.addEventListener('submit', async (e) => {
-        E.preventDefault();
-        Const email = document.getElementById('login-email').value;
-        Const password = document.getElementById('login-password').value;
+function setupEventListeners() {
+    document.getElementById('login-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const email = document.getElementById('login-email').value;
+        const password = document.getElementById('login-password').value;
 
-        Try {
-            Const res = await fetch('/api/login', {
-                Method: 'POST',
-                Headers: { 'Content-Type': 'application/json' },
-                Body: JSON.stringify({ email, password })
+        try {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
             });
-            Const data = await res.json();
-            If (res.ok) {
-                CurrentUser = data.user;
-                LocalStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
-                InitApp();
+            const data = await res.json();
+            if (res.ok) {
+                currentUser = data.user;
+                localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+                initApp();
             } else {
-                Alert(data.error);
+                alert(data.error);
             }
         } catch (err) {
-            Alert('Erreur serveur lors de la connexion.');
+            alert('Erreur serveur lors de la connexion.');
         }
     });
 
-    Document.getElementById('register-form')?.addEventListener('submit', async (e) => {
-        E.preventDefault();
-        Const formData = new FormData(e.target);
+    document.getElementById('register-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
 
-        Try {
-            Const res = await fetch('/api/register', {
-                Method: 'POST',
-                Body: formData
+        try {
+            const res = await fetch('/api/register', {
+                method: 'POST',
+                body: formData
             });
-            Const data = await res.json();
-            If (res.ok) {
-                CurrentUser = data.user;
-                LocalStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
-                InitApp();
+            const data = await res.json();
+            if (res.ok) {
+                currentUser = data.user;
+                localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+                initApp();
             } else {
-                Alert(data.error);
+                alert(data.error);
             }
         } catch (err) {
-            Alert('Erreur réseau lors de l’inscription.');
+            alert('Erreur réseau lors de l’inscription.');
         }
     });
 
-    Document.getElementById('private-chat-form')?.addEventListener('submit', (e) => {
-        E.preventDefault();
-        Const input = document.getElementById('private-message-input');
-        Const text = input.value.trim();
-        If (!text || !activeChatTargetId) return;
+    document.getElementById('private-chat-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = document.getElementById('private-message-input');
+        const text = input.value.trim();
+        if (!text || !activeChatTargetId) return;
 
-        Socket.emit('private_message', {
-            FromUserId: currentUser.id || currentUser._id,
-            ToUserId: activeChatTargetId,
-            FromUserName: currentUser.nom,
-            FromUserPhoto: currentUser.photo,
-            Text,
-            IsCoupDeCoeur: false
+        socket.emit('private_message', {
+            fromUserId: currentUser.id || currentUser._id,
+            toUserId: activeChatTargetId,
+            fromUserName: currentUser.nom,
+            fromUserPhoto: currentUser.photo,
+            text,
+            isCoupDeCoeur: false
         });
 
-        Socket.emit('stop_typing', { toUserId: activeChatTargetId });
-        Input.value = '';
+        socket.emit('stop_typing', { toUserId: activeChatTargetId });
+        input.value = '';
     });
 
-    Document.getElementById('private-message-input')?.addEventListener('input', () => {
-        If (!activeChatTargetId) return;
-        Socket.emit('typing', { toUserId: activeChatTargetId });
+    document.getElementById('private-message-input')?.addEventListener('input', () => {
+        if (!activeChatTargetId) return;
+        socket.emit('typing', { toUserId: activeChatTargetId });
 
-        ClearTimeout(typingTimeout);
-        TypingTimeout = setTimeout(() => {
-            Socket.emit('stop_typing', { toUserId: activeChatTargetId });
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+            socket.emit('stop_typing', { toUserId: activeChatTargetId });
         }, 2000);
     });
 
-    Document.getElementById('public-chat-form')?.addEventListener('submit', (e) => {
-        E.preventDefault();
-        Const input = document.getElementById('public-message-input');
-        Const text = input.value.trim();
-        If (!text) return;
+    document.getElementById('public-chat-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const input = document.getElementById('public-message-input');
+        const text = input.value.trim();
+        if (!text) return;
 
-        Socket.emit('public_message', {
-            FromUserName: currentUser ? currentUser.nom : 'Anonyme',
-            Text
+        socket.emit('public_message', {
+            fromUserName: currentUser ? currentUser.nom : 'Anonyme',
+            text
         });
-        Input.value = '';
+        input.value = '';
     });
 
-    Document.getElementById('ecoute-form')?.addEventListener('submit', async (e) => {
-        E.preventDefault();
-        Const type = document.getElementById('ecoute-type').value;
-        Const message = document.getElementById('ecoute-message').value;
+    document.getElementById('ecoute-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const type = document.getElementById('ecoute-type').value;
+        const message = document.getElementById('ecoute-message').value;
 
-        Try {
-            Const res = await fetch('/api/ecoute', {
-                Method: 'POST',
-                Headers: { 'Content-Type': 'application/json' },
-                Body: JSON.stringify({
-                    Type,
-                    Message,
-                    UserId: currentUser ? (currentUser.id || currentUser._id) : null
+        try {
+            const res = await fetch('/api/ecoute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type,
+                    message,
+                    userId: currentUser ? (currentUser.id || currentUser._id) : null
                 })
             });
-            If (res.ok) {
-                Alert('Votre message a été transmis avec succès et en toute confidentialité.');
-                Document.getElementById('ecoute-message').value = '';
-                ShowSection('members-section');
+            if (res.ok) {
+                alert('Votre message a été transmis avec succès et en toute confidentialité.');
+                document.getElementById('ecoute-message').value = '';
+                showSection('members-section');
             }
         } catch (err) {
-            Alert('Erreur d’envoi.');
+            alert('Erreur d’envoi.');
         }
     });
 
-    Document.getElementById('admin-login-form')?.addEventListener('submit', async (e) => {
-        E.preventDefault();
-        Const password = document.getElementById('admin-password').value;
+    document.getElementById('admin-login-form')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const password = document.getElementById('admin-password').value;
 
-        Try {
-            Const res = await fetch('/api/admin/login', {
-                Method: 'POST',
-                Headers: { 'Content-Type': 'application/json' },
-                Body: JSON.stringify({ password })
+        try {
+            const res = await fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
             });
-            Const data = await res.json();
-            If (res.ok) {
-                Document.getElementById('admin-login-box').style.display = 'none';
-                Document.getElementById('admin-dashboard').style.display = 'block';
-                RenderAdminData(data.users, data.ecoutes);
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById('admin-login-box').style.display = 'none';
+                document.getElementById('admin-dashboard').style.display = 'block';
+                renderAdminData(data.users, data.ecoutes);
             } else {
-                Alert(data.error);
+                alert(data.error);
             }
         } catch (err) {
-            Alert('Erreur lors de la connexion admin.');
+            alert('Erreur lors de la connexion admin.');
         }
     });
 }
 
-Async function loadMembers() {
-    Try {
-        Const userId = currentUser ? (currentUser.id || currentUser._id) : '';
-        Const res = await fetch(`/api/members?userId=${userId}`);
-        AllMembers = await res.json();
-        RenderMembers(allMembers);
+async function loadMembers() {
+    try {
+        const userId = currentUser ? (currentUser.id || currentUser._id) : '';
+        const res = await fetch(`/api/members?userId=${userId}`);
+        allMembers = await res.json();
+        renderMembers(allMembers);
     } catch (err) {
-        Console.error('Erreur membres:', err);
+        console.error('Erreur membres:', err);
     }
 }
 
-Function renderMembers(members) {
-    Const container = document.getElementById('members-container');
-    If (!container) return;
+function renderMembers(members) {
+    const container = document.getElementById('members-container');
+    if (!container) return;
 
-    Const currentId = currentUser ? (currentUser.id || currentUser._id) : null;
+    const currentId = currentUser ? (currentUser.id || currentUser._id) : null;
 
-    Container.innerHTML = members
+    container.innerHTML = members
         .filter(m => m.id !== currentId && m._id !== currentId)
         .map(m => {
-            Const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(m.nom)}&background=e11d48&color=fff&size=200`;
-            Const photoSrc = m.photo ? m.photo : defaultAvatar;
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(m.nom)}&background=e11d48&color=fff&size=200`;
+            const photoSrc = m.photo ? m.photo : defaultAvatar;
 
-            Return `
+            return `
             <div class="member-card">
                 <span class="status-badge ${m.online ? 'online' : ''}">${m.online ? 'En ligne' : 'Hors ligne'}</span>
                 <img src="${photoSrc}" alt="${m.nom}" onerror="this.onerror=null; this.src='${defaultAvatar}';">
@@ -245,191 +245,191 @@ Function renderMembers(members) {
         `}).join('');
 }
 
-Async function sendLike(targetId) {
-    If (!currentUser) return alert('Veuillez vous connecter.');
-    Try {
-        Const res = await fetch('/api/like', {
-            Method: 'POST',
-            Headers: { 'Content-Type': 'application/json' },
-            Body: JSON.stringify({ senderId: currentUser.id || currentUser._id, targetId })
+async function sendLike(targetId) {
+    if (!currentUser) return alert('Veuillez vous connecter.');
+    try {
+        const res = await fetch('/api/like', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: currentUser.id || currentUser._id, targetId })
         });
-        If (res.ok) loadMembers();
+        if (res.ok) loadMembers();
     } catch (err) {
-        Console.error(err);
+        console.error(err);
     }
 }
 
-Async function sendHeartAction(targetId) {
-    If (!currentUser) return alert('Veuillez vous connecter.');
-    Try {
-        Const res = await fetch('/api/heart', {
-            Method: 'POST',
-            Headers: { 'Content-Type': 'application/json' },
-            Body: JSON.stringify({ senderId: currentUser.id || currentUser._id, targetId })
+async function sendHeartAction(targetId) {
+    if (!currentUser) return alert('Veuillez vous connecter.');
+    try {
+        const res = await fetch('/api/heart', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senderId: currentUser.id || currentUser._id, targetId })
         });
-        Const data = await res.json();
-        If (res.ok) {
-            If (data.user) {
-                CurrentUser = data.user;
-                LocalStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
-                RenderNavigation();
-                UpdateCoinsDisplay();
+        const data = await res.json();
+        if (res.ok) {
+            if (data.user) {
+                currentUser = data.user;
+                localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+                renderNavigation();
+                updateCoinsDisplay();
             }
-            If (data.isMatch) alert('🎉 C\'est un MATCH ! Vous vous plaisez mutuellement.');
-            LoadMembers();
+            if (data.isMatch) alert('🎉 C\'est un MATCH ! Vous vous plaisez mutuellement.');
+            loadMembers();
         } else {
-            Alert(data.error);
+            alert(data.error);
         }
     } catch (err) {
-        Console.error(err);
+        console.error(err);
     }
 }
 
-Function sendCoupDeCoeur() {
-    If (!activeChatTargetId) return;
-    SendHeartAction(activeChatTargetId);
+function sendCoupDeCoeur() {
+    if (!activeChatTargetId) return;
+    sendHeartAction(activeChatTargetId);
 }
 
-Async function openPrivateChat(targetId, targetName) {
-    If (!currentUser) return alert('Veuillez vous connecter.');
-    ActiveChatTargetId = targetId;
-    Document.getElementById('chat-target-name').innerHTML = `<i class="fa-solid fa-user-lock"></i> Discussion avec ${targetName}`;
-    ShowSection('private-chat-section');
+async function openPrivateChat(targetId, targetName) {
+    if (!currentUser) return alert('Veuillez vous connecter.');
+    activeChatTargetId = targetId;
+    document.getElementById('chat-target-name').innerHTML = `<i class="fa-solid fa-user-lock"></i> Discussion avec ${targetName}`;
+    showSection('private-chat-section');
 
-    Const viewport = document.getElementById('private-messages-viewport');
-    Viewport.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Chargement de la conversation...</p>';
+    const viewport = document.getElementById('private-messages-viewport');
+    viewport.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Chargement de la conversation...</p>';
 
-    Try {
-        Const userId = currentUser.id || currentUser._id;
-        Const res = await fetch(`/api/messages/${userId}/${targetId}`);
-        Const messages = await res.json();
+    try {
+        const userId = currentUser.id || currentUser._id;
+        const res = await fetch(`/api/messages/${userId}/${targetId}`);
+        const messages = await res.json();
 
-        Viewport.innerHTML = '';
-        Messages.forEach(msg => appendPrivateMessage(msg));
-        Viewport.scrollTop = viewport.scrollHeight;
+        viewport.innerHTML = '';
+        messages.forEach(msg => appendPrivateMessage(msg));
+        viewport.scrollTop = viewport.scrollHeight;
     } catch (err) {
-        Viewport.innerHTML = '<p style="color:red; text-align:center;">Erreur lors du chargement des messages.</p>';
+        viewport.innerHTML = '<p style="color:red; text-align:center;">Erreur lors du chargement des messages.</p>';
     }
 }
 
-Function appendPrivateMessage(msg) {
-    Const viewport = document.getElementById('private-messages-viewport');
-    If (!viewport) return;
+function appendPrivateMessage(msg) {
+    const viewport = document.getElementById('private-messages-viewport');
+    if (!viewport) return;
 
-    Const currentId = currentUser ? (currentUser.id || currentUser._id) : '';
-    Const isOwn = msg.fromUserId === currentId;
+    const currentId = currentUser ? (currentUser.id || currentUser._id) : '';
+    const isOwn = msg.fromUserId === currentId;
 
-    Const div = document.createElement('div');
-    Div.className = `chat-msg ${isOwn ? 'own-msg' : ''}`;
-    Div.innerHTML = `
+    const div = document.createElement('div');
+    div.className = `chat-msg ${isOwn ? 'own-msg' : ''}`;
+    div.innerHTML = `
         <strong>${isOwn ? 'Vous' : (msg.fromUserName || 'Membre')} ${msg.isCoupDeCoeur ? '💖 (Coup de Cœur)' : ''}</strong>
         <div>${msg.text}</div>
     `;
-    Viewport.appendChild(div);
-    Viewport.scrollTop = viewport.scrollHeight;
+    viewport.appendChild(div);
+    viewport.scrollTop = viewport.scrollHeight;
 }
 
-Function setupSocketListeners() {
-    Socket.on('private_message', (data) => {
-        Const currentId = currentUser ? (currentUser.id || currentUser._id) : '';
-        If (
+function setupSocketListeners() {
+    socket.on('private_message', (data) => {
+        const currentId = currentUser ? (currentUser.id || currentUser._id) : '';
+        if (
             (data.fromUserId === activeChatTargetId && data.toUserId === currentId) ||
             (data.fromUserId === currentId && data.toUserId === activeChatTargetId)
         ) {
-            AppendPrivateMessage(data);
+            appendPrivateMessage(data);
         }
     });
 
-    Socket.on('public_message', (data) => {
-        Const viewport = document.getElementById('public-messages-viewport');
-        If (!viewport) return;
+    socket.on('public_message', (data) => {
+        const viewport = document.getElementById('public-messages-viewport');
+        if (!viewport) return;
 
-        Const div = document.createElement('div');
-        Div.className = 'chat-msg';
-        Div.innerHTML = `<strong>${data.fromUserName}</strong><div>${data.text}</div>`;
-        Viewport.appendChild(div);
-        Viewport.scrollTop = viewport.scrollHeight;
+        const div = document.createElement('div');
+        div.className = 'chat-msg';
+        div.innerHTML = `<strong>${data.fromUserName}</strong><div>${data.text}</div>`;
+        viewport.appendChild(div);
+        viewport.scrollTop = viewport.scrollHeight;
     });
 
-    Socket.on('user_typing', (data) => {
-        If (data.fromUserId === activeChatTargetId) {
-            Document.getElementById('typing-indicator').innerText = 'En train d\'écrire...';
+    socket.on('user_typing', (data) => {
+        if (data.fromUserId === activeChatTargetId) {
+            document.getElementById('typing-indicator').innerText = 'En train d\'écrire...';
         }
     });
 
-    Socket.on('stop_typing', (data) => {
-        If (data.fromUserId === activeChatTargetId) {
-            Document.getElementById('typing-indicator').innerText = '';
+    socket.on('stop_typing', (data) => {
+        if (data.fromUserId === activeChatTargetId) {
+            document.getElementById('typing-indicator').innerText = '';
         }
     });
 
-    Socket.on('update_online_status', () => {
-        If (document.getElementById('members-section').style.display !== 'none') {
-            LoadMembers();
+    socket.on('update_online_status', () => {
+        if (document.getElementById('members-section').style.display !== 'none') {
+            loadMembers();
         }
     });
 }
 
-Async function buyVIP() {
-    If (!currentUser) return;
-    Try {
-        Const res = await fetch('/api/buy-vip', {
-            Method: 'POST',
-            Headers: { 'Content-Type': 'application/json' },
-            Body: JSON.stringify({ userId: currentUser.id || currentUser._id })
+async function buyVIP() {
+    if (!currentUser) return;
+    try {
+        const res = await fetch('/api/buy-vip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: currentUser.id || currentUser._id })
         });
-        Const data = await res.json();
-        If (res.ok) {
-            CurrentUser = data.user;
-            LocalStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
-            RenderNavigation();
-            UpdateCoinsDisplay();
-            Alert('👑 Votre statut VIP est maintenant activé !');
+        const data = await res.json();
+        if (res.ok) {
+            currentUser = data.user;
+            localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+            renderNavigation();
+            updateCoinsDisplay();
+            alert('👑 Votre statut VIP est maintenant activé !');
         } else {
-            Alert(data.error);
+            alert(data.error);
         }
     } catch (err) {
-        Alert('Erreur d’activation VIP.');
+        alert('Erreur d’activation VIP.');
     }
 }
 
-Function filterUsers() {
-    Const name = document.getElementById('search-name').value.toLowerCase();
-    Const country = document.getElementById('search-country').value.toLowerCase();
-    Const city = document.getElementById('search-city').value.toLowerCase();
-    Const maxAge = parseInt(document.getElementById('search-age').value) || 100;
-    Const sex = document.getElementById('search-sex').value;
-    Const interest = document.getElementById('search-interest').value.toLowerCase();
+function filterUsers() {
+    const name = document.getElementById('search-name').value.toLowerCase();
+    const country = document.getElementById('search-country').value.toLowerCase();
+    const city = document.getElementById('search-city').value.toLowerCase();
+    const maxAge = parseInt(document.getElementById('search-age').value) || 100;
+    const sex = document.getElementById('search-sex').value;
+    const interest = document.getElementById('search-interest').value.toLowerCase();
 
-    Const filtered = allMembers.filter(m => {
-        Const matchesName = m.nom.toLowerCase().includes(name);
-        Const matchesCountry = m.pays.toLowerCase().includes(country);
-        Const matchesCity = m.ville.toLowerCase().includes(city);
-        Const matchesAge = m.age <= maxAge;
-        Const matchesSex = !sex || m.sexe === sex;
-        Const matchesInterest = !interest || (m.interets && m.interets.toLowerCase().includes(interest));
+    const filtered = allMembers.filter(m => {
+        const matchesName = m.nom.toLowerCase().includes(name);
+        const matchesCountry = m.pays.toLowerCase().includes(country);
+        const matchesCity = m.ville.toLowerCase().includes(city);
+        const matchesAge = m.age <= maxAge;
+        const matchesSex = !sex || m.sexe === sex;
+        const matchesInterest = !interest || (m.interets && m.interets.toLowerCase().includes(interest));
 
-        Return matchesName && matchesCountry && matchesCity && matchesAge && matchesSex && matchesInterest;
+        return matchesName && matchesCountry && matchesCity && matchesAge && matchesSex && matchesInterest;
     });
 
-    RenderMembers(filtered);
+    renderMembers(filtered);
 }
 
-Function resetFilters() {
-    Document.getElementById('search-name').value = '';
-    Document.getElementById('search-country').value = '';
-    Document.getElementById('search-city').value = '';
-    Document.getElementById('search-age').value = '';
-    Document.getElementById('search-sex').value = '';
-    Document.getElementById('search-interest').value = '';
-    RenderMembers(allMembers);
+function resetFilters() {
+    document.getElementById('search-name').value = '';
+    document.getElementById('search-country').value = '';
+    document.getElementById('search-city').value = '';
+    document.getElementById('search-age').value = '';
+    document.getElementById('search-sex').value = '';
+    document.getElementById('search-interest').value = '';
+    renderMembers(allMembers);
 }
 
-Function renderAdminData(users, ecoutes) {
-    Const usersTable = document.getElementById('admin-users-list');
-    Const ecoutesTable = document.getElementById('admin-ecoutes-list');
+function renderAdminData(users, ecoutes) {
+    const usersTable = document.getElementById('admin-users-list');
+    const ecoutesTable = document.getElementById('admin-ecoutes-list');
 
-    UsersTable.innerHTML = users.map(u => `
+    usersTable.innerHTML = users.map(u => `
         <tr>
             <td>${u.nom}</td>
             <td>${u.email}</td>
@@ -440,7 +440,7 @@ Function renderAdminData(users, ecoutes) {
         </tr>
     `).join('');
 
-    EcoutesTable.innerHTML = ecoutes.map(e => `
+    ecoutesTable.innerHTML = ecoutes.map(e => `
         <tr>
             <td><strong>${e.type}</strong></td>
             <td>${e.message}</td>
@@ -449,9 +449,9 @@ Function renderAdminData(users, ecoutes) {
     `).join('');
 }
 
-Function logout() {
-    LocalStorage.removeItem('nonvitcha_user');
-    CurrentUser = null;
-    Socket.disconnect();
-    Location.reload();
+function logout() {
+    localStorage.removeItem('nonvitcha_user');
+    currentUser = null;
+    socket.disconnect();
+    location.reload();
 }

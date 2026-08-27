@@ -32,6 +32,38 @@ function showSection(sectionId) {
 }
 
 function renderNavigation() {
+    const headerEl = document.querySelector('header');
+    if (!headerEl) return;
+
+    const userName = currentUser ? (currentUser.nom || currentUser.username || 'Membre') : '';
+    const userRole = currentUser ? (currentUser.isVip ? '👑 VIP' : 'Membre') : '';
+    
+    // Gestion de la photo de l'utilisateur connecté dans l'angle
+    let userCornerHTML = '';
+    if (currentUser) {
+        const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=e11d48&color=fff&size=150`;
+        const userPhoto = (currentUser.photo && currentUser.photo.trim() !== '') ? currentUser.photo : defaultAvatar;
+        
+        userCornerHTML = `
+            <div class="header-user-corner">
+                <img src="${userPhoto}" alt="${userName}" onerror="this.onerror=null; this.src='${defaultAvatar}';">
+                <div class="header-user-info">
+                    <span class="header-user-name">${userName}</span>
+                    <span class="header-user-role">${userRole}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    // Structure globale de l'en-tête
+    headerEl.innerHTML = `
+        <div class="header-top">
+            <h1><i class="fa-solid fa-heart-pulse"></i> Nonvitcha</h1>
+            ${userCornerHTML}
+        </div>
+        <div id="nav-menu"></div>
+    `;
+
     const nav = document.getElementById('nav-menu');
     if (!nav) return;
 
@@ -42,14 +74,12 @@ function renderNavigation() {
             <button class="nav-btn nav-btn-admin" onclick="showSection('admin-section')"><i class="fa-solid fa-shield-halved"></i> Admin</button>
         `;
     } else {
-        const userName = currentUser.nom || currentUser.username || 'Membre';
         nav.innerHTML = `
             <button class="nav-btn nav-btn-members" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Membres</button>
             <button class="nav-btn nav-btn-public" onclick="showSection('public-chat-section')"><i class="fa-solid fa-comments"></i> Chat Public</button>
-            <button class="nav-btn nav-btn-coins" onclick="showSection('recharge-section')"><i class="fa-solid fa-coins"></i> ${currentUser.coins || 0} Coins ${currentUser.isVip ? '👑 VIP' : ''}</button>
+            <button class="nav-btn nav-btn-coins" onclick="showSection('recharge-section')"><i class="fa-solid fa-coins"></i> ${currentUser.coins || 0} Coins</button>
             <button class="nav-btn nav-btn-ecoute" onclick="showSection('ecoutes-section')"><i class="fa-solid fa-hand-holding-heart"></i> Écoute SOS</button>
             <button class="nav-btn nav-btn-admin" onclick="showSection('admin-section')"><i class="fa-solid fa-shield-halved"></i> Admin</button>
-            <span class="nav-user-name"><i class="fa-solid fa-user-circle"></i> ${userName}</span>
             <button class="nav-btn nav-btn-logout" onclick="logout()"><i class="fa-solid fa-power-off"></i> Déconnexion</button>
         `;
     }

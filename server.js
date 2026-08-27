@@ -16,18 +16,18 @@ const io = new Server(server, {
 const PORT = process.env.PORT || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/nonvitcha';
 
-// --- CONNEXION BASE DE DONNÉES MONGODB ---
+// --- CONNEXION MONGO DB ---
 mongoose.connect(MONGO_URI)
-    .then(() => console.log('✅ Connecté avec succès à MongoDB Atlas !'))
-    .catch(err => console.error('❌ Erreur de connexion MongoDB :', err));
+    .then(() => console.log('✅ Base de données MongoDB connectée.'))
+    .catch(err => console.error('❌ Erreur MongoDB :', err));
 
-// --- MODÈLES MONGODB ---
+// --- SCHÉMAS & MODÈLES MONGODB ---
 const userSchema = new mongoose.Schema({
     nom: { type: String, required: true },
     email: { type: String, required: true, unique: true, lowercase: true, trim: true },
     password: { type: String, required: true },
     age: { type: Number, default: 18 },
-    sexe: { type: String, default: 'M' },
+    sexe: { type: String, default: 'H' },
     pays: { type: String, default: 'Bénin' },
     ville: { type: String, default: 'Cotonou' },
     interets: { type: String, default: '' },
@@ -48,8 +48,8 @@ const messageSchema = new mongoose.Schema({
     fromUserName: { type: String },
     fromUserPhoto: { type: String },
     text: { type: String, required: true },
-    read: { type: Boolean, default: false },
-    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
+    isCoupDeCoeur: { type: Boolean, default: false },
+    read: { type: Boolean, default: false }
 }, { timestamps: true });
 
 const ecouteSchema = new mongoose.Schema({
@@ -63,7 +63,7 @@ const User = mongoose.model('User', userSchema);
 const Message = mongoose.model('Message', messageSchema);
 const Ecoute = mongoose.model('Ecoute', ecouteSchema);
 
-// --- MIDDLEWARES & STATIQUES ---
+// --- MIDDLEWARES & DOSSIER UPLOADS ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -80,20 +80,20 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// --- ROUTES API ---
+// --- API ROUTES ---
 
-// 1. Inscription
+// Inscription
 app.post('/api/register', upload.single('photo'), async (req, res) => {
     try {
         const { nom, email, password, age, sexe, pays, ville, interets } = req.body;
 
         if (!email || !nom || !password) {
-            return res.status(400).json({ error: 'Tous les champs obligatoires doivent être remplis.' });
+            return res.status(400).json({ error: 'Tous les champs requis doivent être renseignés.' });
         }
 
         const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
         if (existingUser) {
-            return res.status(400).json({ error: 'Un compte existe déjà avec cet e-mail.' });
+            return res.status(400).json({ error: 'Un compte associé à cet e-mail existe déjà.' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
@@ -104,7 +104,7 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
             email: email.toLowerCase().trim(),
             password: hashedPassword,
             age: parseInt(age) || 18,
-            sexe: sexe || 'M',
+            sexe: sexe || 'H',
             pays: pays || 'Bénin',
             ville: ville || 'Cotonou',
             interets: interets || '',
@@ -114,47 +114,42 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         });
 
         await newUser.save();
+        const userObj = newUser.toObject();
+        delete userObj.password;
+        userObj.id = userObj._id.toString();
 
-        const userResponse = newUser.toObject();
-        delete userResponse.password;
-        userResponse.id = userResponse._id.toString();
-
-        res.json({ user: userResponse });
+        res.json({ user: userObj });
     } catch (err) {
-        console.error('Erreur Inscription :', err);
-        res.status(500).json({ error: "Erreur lors de la création du compte." });
+        console.error(err);
+        res.status(500).json({ error: 'Erreur lors de l’inscription.' });
     }
 });
 
-// 2. Connexion
+// Connexion
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
         const user = await User.findOne({ email: email.toLowerCase().trim() });
 
-        if (!user) {
-            return res.status(401).json({ error: 'Identifiants incorrects' });
-        }
+        if (!user) return res.status(401).json({ error: 'Identifiants invalides.' });
 
-        const isPasswordValid = await bcrypt.compare(password, user.password);
-        if (!isPasswordValid) {
-            return res.status(401).json({ error: 'Identifiants incorrects' });
-        }
+        const isValid = await bcrypt.compare(password, user.password);
+        if (!isValid) return res.status(401).json({ error: 'Identifiants invalides.' });
 
         user.online = true;
         await user.save();
 
-        const userResponse = user.toObject();
-        delete userResponse.password;
-        userResponse.id = userResponse._id.toString();
+        const userObj = user.toObject();
+        delete userObj.password;
+        userObj.id = userObj._id.toString();
 
-        res.json({ user: userResponse });
+        res.json({ user: userObj });
     } catch (err) {
-        res.status(500).json({ error: 'Erreur lors de la connexion' });
+        res.status(500).json({ error: 'Erreur lors de la connexion.' });
     }
 });
 
-// 3. Liste des membres
+// Récupération des membres
 app.get('/api/members', async (req, res) => {
     try {
         const currentUserId = req.query.userId;
@@ -165,7 +160,7 @@ app.get('/api/members', async (req, res) => {
             currentUser = await User.findById(currentUserId).lean();
         }
 
-        const formattedMembers = members.map(m => {
+        const formatted = members.map(m => {
             const memberId = m._id.toString();
             let isMatch = false;
 
@@ -175,28 +170,19 @@ app.get('/api/members', async (req, res) => {
                 isMatch = iHeart && heHeartsMe;
             }
 
-            return {
-                ...m,
-                id: memberId,
-                isMatch
-            };
+            return { ...m, id: memberId, isMatch };
         });
 
-        res.json(formattedMembers);
+        res.json(formatted);
     } catch (err) {
-        res.status(500).json({ error: 'Erreur lors du chargement des membres' });
+        res.status(500).json({ error: 'Erreur de récupération des membres.' });
     }
 });
 
-// 4. Récupérer l'historique des messages privés entre deux utilisateurs
+// Historique des messages
 app.get('/api/messages/:userId/:targetId', async (req, res) => {
     try {
         const { userId, targetId } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(userId) || !mongoose.Types.ObjectId.isValid(targetId)) {
-            return res.status(400).json({ error: 'IDs invalides' });
-        }
-
         const messages = await Message.find({
             $or: [
                 { fromUserId: userId, toUserId: targetId },
@@ -204,28 +190,20 @@ app.get('/api/messages/:userId/:targetId', async (req, res) => {
             ]
         }).sort({ createdAt: 1 }).lean();
 
-        // Marquer comme lus les messages reçus
-        await Message.updateMany(
-            { fromUserId: targetId, toUserId: userId, read: false },
-            { $set: { read: true } }
-        );
-
         res.json(messages);
     } catch (err) {
-        res.status(500).json({ error: 'Erreur chargement messages' });
+        res.status(500).json({ error: 'Erreur d’historique.' });
     }
 });
 
-// 5. Envoyer un Like
+// Like
 app.post('/api/like', async (req, res) => {
     try {
         const { senderId, targetId } = req.body;
-        if (!senderId || !targetId) return res.status(400).json({ error: 'IDs manquants' });
-
         const sender = await User.findById(senderId);
         const target = await User.findById(targetId);
 
-        if (!sender || !target) return res.status(404).json({ error: 'Utilisateur introuvable' });
+        if (!sender || !target) return res.status(404).json({ error: 'Utilisateur introuvable.' });
 
         const hasLiked = sender.likes.some(id => id.toString() === targetId);
         if (!hasLiked) {
@@ -235,40 +213,70 @@ app.post('/api/like', async (req, res) => {
             await target.save();
         }
 
-        res.json({ success: true, likesCount: target.likesCount });
+        res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: 'Erreur lors de l’envoi du like' });
+        res.status(500).json({ error: 'Erreur lors du like.' });
     }
 });
 
-// 6. Envoyer un Coup de Cœur / Match
+// Coup de Cœur
 app.post('/api/heart', async (req, res) => {
     try {
         const { senderId, targetId } = req.body;
-        if (!senderId || !targetId) return res.status(400).json({ error: 'IDs manquants' });
-
         const sender = await User.findById(senderId);
         const target = await User.findById(targetId);
 
-        if (!sender || !target) return res.status(404).json({ error: 'Utilisateur introuvable' });
+        if (!sender || !target) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+
+        if (!sender.isVip) {
+            if (sender.coins < 10) return res.status(400).json({ error: 'Coins insuffisants (10 Coins requis).' });
+            sender.coins -= 10;
+        }
 
         const hasHearted = sender.hearts.some(id => id.toString() === targetId);
         if (!hasHearted) {
             sender.hearts.push(targetId);
             target.heartsCount = (target.heartsCount || 0) + 1;
-            await sender.save();
-            await target.save();
         }
 
-        const isMatch = target.hearts.some(id => id.toString() === senderId);
+        await sender.save();
+        await target.save();
 
-        res.json({ success: true, isMatch, heartsCount: target.heartsCount });
+        const isMatch = target.hearts.some(id => id.toString() === senderId);
+        const userObj = sender.toObject();
+        delete userObj.password;
+        userObj.id = userObj._id.toString();
+
+        res.json({ success: true, isMatch, user: userObj });
     } catch (err) {
-        res.status(500).json({ error: 'Erreur lors de l’envoi du cœur' });
+        res.status(500).json({ error: 'Erreur lors de l’envoi du Coup de Cœur.' });
     }
 });
 
-// 7. Demande d'Écoute SOS / VBG
+// Achat VIP
+app.post('/api/buy-vip', async (req, res) => {
+    try {
+        const { userId } = req.body;
+        const user = await User.findById(userId);
+
+        if (!user) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+        if (user.coins < 500) return res.status(400).json({ error: 'Coins insuffisants (500 requises).' });
+
+        user.coins -= 500;
+        user.isVip = true;
+        await user.save();
+
+        const userObj = user.toObject();
+        delete userObj.password;
+        userObj.id = userObj._id.toString();
+
+        res.json({ success: true, user: userObj });
+    } catch (err) {
+        res.status(500).json({ error: 'Erreur lors de l’activation VIP.' });
+    }
+});
+
+// Soumission Espace d'Écoute (SSR / VBG)
 app.post('/api/ecoute', async (req, res) => {
     try {
         const { type, message, userId } = req.body;
@@ -281,83 +289,71 @@ app.post('/api/ecoute', async (req, res) => {
         await newEcoute.save();
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: 'Erreur envoi demande d’écoute' });
+        res.status(500).json({ error: 'Erreur d’envoi.' });
     }
 });
 
-// 8. Connexion Administration
+// Admin Login & Dashboard
 app.post('/api/admin/login', async (req, res) => {
     const { password } = req.body;
     const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-    
+
     if (password === ADMIN_PASSWORD) {
         const users = await User.find().select('-password').lean();
         const ecoutes = await Ecoute.find().lean();
         res.json({ users, ecoutes });
     } else {
-        res.status(401).json({ error: 'Mot de passe administrateur incorrect' });
+        res.status(401).json({ error: 'Mot de passe Administrateur incorrect.' });
     }
 });
 
-// --- WEBSOCKETS (SOCKET.IO) ---
-const userSockets = new Map();
-
+// --- WEBSOCKETS ---
 io.on('connection', (socket) => {
-    // 1. Enregistrement de l'utilisateur
     socket.on('user_connected', async (userId) => {
         if (mongoose.Types.ObjectId.isValid(userId)) {
             socket.userId = userId;
-            userSockets.set(userId, socket.id);
             socket.join(userId);
-
             await User.findByIdAndUpdate(userId, { online: true });
             io.emit('update_online_status', { userId, online: true });
         }
     });
 
-    // 2. Chat Public
     socket.on('public_message', (data) => {
         io.emit('public_message', data);
     });
 
-    // 3. Chat Privé (Sauvegarde MongoDB + Temps Réel / Hors-ligne)
     socket.on('private_message', async (data) => {
         try {
-            const { fromUserId, toUserId, text, fromUserName, fromUserPhoto } = data;
-
+            const { fromUserId, toUserId, text, fromUserName, fromUserPhoto, isCoupDeCoeur } = data;
             if (!fromUserId || !toUserId || !text) return;
 
-            // Sauvegarde systématique dans MongoDB
-            const newMessage = new Message({
-                fromUserId,
-                toUserId,
-                fromUserName,
-                fromUserPhoto,
-                text
-            });
-            await newMessage.save();
-
-            // Incrémentation du compteur de messages envoyés
-            await User.findByIdAndUpdate(fromUserId, { $inc: { messageCount: 1 } });
-
-            const payload = {
-                _id: newMessage._id,
+            const msg = new Message({
                 fromUserId,
                 toUserId,
                 fromUserName,
                 fromUserPhoto,
                 text,
-                createdAt: newMessage.createdAt
+                isCoupDeCoeur: !!isCoupDeCoeur
+            });
+            await msg.save();
+
+            const payload = {
+                _id: msg._id,
+                fromUserId,
+                toUserId,
+                fromUserName,
+                fromUserPhoto,
+                text,
+                isCoupDeCoeur: msg.isCoupDeCoeur,
+                createdAt: msg.createdAt
             };
 
-            // Émission immédiate aux rooms (si en ligne, réception directe et ouverture)
             io.to(toUserId).to(fromUserId).emit('private_message', payload);
         } catch (err) {
-            console.error('Erreur sauvegarde message privé :', err);
+            console.error('Erreur Websocket private_message:', err);
         }
     });
 
-    // 4. Indicateur "En train d'écrire..."
     socket.on('typing', (data) => {
         socket.to(data.toUserId).emit('user_typing', { fromUserId: socket.userId });
     });
@@ -366,17 +362,12 @@ io.on('connection', (socket) => {
         socket.to(data.toUserId).emit('user_stop_typing', { fromUserId: socket.userId });
     });
 
-    // 5. Déconnexion
     socket.on('disconnect', async () => {
         if (socket.userId) {
-            userSockets.delete(socket.userId);
             await User.findByIdAndUpdate(socket.userId, { online: false });
             io.emit('update_online_status', { userId: socket.userId, online: false });
         }
     });
 });
 
-// --- DÉMARRAGE DU SERVEUR ---
-server.listen(PORT, () => {
-    console.log(`🚀 Serveur Nonvitcha démarré sur le port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`🚀 Serveur actif sur le port ${PORT}`));

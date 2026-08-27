@@ -22,10 +22,38 @@
         
         .container { max-width: 1200px; margin: 20px auto; padding: 0 15px; }
         
-        /* Navigation & Barre d'outils */
-        .nav-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; background: white; padding: 10px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
-        .nav-btn { background: #f1f3f5; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; color: var(--text); transition: 0.2s; }
-        .nav-btn.active, .nav-btn:hover { background: var(--primary); color: white; }
+        /* Navigation & Barre d'outils colorée */
+        .nav-bar { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 20px; 
+            flex-wrap: wrap; 
+            background: white; 
+            padding: 12px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 6px rgba(0,0,0,0.04); 
+        }
+        .nav-btn { 
+            background: #f8f9fa; 
+            border: 2px solid #e9ecef; 
+            padding: 10px 18px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 600; 
+            color: var(--text); 
+            transition: all 0.2s ease; 
+        }
+        .nav-btn:hover { 
+            background: #ffe3e3; 
+            border-color: var(--primary); 
+            color: var(--primary); 
+        }
+        .nav-btn.active { 
+            background: var(--primary); 
+            border-color: var(--primary); 
+            color: white; 
+            box-shadow: 0 4px 10px rgba(230, 57, 70, 0.3); 
+        }
 
         /* Écrans */
         .screen { display: none; }
@@ -38,7 +66,7 @@
         .member-img-container img { width: 100%; height: 100%; object-fit: cover; }
         .online-badge { position: absolute; top: 10px; right: 10px; background: #2b8a3e; color: white; font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: bold; z-index: 2; }
         
-        .member-info { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+        .member-info { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; background: white; z-index: 3; }
         .member-name { font-size: 16px; font-weight: bold; margin-bottom: 5px; word-break: break-word; line-height: 1.3; }
         .member-details { font-size: 13px; color: var(--gray); margin-bottom: 10px; word-break: break-word; }
         .member-stats { display: flex; justify-content: space-around; font-size: 12px; background: #f8f9fa; padding: 8px; border-radius: 6px; margin-bottom: 12px; color: var(--gray); }
@@ -335,7 +363,17 @@
             
             document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
             
-            if (screenId === 'members-screen') loadMembers();
+            // Activer visuellement le bon bouton de navigation
+            if (screenId === 'members-screen') {
+                document.querySelector('[onclick*="members-screen"]').classList.add('active');
+                loadMembers();
+            } else if (screenId === 'chat-screen') {
+                document.querySelector('[onclick*="chat-screen"]').classList.add('active');
+            } else if (screenId === 'profile-screen') {
+                document.querySelector('[onclick*="profile-screen"]').classList.add('active');
+            } else if (screenId === 'ecoute-screen') {
+                document.querySelector('[onclick*="ecoute-screen"]').classList.add('active');
+            }
         }
 
         async function loadMembers() {
@@ -366,7 +404,7 @@
                                 <span>💌 ${m.messagesCount || 0} msgs</span>
                             </div>
                         </div>
-                        <div class="action-btns">
+                        <div class="action-btns" style="padding: 0 15px 15px 15px;">
                             <button class="btn btn-like" onclick="sendLike('${m.id}')">❤️ Like</button>
                             <button class="btn btn-msg" onclick="openPrivateChat('${m.id}', '${m.nom}')">💬 Message</button>
                         </div>

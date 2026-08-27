@@ -4,11 +4,15 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const path = require('path');
+const cloudinary = require('cloudinary').v2;
+
+// Configuration Cloudinary (utilise la variable d'environnement ou l'URL de secours)
+cloudinary.config(process.env.CLOUDINARY_URL || 'cloudinary://18683127449591:votre_secret_api@scp7oawl');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    maxHttpBufferSize: 1e8 // Autorise les gros paquets via Socket.io (100 Mo)
+    maxHttpBufferSize: 1e8
 });
 
 app.use(express.json({ limit: '50mb' }));
@@ -44,11 +48,30 @@ const Ecoute = mongoose.model('Ecoute', ecouteSchema);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Fonction utilitaire pour envoyer une image Base64 vers Cloudinary
+async function uploadToCloudinary(base64Str) {
+    if (!base64Str || !base64Str.startsWith('data:image')) return base64Str;
+    try {
+        const uploadResponse = await cloudinary.uploader.upload(base64Str, {
+            folder: 'nonvitcha_profiles'
+        });
+        return uploadResponse.secure_url;
+    } catch (error) {
+        console.error("Erreur upload Cloudinary:", error);
+        throw new Error("Erreur lors de l'envoi de l'image sur le cloud");
+    }
+}
+
 app.post('/api/register', async (req, res) => {
     try {
         const { nom, email, password, age, pays, ville, sexe, interets, photoBase64 } = req.body;
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ error: 'Cet email est déjà utilisé.' });
+
+        let photoUrl = '';
+        if (photoBase64) {
+            photoUrl = await uploadToCloudinary(photoBase64);
+        }
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({
@@ -60,7 +83,7 @@ app.post('/api/register', async (req, res) => {
             ville,
             sexe,
             interets,
-            photo: photoBase64 || ''
+            photo: photoUrl
         });
 
         await newUser.save();
@@ -76,7 +99,7 @@ app.post('/api/register', async (req, res) => {
         });
     } catch (err) {
         console.error("Erreur inscription:", err);
-        res.status(500).json({ error: "Erreur lors de l'inscription" });
+        res.status(500).json({ error: err.message || "Erreur lors de l'inscription" });
     }
 });
 
@@ -155,7 +178,6 @@ io.on('connection', (socket) => {
         io.emit('public_message', data);
     });
 
-    // Mise à jour de la photo via WebSocket pour contourner les blocages HTTP
     socket.on('update_photo', async ({ userId, photoBase64 }) => {
         try {
             if (!photoBase64) {
@@ -163,9 +185,12 @@ io.on('connection', (socket) => {
                 return;
             }
 
+            // Envoi vers Cloudinary via le serveur
+            const photoUrl = await uploadToCloudinary(photoBase64);
+
             const updatedUser = await User.findByIdAndUpdate(
                 userId, 
-                { photo: photoBase64 }, 
+                { photo: photoUrl }, 
                 { new: true }
             );
 
@@ -188,7 +213,7 @@ io.on('connection', (socket) => {
             });
         } catch (err) {
             console.error("Erreur mise à jour photo socket:", err);
-            socket.emit('photo_updated', { success: false, error: 'Erreur lors du changement de la photo' });
+            socket.emit('photo_updated', { success: false, error: err.message || 'Erreur lors du changement de la photo' });
         }
     });
 });

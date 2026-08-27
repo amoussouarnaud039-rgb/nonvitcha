@@ -3,8 +3,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const multer = require('multer');
-const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const cloudinary = require('cloudinary').v2;
 const path = require('path');
 
@@ -20,15 +18,6 @@ cloudinary.config({
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
-
-const storage = new CloudinaryStorage({
-    cloudinary: cloudinary,
-    params: {
-        folder: 'nonvitcha_profiles',
-        allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
-    }
-});
-const upload = multer({ storage: storage });
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/nonvitcha';
 mongoose.connect(MONGO_URI)
@@ -69,15 +58,19 @@ const Ecoute = mongoose.model('Ecoute', ecouteSchema);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.post('/api/register', upload.single('photo'), async (req, res) => {
+app.post('/api/register', async (req, res) => {
     try {
-        const { nom, email, password, age, pays, ville, sexe, interets } = req.body;
+        const { nom, email, password, age, pays, ville, sexe, interets, photoBase64 } = req.body;
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ error: 'Cet email est déjà utilisé.' });
 
-        const hashedPassword = await bcrypt.hash(password, 10);
-        const photoUrl = req.file ? req.file.path : '';
+        let photoUrl = '';
+        if (photoBase64) {
+            const uploadResponse = await cloudinary.uploader.upload(photoBase64, { folder: 'nonvitcha_profiles' });
+            photoUrl = uploadResponse.secure_url;
+        }
 
+        const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({
             nom,
             email,
@@ -142,15 +135,17 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// Nouvelle route pour mettre à jour la photo de profil
-app.post('/api/update-photo', upload.single('photo'), async (req, res) => {
+app.post('/api/update-photo', async (req, res) => {
     try {
-        const { userId } = req.body;
-        if (!req.file) return res.status(400).json({ error: 'Aucune photo fournnie.' });
+        const { userId, photoBase64 } = req.body;
+        if (!photoBase64) return res.status(400).json({ error: 'Aucune photo fournnie.' });
+
+        const uploadResponse = await cloudinary.uploader.upload(photoBase64, { folder: 'nonvitcha_profiles' });
+        const photoUrl = uploadResponse.secure_url;
 
         const updatedUser = await User.findByIdAndUpdate(
             userId, 
-            { photo: req.file.path }, 
+            { photo: photoUrl }, 
             { new: true }
         );
 

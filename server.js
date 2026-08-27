@@ -12,18 +12,15 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Augmentation des limites de taille pour les uploads d'images
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Configuration Cloudinary (Vérifie les variables d'environnement)
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-// Stockage direct des images sur Cloudinary via Multer
 const storage = new CloudinaryStorage({
     cloudinary: cloudinary,
     params: {
@@ -33,13 +30,11 @@ const storage = new CloudinaryStorage({
 });
 const upload = multer({ storage: storage });
 
-// Connexion MongoDB corrigée (sans options obsolètes)
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/nonvitcha';
 mongoose.connect(MONGO_URI)
   .then(() => console.log('Connecté à MongoDB avec succès'))
   .catch(err => console.error('Erreur de connexion MongoDB :', err));
 
-// Schémas Mongoose
 const userSchema = new mongoose.Schema({
     nom: { type: String, required: true },
     email: { type: String, required: true, unique: true },
@@ -72,10 +67,8 @@ const ecouteSchema = new mongoose.Schema({
 });
 const Ecoute = mongoose.model('Ecoute', ecouteSchema);
 
-// Middlewares Express
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Routes API Auth & Membres
 app.post('/api/register', upload.single('photo'), async (req, res) => {
     try {
         const { nom, email, password, age, pays, ville, sexe, interets } = req.body;
@@ -98,7 +91,16 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         });
 
         await newUser.save();
-        res.status(201).json({ user: { id: newUser._id, nom: newUser.nom, email: newUser.email, photo: newUser.photo, likesCount: 0, messagesCount: 0 } });
+        res.status(201).json({ 
+            user: { 
+                id: newUser._id, 
+                nom: newUser.nom, 
+                email: newUser.email, 
+                photo: newUser.photo, 
+                likesCount: 0, 
+                messagesCount: 0 
+            } 
+        });
     } catch (err) {
         console.error("Erreur inscription:", err);
         res.status(500).json({ error: "Erreur lors de l'inscription" });
@@ -114,7 +116,16 @@ app.post('/api/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ error: 'Mot de passe incorrect.' });
 
-        res.json({ user: { id: user._id, nom: user.nom, email: user.email, photo: user.photo, likesCount: user.likesCount, messagesCount: user.messagesCount } });
+        res.json({ 
+            user: { 
+                id: user._id, 
+                nom: user.nom, 
+                email: user.email, 
+                photo: user.photo, 
+                likesCount: user.likesCount, 
+                messagesCount: user.messagesCount 
+            } 
+        });
     } catch (err) {
         console.error("Erreur connexion:", err);
         res.status(500).json({ error: 'Erreur lors de la connexion' });
@@ -141,31 +152,6 @@ app.get('/api/members', async (req, res) => {
     }
 });
 
-app.post('/api/like', async (req, res) => {
-    try {
-        const { targetId } = req.body;
-        await User.findByIdAndUpdate(targetId, { $inc: { likesCount: 1 } });
-        res.json({ success: true });
-    } catch (err) {
-        res.status(500).json({ error: 'Erreur lors du like' });
-    }
-});
-
-app.get('/api/messages/:userId/:targetId', async (req, res) => {
-    try {
-        const { userId, targetId } = req.params;
-        const messages = await Message.find({
-            $or: [
-                { fromUserId: userId, toUserId: targetId },
-                { fromUserId: targetId, toUserId: userId }
-            ]
-        }).sort('createdAt');
-        res.json(messages);
-    } catch (err) {
-        res.status(500).json({ error: 'Erreur récupération messages' });
-    }
-});
-
 app.post('/api/ecoute', async (req, res) => {
     try {
         const { userId, type, message } = req.body;
@@ -177,7 +163,6 @@ app.post('/api/ecoute', async (req, res) => {
     }
 });
 
-// Gestion WebSockets (Socket.IO)
 io.on('connection', (socket) => {
     socket.on('user_connected', (userId) => {
         socket.userId = userId;
@@ -185,31 +170,6 @@ io.on('connection', (socket) => {
 
     socket.on('public_message', (data) => {
         io.emit('public_message', data);
-    });
-
-    socket.on('private_message', async (data) => {
-        try {
-            const newMsg = new Message({
-                fromUserId: data.fromUserId,
-                toUserId: data.toUserId,
-                fromUserName: data.fromUserName,
-                text: data.text
-            });
-            await newMsg.save();
-            await User.findByIdAndUpdate(data.fromUserId, { $inc: { messagesCount: 1 } });
-
-            io.emit('private_message', newMsg);
-        } catch (err) {
-            console.error('Erreur envoi message privé', err);
-        }
-    });
-
-    socket.on('typing', (data) => {
-        io.emit('typing', data);
-    });
-
-    socket.on('stop_typing', (data) => {
-        io.emit('stop_typing', data);
     });
 });
 

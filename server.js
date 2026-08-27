@@ -3,7 +3,6 @@ const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const cloudinary = require('cloudinary').v2;
 const path = require('path');
 
 const app = express();
@@ -12,12 +11,6 @@ const io = new Server(server);
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-
-cloudinary.config({
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-});
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/nonvitcha';
 mongoose.connect(MONGO_URI)
@@ -39,15 +32,6 @@ const userSchema = new mongoose.Schema({
 });
 const User = mongoose.model('User', userSchema);
 
-const messageSchema = new mongoose.Schema({
-    fromUserId: String,
-    toUserId: String,
-    fromUserName: String,
-    text: String,
-    createdAt: { type: Date, default: Date.now }
-});
-const Message = mongoose.model('Message', messageSchema);
-
 const ecouteSchema = new mongoose.Schema({
     userId: String,
     type: String,
@@ -64,12 +48,6 @@ app.post('/api/register', async (req, res) => {
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ error: 'Cet email est déjà utilisé.' });
 
-        let photoUrl = '';
-        if (photoBase64) {
-            const uploadResponse = await cloudinary.uploader.upload(photoBase64, { folder: 'nonvitcha_profiles' });
-            photoUrl = uploadResponse.secure_url;
-        }
-
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({
             nom,
@@ -80,7 +58,7 @@ app.post('/api/register', async (req, res) => {
             ville,
             sexe,
             interets,
-            photo: photoUrl
+            photo: photoBase64 || ''
         });
 
         await newUser.save();
@@ -138,14 +116,11 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/update-photo', async (req, res) => {
     try {
         const { userId, photoBase64 } = req.body;
-        if (!photoBase64) return res.status(400).json({ error: 'Aucune photo fournnie.' });
-
-        const uploadResponse = await cloudinary.uploader.upload(photoBase64, { folder: 'nonvitcha_profiles' });
-        const photoUrl = uploadResponse.secure_url;
+        if (!photoBase64) return res.status(400).json({ error: 'Aucune photo fournie.' });
 
         const updatedUser = await User.findByIdAndUpdate(
             userId, 
-            { photo: photoUrl }, 
+            { photo: photoBase64 }, 
             { new: true }
         );
 

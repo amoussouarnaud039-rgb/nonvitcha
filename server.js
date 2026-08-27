@@ -521,8 +521,8 @@ io.on('connection', (socket) => {
   });
 });
 
-// --- DÉMARRAGE DU SERVEUR ---
+// --- DÉMARRAGE DU SERVEUR (Corrigé pour Render) ---
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`🚀 Serveur Nonvitcha démarré sur http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Serveur Nonvitcha démarré sur le port ${PORT}`);
 });

@@ -31,16 +31,16 @@
         .screen { display: none; }
         .screen.active { display: block; }
 
-        /* Grille des membres */
+        /* Grille des membres corrigée */
         .members-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
-        .member-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.04); text-align: center; padding-bottom: 15px; position: relative; }
-        .member-img-container { width: 100%; height: 220px; background: #e9ecef; position: relative; display: flex; align-items: center; justify-content: center; font-size: 40px; color: var(--gray); }
+        .member-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.04); text-align: center; padding-bottom: 15px; position: relative; display: flex; flex-direction: column; }
+        .member-img-container { width: 100%; height: 220px; background: #e9ecef; position: relative; display: flex; align-items: center; justify-content: center; font-size: 40px; color: var(--gray); flex-shrink: 0; }
         .member-img-container img { width: 100%; height: 100%; object-fit: cover; }
-        .online-badge { position: absolute; top: 10px; right: 10px; background: #2b8a3e; color: white; font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: bold; }
+        .online-badge { position: absolute; top: 10px; right: 10px; background: #2b8a3e; color: white; font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: bold; z-index: 2; }
         
-        .member-info { padding: 15px; }
-        .member-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
-        .member-details { font-size: 13px; color: var(--gray); margin-bottom: 10px; }
+        .member-info { padding: 15px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+        .member-name { font-size: 16px; font-weight: bold; margin-bottom: 5px; word-break: break-word; line-height: 1.3; }
+        .member-details { font-size: 13px; color: var(--gray); margin-bottom: 10px; word-break: break-word; }
         .member-stats { display: flex; justify-content: space-around; font-size: 12px; background: #f8f9fa; padding: 8px; border-radius: 6px; margin-bottom: 12px; color: var(--gray); }
         
         .action-btns { display: flex; gap: 8px; padding: 0 15px; }
@@ -316,10 +316,8 @@
             document.getElementById('header-user-name').innerText = currentUser.nom;
             document.getElementById('main-nav').style.display = 'flex';
             
-            // Intégration du comptage des messages mise à jour
             document.getElementById('user-messages').innerText = currentUser.messagesCount || 0;
 
-            // MAJ Données Profil
             document.getElementById('my-profile-name').innerText = currentUser.nom;
             document.getElementById('my-profile-email').innerText = currentUser.email;
             document.getElementById('my-profile-avatar').src = currentUser.photo || '';
@@ -446,7 +444,6 @@
             socket.emit('private_message', msgData);
             input.value = '';
             
-            // Mise à jour locale immédiate des compteurs
             currentUser.messagesCount = (currentUser.messagesCount || 0) + 1;
             document.getElementById('user-messages').innerText = currentUser.messagesCount;
             document.getElementById('my-messages-count').innerText = currentUser.messagesCount;

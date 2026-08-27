@@ -31,17 +31,11 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 const MONGO_URI = process.env.MONGO_URI || '';
-let isMongoConnected = false;
 
 if (MONGO_URI && !MONGO_URI.includes('127.0.0.1')) {
     mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
-        .then(() => {
-            console.log('Connecté avec succès à MongoDB Atlas');
-            isMongoConnected = true;
-        })
-        .catch(err => {
-            console.log('⚠️ Échec connexion MongoDB:', err.message);
-        });
+        .then(() => console.log('Connecté avec succès à MongoDB Atlas'))
+        .catch(err => console.log('⚠️ Échec connexion MongoDB:', err.message));
 }
 
 // Modèles Mongoose
@@ -58,7 +52,8 @@ const userSchema = new mongoose.Schema({
     coins: { type: Number, default: 50 },
     isVip: { type: Boolean, default: false },
     likesCount: { type: Number, default: 0 },
-    heartsCount: { type: Number, default: 0 }
+    heartsCount: { type: Number, default: 0 },
+    messagesCount: { type: Number, default: 0 }
 });
 const User = mongoose.models.User || mongoose.model('User', userSchema);
 
@@ -88,9 +83,7 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         const photoPath = req.file ? `/uploads/${req.file.filename}` : '';
 
         let user = await User.findOne({ email });
-        
         if (user) {
-            // Si l'utilisateur existe déjà, on met à jour ses infos pour éviter le blocage
             user.password = password;
             if (nom) user.nom = nom;
             if (age) user.age = age;
@@ -111,7 +104,6 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         await user.save();
         res.json({ user: formatUser(user) });
     } catch (err) {
-        // En cas de doublon ou d'erreur, on tente une reconnexion ou un upsert de secours
         res.status(500).json({ error: err.message });
     }
 });
@@ -119,14 +111,9 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        let user = await User.findOne({ email, password });
+        const user = await User.findOne({ email, password });
         if (!user) {
-            // Vérifions si l'email existe au moins pour donner un indice
-            const emailExists = await User.findOne({ email });
-            if (!emailExists) {
-                return res.status(400).json({ error: 'Cet email n\'existe pas. Veuillez vous inscrire.' });
-            }
-            return res.status(400).json({ error: 'Mot de passe incorrect.' });
+            return res.status(400).json({ error: 'Email ou mot de passe incorrect.' });
         }
         res.json({ user: formatUser(user) });
     } catch (err) {
@@ -231,15 +218,25 @@ function formatUser(u) {
         coins: u.coins,
         isVip: u.isVip,
         likesCount: u.likesCount || 0,
-        heartsCount: u.heartsCount || 0
+        heartsCount: u.heartsCount || 0,
+        messagesCount: u.messagesCount || 0
     };
 }
 
-// Socket.io
+// Socket.io - Gestion Temps Réel (Messages, Compteurs & Typing)
 io.on('connection', (socket) => {
     socket.on('user_connected', (userId) => {
         socket.userId = userId;
         io.emit('update_online_status');
+    });
+
+    // Événement "En train d'écrire..."
+    socket.on('typing', (data) => {
+        socket.broadcast.emit('typing', data);
+    });
+
+    socket.on('stop_typing', (data) => {
+        socket.broadcast.emit('stop_typing', data);
     });
 
     socket.on('private_message', async (data) => {
@@ -252,6 +249,18 @@ io.on('connection', (socket) => {
             date: new Date()
         });
         await msg.save();
+
+        // Incrémenter le compteur de messages de l'expéditeur
+        try {
+            const sender = await User.findById(data.fromUserId);
+            if (sender) {
+                sender.messagesCount = (sender.messagesCount || 0) + 1;
+                await sender.save();
+            }
+        } catch (e) {
+            console.log("Erreur MAJ compteur:", e.message);
+        }
+
         io.emit('private_message', msg);
     });
 

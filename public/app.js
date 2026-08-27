@@ -46,6 +46,7 @@ function renderNavigation() {
             <button class="nav-btn nav-btn-coins" onclick="showSection('recharge-section')"><i class="fa-solid fa-coins"></i> ${currentUser.coins || 0} Coins ${currentUser.isVip ? '👑 VIP' : ''}</button>
             <button class="nav-btn nav-btn-ecoute" onclick="showSection('ecoutes-section')"><i class="fa-solid fa-hand-holding-heart"></i> Écoute SOS</button>
             <button class="nav-btn nav-btn-admin" onclick="showSection('admin-section')"><i class="fa-solid fa-shield-halved"></i> Admin</button>
+            <span class="nav-user-name" style="color: white; font-weight: bold; align-self: center; margin-left: 10px;"><i class="fa-solid fa-user-circle"></i> ${currentUser.nom || 'Membre'}</span>
             <button class="nav-btn nav-btn-logout" onclick="logout()"><i class="fa-solid fa-power-off"></i> Déconnexion</button>
         `;
     }
@@ -216,8 +217,8 @@ function renderMembers(members) {
     container.innerHTML = members
         .filter(m => m.id !== currentId && m._id !== currentId)
         .map(m => {
-            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(m.nom)}&background=e11d48&color=fff&size=200`;
-            const photoSrc = m.photo ? m.photo : defaultAvatar;
+            const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(m.nom || 'Membre')}&background=e11d48&color=fff&size=200`;
+            const photoSrc = (m.photo && m.photo.trim() !== '') ? m.photo : defaultAvatar;
 
             return `
             <div class="member-card">

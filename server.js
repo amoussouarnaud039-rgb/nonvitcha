@@ -4,16 +4,10 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const path = require('path');
-const cloudinary = require('cloudinary').v2;
-
-// Configuration Cloudinary (utilise la variable d'environnement ou l'URL de secours)
-cloudinary.config(process.env.CLOUDINARY_URL || 'cloudinary://18683127449591:votre_secret_api@scp7oawl');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-    maxHttpBufferSize: 1e8
-});
+const io = new Server(server, { maxHttpBufferSize: 1e8 });
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -48,54 +42,20 @@ const Ecoute = mongoose.model('Ecoute', ecouteSchema);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Fonction utilitaire pour envoyer une image Base64 vers Cloudinary
-async function uploadToCloudinary(base64Str) {
-    if (!base64Str || !base64Str.startsWith('data:image')) return base64Str;
-    try {
-        const uploadResponse = await cloudinary.uploader.upload(base64Str, {
-            folder: 'nonvitcha_profiles'
-        });
-        return uploadResponse.secure_url;
-    } catch (error) {
-        console.error("Erreur upload Cloudinary:", error);
-        throw new Error("Erreur lors de l'envoi de l'image sur le cloud");
-    }
-}
-
 app.post('/api/register', async (req, res) => {
     try {
         const { nom, email, password, age, pays, ville, sexe, interets, photoBase64 } = req.body;
         const existingUser = await User.findOne({ email });
         if (existingUser) return res.status(400).json({ error: 'Cet email est déjà utilisé.' });
 
-        let photoUrl = '';
-        if (photoBase64) {
-            photoUrl = await uploadToCloudinary(photoBase64);
-        }
-
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({
-            nom,
-            email,
-            password: hashedPassword,
-            age,
-            pays,
-            ville,
-            sexe,
-            interets,
-            photo: photoUrl
+            nom, email, password: hashedPassword, age, pays, ville, sexe, interets, photo: photoBase64 || ''
         });
 
         await newUser.save();
         res.status(201).json({ 
-            user: { 
-                id: newUser._id, 
-                nom: newUser.nom, 
-                email: newUser.email, 
-                photo: newUser.photo, 
-                likesCount: 0, 
-                messagesCount: 0 
-            } 
+            user: { id: newUser._id, nom: newUser.nom, email: newUser.email, photo: newUser.photo, likesCount: 0, messagesCount: 0 } 
         });
     } catch (err) {
         console.error("Erreur inscription:", err);
@@ -123,17 +83,9 @@ app.post('/api/login', async (req, res) => {
         if (!isMatch) return res.status(400).json({ error: 'Mot de passe incorrect.' });
 
         res.json({ 
-            user: { 
-                id: user._id, 
-                nom: user.nom, 
-                email: user.email, 
-                photo: user.photo, 
-                likesCount: user.likesCount, 
-                messagesCount: user.messagesCount 
-            } 
+            user: { id: user._id, nom: user.nom, email: user.email, photo: user.photo, likesCount: user.likesCount, messagesCount: user.messagesCount } 
         });
     } catch (err) {
-        console.error("Erreur connexion:", err);
         res.status(500).json({ error: 'Erreur lors de la connexion' });
     }
 });
@@ -142,19 +94,45 @@ app.get('/api/members', async (req, res) => {
     try {
         const members = await User.find({}, '-password');
         res.json(members.map(m => ({
-            id: m._id,
-            nom: m.nom,
-            age: m.age,
-            pays: m.pays,
-            ville: m.ville,
-            sexe: m.sexe,
-            interets: m.interets,
-            photo: m.photo,
-            likesCount: m.likesCount,
-            messagesCount: m.messagesCount
+            id: m._id, nom: m.nom, age: m.age, pays: m.pays, ville: m.ville, sexe: m.sexe, interets: m.interets, photo: m.photo, likesCount: m.likesCount, messagesCount: m.messagesCount
         })));
     } catch (err) {
         res.status(500).json({ error: 'Erreur chargement membres' });
+    }
+});
+
+app.post('/api/update-photo', async (req, res) => {
+    try {
+        const { userId, photoBase64 } = req.body;
+        if (!userId || !photoBase64) {
+            return res.status(400).json({ success: false, error: 'Données manquantes.' });
+        }
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId, 
+            { photo: photoBase64 }, 
+            { new: true }
+        );
+
+        if (!updatedUser) {
+            return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
+        }
+
+        res.json({
+            success: true,
+            photo: updatedUser.photo,
+            user: {
+                id: updatedUser._id,
+                nom: updatedUser.nom,
+                email: updatedUser.email,
+                photo: updatedUser.photo,
+                likesCount: updatedUser.likesCount,
+                messagesCount: updatedUser.messagesCount
+            }
+        });
+    } catch (err) {
+        console.error("Erreur mise à jour photo:", err);
+        res.status(500).json({ success: false, error: err.message || 'Erreur serveur' });
     }
 });
 
@@ -170,55 +148,9 @@ app.post('/api/ecoute', async (req, res) => {
 });
 
 io.on('connection', (socket) => {
-    socket.on('user_connected', (userId) => {
-        socket.userId = userId;
-    });
-
-    socket.on('public_message', (data) => {
-        io.emit('public_message', data);
-    });
-
-    socket.on('update_photo', async ({ userId, photoBase64 }) => {
-        try {
-            if (!photoBase64) {
-                socket.emit('photo_updated', { success: false, error: 'Aucune photo fournie.' });
-                return;
-            }
-
-            // Envoi vers Cloudinary via le serveur
-            const photoUrl = await uploadToCloudinary(photoBase64);
-
-            const updatedUser = await User.findByIdAndUpdate(
-                userId, 
-                { photo: photoUrl }, 
-                { new: true }
-            );
-
-            if (!updatedUser) {
-                socket.emit('photo_updated', { success: false, error: 'Utilisateur introuvable.' });
-                return;
-            }
-
-            socket.emit('photo_updated', {
-                success: true,
-                photo: updatedUser.photo,
-                user: {
-                    id: updatedUser._id,
-                    nom: updatedUser.nom,
-                    email: updatedUser.email,
-                    photo: updatedUser.photo,
-                    likesCount: updatedUser.likesCount,
-                    messagesCount: updatedUser.messagesCount
-                }
-            });
-        } catch (err) {
-            console.error("Erreur mise à jour photo socket:", err);
-            socket.emit('photo_updated', { success: false, error: err.message || 'Erreur lors du changement de la photo' });
-        }
-    });
+    socket.on('user_connected', (userId) => { socket.userId = userId; });
+    socket.on('public_message', (data) => { io.emit('public_message', data); });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Serveur démarré sur le port ${PORT}`);
-});
+server.listen(PORT, () => { console.log(`Serveur démarré sur le port ${PORT}`); });

@@ -91,10 +91,11 @@
             gap: 10px;
             margin-bottom: 20px;
             flex-wrap: wrap;
+            align-items: center;
         }
         .filter-bar input {
             flex: 1;
-            min-width: 150px;
+            min-width: 130px;
         }
         
         .members-grid { 
@@ -285,7 +286,8 @@
                 <input type="text" id="filterInterest" placeholder="Centre d'intérêt..." oninput="loadMembers()">
                 <input type="text" id="filterCity" placeholder="Ville..." oninput="loadMembers()">
                 <input type="text" id="filterCountry" placeholder="Pays..." oninput="loadMembers()">
-                <input type="number" id="filterAge" placeholder="Âge max..." oninput="loadMembers()" style="max-width: 120px;">
+                <input type="number" id="filterAge" placeholder="Âge max..." oninput="loadMembers()" style="max-width: 100px;">
+                <button class="btn" onclick="loadMembers()">🔍 Rechercher</button>
             </div>
             <div id="membersGrid" class="members-grid"></div>
         </div>
@@ -550,7 +552,8 @@
                             </p>
                             <p style="font-size: 0.8rem; margin: 5px 0;"><strong>Intérêts:</strong> ${escapeHtml(m.interets || 'Non renseigné')}</p>
                             <div style="margin-top: 10px; display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
-                                <button class="btn" style="padding: 5px 10px; font-size: 0.8rem;" onclick="sendLike('${m.id}')">❤️ Coup de cœur (${m.likesCount || 0})</button>
+                                <button class="btn" style="padding: 5px 10px; font-size: 0.8rem; background-color: #e74c3c;" onclick="sendLike('${m.id}')">❤️ Like (${m.likesCount || 0})</button>
+                                <button class="btn" style="padding: 5px 10px; font-size: 0.8rem; background-color: #f39c12;" onclick="sendHeart('${m.id}')">💘 Coup de cœur</button>
                                 <button class="btn" style="padding: 5px 10px; font-size: 0.8rem; background: #3498db;" onclick="openChatWith('${m.id}')">💬 Message</button>
                             </div>
                         `;
@@ -578,6 +581,11 @@
             } catch (err) {
                 console.error(err);
             }
+        }
+
+        function sendHeart(targetUserId) {
+            // Vous pouvez lier ici une action spécifique pour le coup de cœur si gérée par le backend
+            alert("Coup de cœur envoyé !");
         }
 
         function openChatWith(userId) {

@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nonvitcha - Communauté et Rencontres</title>
-    <!-- Socket.IO client -->
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
@@ -134,26 +133,11 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             border-left: 4px solid var(--primary-color);
             text-align: center;
-            cursor: pointer;
-            transition: background-color 0.2s, transform 0.1s, box-shadow 0.2s;
-        }
-
-        .member-card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        .member-card:active {
-            background-color: #f9ebea;
-            transform: scale(0.98);
         }
 
         .member-card img {
             width: 80px !important;
             height: 80px !important;
-            min-width: 80px !important;
-            min-height: 80px !important;
-            max-width: 80px !important;
-            max-height: 80px !important;
             object-fit: cover !important;
             border-radius: 50% !important;
             border: 2px solid var(--primary-color);
@@ -198,9 +182,7 @@
             <span style="font-size: 1.5rem;">❤️</span>
             <h1>Nonvitcha</h1>
         </div>
-        <div class="user-info-bar" id="userInfoBar">
-            Non connecté
-        </div>
+        <div class="user-info-bar" id="userInfoBar">Non connecté</div>
     </header>
 
     <nav id="mainNav" style="display:none;">
@@ -225,21 +207,21 @@
 
             <div id="registerFormContainer" style="display: none;">
                 <h2 style="text-align: center; color: var(--primary-color);">Inscription à Nonvitcha</h2>
-                <form id="registerForm" enctype="multipart/form-data">
-                    <input type="text" id="regNom" name="nom" placeholder="Nom complet" required>
-                    <input type="email" id="regEmail" name="email" placeholder="Email" required>
-                    <input type="password" id="regPassword" name="password" placeholder="Mot de passe" required>
-                    <input type="number" id="regAge" name="age" placeholder="Âge">
-                    <input type="text" id="regPays" name="pays" placeholder="Pays de résidence">
-                    <input type="text" id="regVille" name="ville" placeholder="Ville de résidence">
-                    <select id="regSexe" name="sexe">
+                <form id="registerForm">
+                    <input type="text" id="regNom" placeholder="Nom complet" required>
+                    <input type="email" id="regEmail" placeholder="Email" required>
+                    <input type="password" id="regPassword" placeholder="Mot de passe" required>
+                    <input type="number" id="regAge" placeholder="Âge">
+                    <input type="text" id="regPays" placeholder="Pays de résidence">
+                    <input type="text" id="regVille" placeholder="Ville de résidence">
+                    <select id="regSexe">
                         <option value="">Sélectionner le sexe</option>
                         <option value="Homme">Homme</option>
                         <option value="Femme">Femme</option>
                     </select>
-                    <input type="text" id="regInterets" name="interets" placeholder="Centres d'intérêt (ex: musique, voyage)">
+                    <input type="text" id="regInterets" placeholder="Centres d'intérêt (ex: musique, voyage)">
                     <label style="font-size: 0.9rem; color: var(--gray);">Photo de profil :</label>
-                    <input type="file" id="regPhoto" name="photo" accept="image/*" required>
+                    <input type="file" id="regPhoto" accept="image/*" required>
                     <button type="submit">S'inscrire</button>
                 </form>
                 <div class="auth-toggle" onclick="toggleAuthMode()">Déjà un compte ? Se connecter</div>
@@ -331,15 +313,78 @@
             if (sectionId === 'profileSection') loadProfile();
         }
 
+        // Fonction de compression automatique de l'image (redimensionne et réduit le poids)
+        function compressImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const MAX_WIDTH = 600;
+                        const MAX_HEIGHT = 600;
+                        let width = img.width;
+                        let height = img.height;
+
+                        if (width > height) {
+                            if (width > MAX_WIDTH) {
+                                height *= MAX_WIDTH / width;
+                                width = MAX_WIDTH;
+                            }
+                        } else {
+                            if (height > MAX_HEIGHT) {
+                                width *= MAX_HEIGHT / height;
+                                height = MAX_HEIGHT;
+                            }
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+
+                        // Compression JPEG à 70% de qualité (léger et ultra-rapide)
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        resolve(dataUrl);
+                    };
+                    img.onerror = (error) => reject(error);
+                };
+                reader.onerror = (error) => reject(error);
+            });
+        }
+
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
-            submitBtn.innerText = "Inscription en cours...";
+            submitBtn.innerText = "Compression et envoi...";
             submitBtn.disabled = true;
 
             try {
-                const formData = new FormData(e.target);
-                const res = await fetch('/api/register', { method: 'POST', body: formData });
+                const photoFile = document.getElementById('regPhoto').files[0];
+                let photoBase64 = '';
+                if (photoFile) {
+                    photoBase64 = await compressImage(photoFile);
+                }
+
+                const payload = {
+                    nom: document.getElementById('regNom').value,
+                    email: document.getElementById('regEmail').value,
+                    password: document.getElementById('regPassword').value,
+                    age: document.getElementById('regAge').value,
+                    pays: document.getElementById('regPays').value,
+                    ville: document.getElementById('regVille').value,
+                    sexe: document.getElementById('regSexe').value,
+                    interets: document.getElementById('regInterets').value,
+                    photoBase64
+                };
+
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
                 const data = await res.json();
                 if (res.ok) {
                     localStorage.setItem('currentUser', JSON.stringify(data.user));
@@ -352,7 +397,7 @@
                     submitBtn.disabled = false;
                 }
             } catch (err) {
-                alert('Erreur réseau lors de l’inscription');
+                alert('Erreur lors du traitement de l’image');
                 submitBtn.innerText = "S'inscrire";
                 submitBtn.disabled = false;
             }
@@ -395,7 +440,6 @@
                 grid.innerHTML = '';
                 members.forEach(m => {
                     const photoUrl = (m.photo && m.photo.trim() !== '') ? m.photo : defaultAvatar;
-                    
                     grid.innerHTML += `
                         <div class="member-card">
                             <img src="${photoUrl}" alt="${m.nom}" onerror="this.src='${defaultAvatar}'">
@@ -436,17 +480,16 @@
                 if (fileInput.files.length === 0) return;
 
                 const submitBtn = e.target.querySelector('button[type="submit"]');
-                submitBtn.innerText = "Envoi en cours...";
+                submitBtn.innerText = "Compression...";
                 submitBtn.disabled = true;
 
-                const formData = new FormData();
-                formData.append('photo', fileInput.files[0]);
-                formData.append('userId', currentUser.id);
-
                 try {
+                    const photoBase64 = await compressImage(fileInput.files[0]);
+
                     const res = await fetch('/api/update-photo', {
                         method: 'POST',
-                        body: formData
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: currentUser.id, photoBase64 })
                     });
                     const data = await res.json();
                     if (res.ok) {
@@ -460,7 +503,7 @@
                         submitBtn.disabled = false;
                     }
                 } catch (err) {
-                    alert('Erreur réseau : l’image est peut-être trop lourde pour votre connexion actuelle. Essayez avec une image plus légère ou une capture d’écran.');
+                    alert('Erreur lors du traitement de l’image');
                     submitBtn.innerText = "Mettre à jour la photo";
                     submitBtn.disabled = false;
                 }

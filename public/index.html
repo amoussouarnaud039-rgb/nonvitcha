@@ -36,7 +36,9 @@
         }
         .logo-area { display: flex; align-items: center; gap: 10px; }
         .logo-area h1 { color: var(--primary-color); margin: 0; font-size: 1.5rem; }
-        .user-info-bar { font-size: 0.85rem; color: var(--gray); font-weight: bold; }
+        .user-header-info { display: flex; align-items: center; gap: 10px; font-size: 0.85rem; font-weight: bold; color: var(--gray); }
+        .user-header-info img { width: 35px; height: 35px; border-radius: 50%; object-fit: cover; border: 2px solid var(--primary-color); }
+        
         nav { 
             background: var(--white); 
             padding: 10px 20px; 
@@ -58,6 +60,7 @@
         }
         nav button:hover, .btn:hover { background-color: var(--primary-dark); }
         nav button.active-nav { background-color: var(--primary-pressed); }
+        
         .container { 
             max-width: 950px; 
             margin: 20px auto; 
@@ -68,6 +71,7 @@
         }
         .section { display: none; }
         .section.active { display: block; }
+        
         form { 
             display: flex; 
             flex-direction: column; 
@@ -81,6 +85,7 @@
             border-radius: 5px; 
             font-size: 1rem; 
         }
+        
         .filter-bar {
             display: flex;
             gap: 10px;
@@ -89,8 +94,9 @@
         }
         .filter-bar input {
             flex: 1;
-            min-width: 200px;
+            min-width: 150px;
         }
+        
         .members-grid { 
             display: grid; 
             grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
@@ -126,6 +132,16 @@
             top: 10px; 
             right: 10px; 
         }
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 5px;
+        }
+        .status-online { background-color: var(--success); }
+        .status-offline { background-color: var(--gray); }
+
         .auth-toggle { 
             text-align: center; 
             margin-top: 15px; 
@@ -133,6 +149,7 @@
             cursor: pointer; 
             font-weight: bold; 
         }
+        
         .chat-container { 
             display: flex; 
             height: 400px; 
@@ -177,22 +194,26 @@
             word-break: break-word; 
             font-size: 0.9rem; 
         }
-        .msg-sent { 
-            background: #e74c3c; 
-            color: #fff; 
-            align-self: flex-end; 
-        }
-        .msg-received { 
-            background: #ecf0f1; 
-            color: #333; 
-            align-self: flex-start; 
-        }
+        .msg-sent { background: #e74c3c; color: #fff; align-self: flex-end; }
+        .msg-received { background: #ecf0f1; color: #333; align-self: flex-start; }
+        
         .typing-indicator { 
             font-size: 0.8rem; 
             color: var(--gray); 
             font-style: italic; 
             padding: 5px 15px; 
             height: 25px; 
+        }
+
+        .ads-banner {
+            background: #fff9e6;
+            border: 1px dashed #f1c40f;
+            padding: 10px;
+            text-align: center;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            color: #d4ac0d;
         }
     </style>
 </head>
@@ -202,7 +223,9 @@
             <span style="font-size: 1.5rem;">❤️</span>
             <h1>Nonvitcha</h1>
         </div>
-        <div class="user-info-bar" id="userInfoBar">Non connecté</div>
+        <div class="user-header-info" id="userInfoBar">
+            <span>Non connecté</span>
+        </div>
     </header>
 
     <nav id="mainNav" style="display:none;">
@@ -217,6 +240,9 @@
     </nav>
 
     <div class="container">
+        <!-- ESPACE PUBLICITE -->
+        <div class="ads-banner">📢 Espace publicitaire : Boostez vos profils ou découvrez nos offres VIP exclusives !</div>
+
         <!-- AUTH SECTION -->
         <div id="authSection" class="section active">
             <div id="loginFormContainer">
@@ -256,8 +282,10 @@
         <div id="membersSection" class="section">
             <h2>Membres de la communauté</h2>
             <div class="filter-bar">
-                <input type="text" id="filterInterest" placeholder="Filtrer par centre d'intérêt..." oninput="loadMembers()">
-                <input type="text" id="filterCity" placeholder="Filtrer par ville..." oninput="loadMembers()">
+                <input type="text" id="filterInterest" placeholder="Centre d'intérêt..." oninput="loadMembers()">
+                <input type="text" id="filterCity" placeholder="Ville..." oninput="loadMembers()">
+                <input type="text" id="filterCountry" placeholder="Pays..." oninput="loadMembers()">
+                <input type="number" id="filterAge" placeholder="Âge max..." oninput="loadMembers()" style="max-width: 120px;">
             </div>
             <div id="membersGrid" class="members-grid"></div>
         </div>
@@ -372,7 +400,13 @@
                 document.getElementById('authSection').classList.remove('active');
                 switchSection('membersSection');
                 document.getElementById('mainNav').style.display = 'flex';
-                document.getElementById('userInfoBar').innerHTML = `${currentUser.nom} ${currentUser.isVip ? '⭐ VIP' : ''} | J'aime: ${currentUser.likesCount || 0} | Msgs: ${currentUser.messagesCount || 0}`;
+                document.getElementById('userInfoBar').innerHTML = `
+                    <img src="${currentUser.photo || defaultAvatar}" alt="Avatar">
+                    <div>
+                        <div>${escapeHtml(currentUser.nom)} ${currentUser.isVip ? '⭐ VIP' : ''}</div>
+                        <div style="font-size: 0.75rem; color: var(--success);"><span class="status-indicator status-online"></span>En ligne | J'aime: ${currentUser.likesCount || 0}</div>
+                    </div>
+                `;
                 loadProfile();
                 loadVipStatus();
                 loadMonetization();
@@ -422,8 +456,6 @@
                     body: JSON.stringify({ email, password })
                 });
                 const data = await res.json();
-                console.log("Réponse login:", data);
-
                 if (res.ok && data.token) {
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('currentUser', JSON.stringify(data.user));
@@ -432,8 +464,8 @@
                     alert(data.error || 'Erreur de connexion');
                 }
             } catch (err) {
-                console.error("Erreur réseau login:", err);
-                alert('Erreur réseau ou serveur inaccessible');
+                console.error(err);
+                alert('Erreur réseau');
             }
         });
 
@@ -491,11 +523,15 @@
                 if (res.ok) {
                     const interestFilter = document.getElementById('filterInterest').value.toLowerCase();
                     const cityFilter = document.getElementById('filterCity').value.toLowerCase();
+                    const countryFilter = document.getElementById('filterCountry').value.toLowerCase();
+                    const ageFilter = document.getElementById('filterAge').value;
 
                     const filteredMembers = members.filter(m => {
                         const matchesInterest = !interestFilter || (m.interets && m.interets.toLowerCase().includes(interestFilter));
                         const matchesCity = !cityFilter || (m.ville && m.ville.toLowerCase().includes(cityFilter));
-                        return matchesInterest && matchesCity;
+                        const matchesCountry = !countryFilter || (m.pays && m.pays.toLowerCase().includes(countryFilter));
+                        const matchesAge = !ageFilter || (m.age && parseInt(m.age) <= parseInt(ageFilter));
+                        return matchesInterest && matchesCity && matchesCountry && matchesAge;
                     });
 
                     const grid = document.getElementById('membersGrid');
@@ -508,9 +544,12 @@
                             ${m.isVip ? '<span class="badge-vip">⭐ VIP</span>' : ''}
                             <img src="${m.photo || defaultAvatar}" alt="Avatar">
                             <h3 style="margin: 5px 0; font-size: 1.1rem;">${escapeHtml(m.nom)}</h3>
-                            <p style="font-size: 0.85rem; color: var(--gray); margin: 3px 0;">${m.age ? m.age + ' ans' : ''} ${m.ville ? '- ' + escapeHtml(m.ville) : ''}</p>
+                            <p style="font-size: 0.85rem; color: var(--gray); margin: 3px 0;">
+                                <span class="status-indicator ${m.isOnline ? 'status-online' : 'status-offline'}"></span>
+                                ${m.isOnline ? 'En ligne' : 'Hors ligne'} | ${m.age ? m.age + ' ans' : ''} ${m.ville ? '- ' + escapeHtml(m.ville) : ''} ${m.pays ? '(' + escapeHtml(m.pays) + ')' : ''}
+                            </p>
                             <p style="font-size: 0.8rem; margin: 5px 0;"><strong>Intérêts:</strong> ${escapeHtml(m.interets || 'Non renseigné')}</p>
-                            <div style="margin-top: 10px; display: flex; gap: 5px; justify-content: center;">
+                            <div style="margin-top: 10px; display: flex; gap: 5px; justify-content: center; flex-wrap: wrap;">
                                 <button class="btn" style="padding: 5px 10px; font-size: 0.8rem;" onclick="sendLike('${m.id}')">❤️ Coup de cœur (${m.likesCount || 0})</button>
                                 <button class="btn" style="padding: 5px 10px; font-size: 0.8rem; background: #3498db;" onclick="openChatWith('${m.id}')">💬 Message</button>
                             </div>
@@ -602,7 +641,10 @@
                             <img src="${m.photo || defaultAvatar}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;">
                             <div>
                                 <div style="font-weight: bold; font-size: 0.9rem;">${escapeHtml(m.nom)}</div>
-                                <div style="font-size: 0.75rem; color: var(--gray);">${escapeHtml(m.ville || '')}</div>
+                                <div style="font-size: 0.75rem; color: var(--gray);">
+                                    <span class="status-indicator ${m.isOnline ? 'status-online' : 'status-offline'}"></span>
+                                    ${m.isOnline ? 'En ligne' : 'Hors ligne'}
+                                </div>
                             </div>
                         `;
                         item.onclick = () => selectContact(m.id, m.nom);
@@ -677,7 +719,7 @@
 
         socket.on('display_typing_private', (data) => {
             if (activeReceiverId && data.senderId === activeReceiverId) {
-                privateTypingIndicator.innerText = `${data.senderName} écrit...`;
+                privateTypingIndicator.innerText = `${data.senderName} est en train d'écrire...`;
             }
         });
 

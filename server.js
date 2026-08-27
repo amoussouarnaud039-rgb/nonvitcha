@@ -20,11 +20,8 @@ app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static('public'));
 
-// --- CONNEXION MONGODB ---
-mongoose.connect('mongodb://localhost:27017/nonvitcha', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-})
+// --- CONNEXION MONGODB CORRIGÉE ---
+mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/nonvitcha')
 .then(() => console.log('Connecté à MongoDB (nonvitcha)'))
 .catch(err => console.error('Erreur de connexion MongoDB :', err));
 

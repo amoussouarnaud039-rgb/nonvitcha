@@ -3,267 +3,192 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nonvitcha - Rencontres & Communauté</title>
-    <link rel="stylesheet" href="/style.css">
+    <title>Nonvitcha</title>
+    <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
 
-    <!-- Barre de Navigation -->
-    <nav class="navbar" style="background: white; border-bottom: 1px solid #e7e5e4; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 1000;">
-        <div class="logo" style="font-size: 1.5rem; font-weight: bold; color: #e11d48;">
-            <i class="fa-solid fa-heart-pulse"></i> Nonvitcha
-        </div>
-        <div id="nav-menu">
-            <!-- Injecté dynamiquement par app.js -->
-        </div>
-    </nav>
+    <header>
+        <!-- L'en-tête (titre Nonvitcha + photo de profil dans l'angle + menu) est généré dynamiquement par app.js -->
+    </header>
 
     <main>
-        <!-- SECTION 1 : Authentification (Connexion & Inscription) -->
-        <section id="auth-section" class="page-section">
-            <div class="auth-box" style="max-width: 450px; margin: 1rem auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <h3><i class="fa-solid fa-right-to-bracket"></i> Connexion</h3>
-                <form id="login-form">
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="login-email">Email</label>
-                        <input type="email" id="login-email" required placeholder="votre@email.com" style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="login-password">Mot de passe</label>
-                        <input type="password" id="login-password" required placeholder="••••••••" style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.8rem; background: #e11d48; color: white; border: none; border-radius: 6px; font-weight: bold;"><i class="fa-solid fa-sign-in-alt"></i> Se connecter</button>
-                </form>
-            </div>
-
-            <div class="auth-box" style="max-width: 450px; margin: 1rem auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-                <h3><i class="fa-solid fa-user-plus"></i> Créer un compte</h3>
-                <form id="register-form" enctype="multipart/form-data">
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="reg-nom">Nom complet / Pseudo</label>
-                        <input type="text" id="reg-nom" name="nom" required placeholder="Votre nom ou pseudo" style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="reg-email">Email</label>
-                        <input type="email" id="reg-email" name="email" required placeholder="votre@email.com" style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="reg-password">Mot de passe</label>
-                        <input type="password" id="reg-password" name="password" required placeholder="••••••••" style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
-                        <div class="form-group">
-                            <label for="reg-age">Âge</label>
-                            <input type="number" id="reg-age" name="age" required min="18" max="99" placeholder="25" style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
+        <!-- SECTION AUTH (Connexion / Inscription) -->
+        <section id="auth-section" class="page-section" style="display: none;">
+            <div style="display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center;">
+                <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); flex: 1; min-width: 280px; max-width: 400px;">
+                    <h3>Connexion</h3>
+                    <form id="login-form">
+                        <div style="margin-bottom: 1rem;">
+                            <label>Email</label>
+                            <input type="email" id="login-email" required style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;">
                         </div>
-                        <div class="form-group">
-                            <label for="reg-sexe">Sexe</label>
-                            <select id="reg-sexe" name="sexe" required style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                                <option value="F">Femme</option>
-                                <option value="H">Homme</option>
-                                <option value="Autre">Autre</option>
+                        <div style="margin-bottom: 1rem;">
+                            <label>Mot de passe</label>
+                            <input type="password" id="login-password" required style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                        </div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">Se connecter</button>
+                    </form>
+                </div>
+
+                <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); flex: 1; min-width: 280px; max-width: 400px;">
+                    <h3>Inscription</h3>
+                    <form id="register-form" enctype="multipart/form-data">
+                        <div style="margin-bottom: 0.8rem;"><label>Nom</label><input type="text" name="nom" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+                        <div style="margin-bottom: 0.8rem;"><label>Email</label><input type="email" name="email" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+                        <div style="margin-bottom: 0.8rem;"><label>Mot de passe</label><input type="password" name="password" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+                        <div style="margin-bottom: 0.8rem;"><label>Âge</label><input type="number" name="age" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+                        <div style="margin-bottom: 0.8rem;"><label>Pays</label><input type="text" name="pays" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+                        <div style="margin-bottom: 0.8rem;"><label>Ville</label><input type="text" name="ville" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+                        <div style="margin-bottom: 0.8rem;">
+                            <label>Sexe</label>
+                            <select name="sexe" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                                <option value="Homme">Homme</option>
+                                <option value="Femme">Femme</option>
                             </select>
                         </div>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 1rem;">
-                        <div class="form-group">
-                            <label for="reg-pays">Pays</label>
-                            <input type="text" id="reg-pays" name="pays" placeholder="Bénin" value="Bénin" style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                        </div>
-                        <div class="form-group">
-                            <label for="reg-ville">Ville</label>
-                            <input type="text" id="reg-ville" name="ville" placeholder="Cotonou" style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="reg-interets">Centres d'intérêt</label>
-                        <input type="text" id="reg-interets" name="interets" placeholder="Musique, Sport, Lecture..." style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                    </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="reg-photo">Photo de profil</label>
-                        <input type="file" id="reg-photo" name="photo" accept="image/*" style="width: 100%;">
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.8rem; background: #e11d48; color: white; border: none; border-radius: 6px; font-weight: bold;"><i class="fa-solid fa-check-circle"></i> S'inscrire (50 Coins offerts)</button>
-                </form>
+                        <div style="margin-bottom: 0.8rem;"><label>Centres d'intérêt</label><input type="text" name="interets" placeholder="ex: Musique, Sport..." style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+                        <div style="margin-bottom: 1rem;"><label>Photo de profil</label><input type="file" name="photo" accept="image/*" style="width: 100%;"></div>
+                        <button type="submit" class="btn btn-primary" style="width: 100%;">S'inscrire</button>
+                    </form>
+                </div>
             </div>
         </section>
 
-        <!-- SECTION 2 : Liste des Membres & Recherche -->
-        <section id="members-section" class="page-section" style="display: none;">
-            <div class="search-filter-box" style="background: white; padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid #e7e5e4;">
-                <h3 style="margin-bottom: 0.8rem; color: #e11d48;"><i class="fa-solid fa-filter"></i> Recherche & Filtres</h3>
-                <form id="search-form" onsubmit="event.preventDefault(); filterUsers();">
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.5rem; margin-bottom: 1rem;">
-                        <input type="text" id="search-name" placeholder="Nom..." oninput="filterUsers()" style="padding: 0.6rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                        <input type="text" id="search-country" placeholder="Pays..." oninput="filterUsers()" style="padding: 0.6rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                        <input type="text" id="search-city" placeholder="Ville..." oninput="filterUsers()" style="padding: 0.6rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                        <input type="number" id="search-age" placeholder="Âge max" oninput="filterUsers()" style="padding: 0.6rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                        <select id="search-sex" onchange="filterUsers()" style="padding: 0.6rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                            <option value="">Tous les sexes</option>
-                            <option value="F">Femme</option>
-                            <option value="H">Homme</option>
-                            <option value="Autre">Autre</option>
-                        </select>
-                        <input type="text" id="search-interest" placeholder="Intérêt..." oninput="filterUsers()" style="padding: 0.6rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                    </div>
-                    <div style="display: flex; gap: 0.5rem;">
-                        <button type="button" onclick="filterUsers()" class="btn btn-primary btn-sm" style="padding: 0.5rem 1rem; background: #e11d48; color: white; border: none; border-radius: 6px;"><i class="fa-solid fa-magnifying-glass"></i> Rechercher</button>
-                        <button type="button" onclick="resetFilters()" class="btn btn-secondary btn-sm" style="padding: 0.5rem 1rem; background: #3b82f6; color: white; border: none; border-radius: 6px;"><i class="fa-solid fa-rotate-left"></i> Réinitialiser</button>
-                    </div>
-                </form>
+        <!-- SECTION MEMBRES -->
+        <section id="members-section" class="page-section">
+            <div style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 2rem;">
+                <h3 style="margin-top: 0; color: var(--primary-color);"><i class="fa-solid fa-filter"></i> Recherche & Filtres</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+                    <input type="text" id="search-name" placeholder="Nom..." oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                    <input type="text" id="search-country" placeholder="Pays..." oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                    <input type="text" id="search-city" placeholder="Ville..." oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                    <input type="number" id="search-age" placeholder="Âge max" oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                    <select id="search-sex" onchange="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                        <option value="">Tous les sexes</option>
+                        <option value="Homme">Homme</option>
+                        <option value="Femme">Femme</option>
+                    </select>
+                    <input type="text" id="search-interest" placeholder="Intérêt..." oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                </div>
+                <button class="btn btn-secondary" onclick="resetFilters()"><i class="fa-solid fa-rotate-right"></i> Réinitialiser</button>
             </div>
 
-            <div id="members-container" class="members-grid">
-                <!-- Les cartes membres s'affichent ici -->
-            </div>
+            <div id="members-container" class="members-grid"></div>
         </section>
 
-        <!-- SECTION 3 : Chat Privé -->
+        <!-- SECTION CHAT PRIVÉ -->
         <section id="private-chat-section" class="page-section" style="display: none;">
             <div class="chat-container">
-                <div class="chat-header" style="padding: 1rem; border-bottom: 1px solid #e7e5e4; display: flex; justify-content: space-between; align-items: center; background: #fafaf9; border-top-left-radius: 12px; border-top-right-radius: 12px;">
-                    <span id="chat-target-name" style="font-weight: bold;"><i class="fa-solid fa-user-lock"></i> Discussion privée</span>
-                    <button class="btn btn-secondary btn-sm" onclick="showSection('members-section')" style="background: #3b82f6; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px;"><i class="fa-solid fa-xmark"></i></button>
+                <div style="padding: 1rem; background: #fdf2f8; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
+                    <h3 id="chat-target-name" style="margin: 0;">Discussion</h3>
+                    <div>
+                        <button class="btn btn-warning" onclick="sendCoupDeCoeur()"><i class="fa-solid fa-heart"></i> Coup de Cœur (10 Coins)</button>
+                    </div>
                 </div>
-                <div class="chat-viewport" id="private-messages-viewport"></div>
-                <div id="typing-indicator" style="padding: 0 1rem; font-size: 0.8rem; color: #78716c; height: 1.2rem;"></div>
-                
+                <div id="private-messages-viewport" class="chat-viewport"></div>
+                <div id="typing-indicator" style="padding: 0 1rem; font-size: 0.8rem; color: var(--text-muted); height: 1.2rem;"></div>
                 <form id="private-chat-form" class="chat-input-bar">
-                    <input type="text" id="private-message-input" placeholder="Écrivez un message privé..." required autocomplete="off">
-                    <button type="button" id="btn-coup-de-coeur" class="btn btn-warning" title="Envoyer un Coup de Cœur (10 Coins)" onclick="sendCoupDeCoeur()" style="background: #f59e0b; color: white; border: none; padding: 0.7rem 1rem; border-radius: 6px;">
-                        <i class="fa-solid fa-heart"></i>
-                    </button>
-                    <button type="submit" class="btn btn-primary" style="background: #e11d48; color: white; border: none; padding: 0.7rem 1rem; border-radius: 6px;"><i class="fa-solid fa-paper-plane"></i></button>
+                    <input type="text" id="private-message-input" placeholder="Écrivez votre message..." autocomplete="off">
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
                 </form>
             </div>
         </section>
 
-        <!-- SECTION 4 : Chat Public -->
+        <!-- SECTION CHAT PUBLIC -->
         <section id="public-chat-section" class="page-section" style="display: none;">
             <div class="chat-container">
-                <div class="chat-header" style="padding: 1rem; border-bottom: 1px solid #e7e5e4; font-weight: bold; background: #fafaf9; border-top-left-radius: 12px; border-top-right-radius: 12px;"><i class="fa-solid fa-comments"></i> Chat Public Communautaire</div>
-                <div class="chat-viewport" id="public-messages-viewport"></div>
+                <div style="padding: 1rem; background: #f5f3ff; border-bottom: 1px solid var(--border-color);">
+                    <h3 style="margin: 0;"><i class="fa-solid fa-comments"></i> Chat Public Global</h3>
+                </div>
+                <div id="public-messages-viewport" class="chat-viewport"></div>
                 <form id="public-chat-form" class="chat-input-bar">
-                    <input type="text" id="public-message-input" placeholder="Participez à la discussion publique..." required autocomplete="off">
-                    <button type="submit" class="btn btn-primary" style="background: #e11d48; color: white; border: none; padding: 0.7rem 1rem; border-radius: 6px;"><i class="fa-solid fa-paper-plane"></i></button>
+                    <input type="text" id="public-message-input" placeholder="Discutez avec tout le monde..." autocomplete="off">
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
                 </form>
             </div>
         </section>
 
-        <!-- SECTION 5 : Espace Sensibilisation (SSR / VBG / Minorités) -->
+        <!-- SECTION RECHARGE COINS -->
+        <section id="recharge-section" class="page-section" style="display: none;">
+            <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; margin: 0 auto; text-align: center;">
+                <h3><i class="fa-solid fa-coins" style="color: #d97706;"></i> Gestion des Coins & VIP</h3>
+                <p>Vous possédez actuellement <strong id="current-coins-display" style="color: #d97706; font-size: 1.2rem;">0</strong> Coins.</p>
+                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
+                <h4>Passer au statut VIP 👑</h4>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Bénéficiez d'avantages exclusifs sur Nonvitcha.</p>
+                <button class="btn btn-warning" onclick="buyVIP()" style="padding: 0.8rem 1.5rem; font-size: 1rem;"><i class="fa-solid fa-crown"></i> Activer VIP</button>
+            </div>
+        </section>
+
+        <!-- SECTION ECOUTE SOS -->
         <section id="ecoutes-section" class="page-section" style="display: none;">
-            <div class="auth-box" style="max-width: 600px; margin: 1rem auto; background: white; padding: 2rem; border-radius: 12px; border: 1px solid #e7e5e4;">
-                <h3><i class="fa-solid fa-hand-holding-heart"></i> Espace de Sensibilisation & Écoute</h3>
-                <p style="font-size: 0.85rem; color: #78716c; margin-bottom: 1rem;">
-                    Un espace d'écoute confidentiel et sécurisé concernant la Santé Sexuelle et Reproductive (SSR), les Violences Basées sur le Genre (VBG) et le soutien aux minorités.
-                </p>
+            <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 600px; margin: 0 auto;">
+                <h3 style="color: #16a34a;"><i class="fa-solid fa-hand-holding-heart"></i> Écoute SOS / Support Confidentiel</h3>
+                <p style="color: var(--text-muted); font-size: 0.9rem;">Besoin d'une écoute bienveillante ou d'un soutien ? Envoyez votre message en toute discrétion.</p>
                 <form id="ecoute-form">
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="ecoute-type">Thématique</label>
-                        <select id="ecoute-type" required style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                            <option value="Santé Sexuelle et Reproductive (SSR)">Santé Sexuelle et Reproductive (SSR)</option>
-                            <option value="Violences Basées sur le Genre (VBG)">Violences Basées sur le Genre (VBG)</option>
-                            <option value="Soutien aux Minorités / Inclusivité">Soutien aux Minorités / Inclusivité</option>
+                    <div style="margin-bottom: 1rem;">
+                        <label>Type de demande</label>
+                        <select id="ecoute-type" style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                            <option value="SOS Soutien Moral">SOS Soutien Moral</option>
                             <option value="Conseil Relationnel">Conseil Relationnel</option>
+                            <option value="Autre Demande Confidentielle">Autre Demande Confidentielle</option>
                         </select>
                     </div>
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="ecoute-message">Votre message / Demande d'assistance</label>
-                        <textarea id="ecoute-message" rows="4" required placeholder="Exprimez-vous en toute confidentialité..." style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;"></textarea>
+                    <div style="margin-bottom: 1rem;">
+                        <label>Votre message</label>
+                        <textarea id="ecoute-message" rows="5" required placeholder="Exprimez-vous librement..." style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;"></textarea>
                     </div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.8rem; background: #e11d48; color: white; border: none; border-radius: 6px; font-weight: bold;"><i class="fa-solid fa-paper-plane"></i> Envoyer le message d'écoute</button>
+                    <button type="submit" class="btn btn-primary" style="background-color: #16a34a; width: 100%;">Envoyer en toute confidentialité</button>
                 </form>
             </div>
         </section>
 
-        <!-- SECTION 6 : Monétisation & Recharge Nonvicoins -->
-        <section id="recharge-section" class="page-section" style="display: none;">
-            <div class="auth-box" style="max-width: 500px; margin: 1rem auto; background: white; padding: 2rem; border-radius: 12px; border: 1px solid #e7e5e4;">
-                <h3><i class="fa-solid fa-coins" style="color: #d97706;"></i> Recharge de Nonvicoins & Statut VIP</h3>
-                <p style="margin-bottom: 1rem;">Solde actuel : <strong id="current-coins-display">0</strong> Coins</p>
-
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.8rem; margin-bottom: 1.5rem;">
-                    <div style="border: 1px solid #e7e5e4; padding: 1rem; border-radius: 8px; text-align: center;">
-                        <h4 style="margin: 0 0 0.5rem 0;">100 Coins</h4>
-                        <div style="font-weight: bold; color: #d97706; margin-bottom: 0.8rem;">500 FCFA</div>
-                        <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(500)" style="width: 100%; padding: 0.4rem; background: #e11d48; color: white; border: none; border-radius: 4px; font-size: 0.8rem;">Acheter</button>
-                    </div>
-                    <div style="border: 1px solid #e7e5e4; padding: 1rem; border-radius: 8px; text-align: center;">
-                        <h4 style="margin: 0 0 0.5rem 0;">500 Coins</h4>
-                        <div style="font-weight: bold; color: #d97706; margin-bottom: 0.8rem;">2000 FCFA</div>
-                        <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(2000)" style="width: 100%; padding: 0.4rem; background: #e11d48; color: white; border: none; border-radius: 4px; font-size: 0.8rem;">Acheter</button>
-                    </div>
-                    <div style="border: 1px solid #e7e5e4; padding: 1rem; border-radius: 8px; text-align: center;">
-                        <h4 style="margin: 0 0 0.5rem 0;">1500 Coins</h4>
-                        <div style="font-weight: bold; color: #d97706; margin-bottom: 0.8rem;">5000 FCFA</div>
-                        <button class="btn btn-primary btn-sm" onclick="triggerKkiaPay(5000)" style="width: 100%; padding: 0.4rem; background: #e11d48; color: white; border: none; border-radius: 4px; font-size: 0.8rem;">Acheter</button>
-                    </div>
-                </div>
-
-                <div style="border: 1px dashed #e11d48; padding: 1.2rem; border-radius: 8px; background: #fee2e2;">
-                    <h4 style="color: #b91c1c; margin: 0 0 0.5rem 0;"><i class="fa-solid fa-crown"></i> Devenir Membre VIP</h4>
-                    <p style="font-size: 0.85rem; margin: 0 0 1rem 0; color: #7f1d1d;">Bénéficiez des Coups de Cœur illimités, du badge 👑 et d'une visibilité prioritaire.</p>
-                    <button class="btn btn-warning" onclick="buyVIP()" style="width: 100%; padding: 0.7rem; background: #f59e0b; color: white; border: none; border-radius: 6px; font-weight: bold;"><i class="fa-solid fa-crown"></i> Activer VIP (500 Coins)</button>
-                </div>
-            </div>
-        </section>
-
-        <!-- SECTION 7 : Espace Administrateur -->
+        <!-- SECTION ADMIN -->
         <section id="admin-section" class="page-section" style="display: none;">
-            <div id="admin-login-box" class="auth-box" style="max-width: 450px; margin: 2rem auto; background: white; padding: 2rem; border-radius: 12px; border: 1px solid #e7e5e4;">
-                <h3><i class="fa-solid fa-user-shield"></i> Connexion Administration</h3>
-                <form id="admin-login-form">
-                    <div class="form-group" style="margin-bottom: 1rem;">
-                        <label for="admin-password">Mot de passe Administrateur</label>
-                        <input type="password" id="admin-password" placeholder="Mot de passe requis" required style="width: 100%; padding: 0.7rem; border: 1px solid #e7e5e4; border-radius: 6px;">
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.8rem; background: #e11d48; color: white; border: none; border-radius: 6px; font-weight: bold;"><i class="fa-solid fa-key"></i> Accéder au Dashboard</button>
-                </form>
-            </div>
-
-            <div id="admin-dashboard" style="display: none;">
-                <div class="auth-box" style="background: white; padding: 2rem; border-radius: 12px; margin-bottom: 1.5rem; border: 1px solid #e7e5e4;">
-                    <h3><i class="fa-solid fa-users"></i> Gestion des Utilisateurs & Statistiques</h3>
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
-                            <thead>
-                                <tr style="border-bottom: 2px solid #e7e5e4;">
-                                    <th style="padding: 0.5rem;">Nom</th>
-                                    <th style="padding: 0.5rem;">Email</th>
-                                    <th style="padding: 0.5rem;">Coins</th>
-                                    <th style="padding: 0.5rem;">VIP</th>
-                                    <th style="padding: 0.5rem;"><i class="fa-solid fa-thumbs-up"></i> Likes</th>
-                                    <th style="padding: 0.5rem;"><i class="fa-solid fa-heart"></i> Coups de Cœur</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-users-list"></tbody>
-                        </table>
-                    </div>
+            <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 800px; margin: 0 auto;">
+                <h3><i class="fa-solid fa-shield-halved"></i> Espace Administrateur</h3>
+                <div id="admin-login-box" style="margin-top: 1rem;">
+                    <form id="admin-login-form">
+                        <div style="margin-bottom: 1rem;">
+                            <label>Mot de passe administrateur</label>
+                            <input type="password" id="admin-password" required style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Connexion Admin</button>
+                    </form>
                 </div>
+                <div id="admin-dashboard" style="display: none; margin-top: 1.5rem;">
+                    <h4>Utilisateurs inscrits</h4>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 2rem; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: #f3f4f6; text-align: left;">
+                                <th style="padding: 0.5rem;">Nom</th>
+                                <th style="padding: 0.5rem;">Email</th>
+                                <th style="padding: 0.5rem;">Coins</th>
+                                <th style="padding: 0.5rem;">VIP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-users-list"></tbody>
+                    </table>
 
-                <div class="auth-box" style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid #e7e5e4;">
-                    <h3><i class="fa-solid fa-heart-pulse"></i> Demandes & Écoutes (SSR / VBG)</h3>
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.9rem;">
-                            <thead>
-                                <tr style="border-bottom: 2px solid #e7e5e4;">
-                                    <th style="padding: 0.5rem;">Type</th>
-                                    <th style="padding: 0.5rem;">Message</th>
-                                    <th style="padding: 0.5rem;">Date</th>
-                                </tr>
-                            </thead>
-                            <tbody id="admin-ecoutes-list"></tbody>
-                        </table>
-                    </div>
+                    <h4>Messages d'Écoute SOS reçus</h4>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                        <thead>
+                            <tr style="background: #f3f4f6; text-align: left;">
+                                <th style="padding: 0.5rem;">Type</th>
+                                <th style="padding: 0.5rem;">Message</th>
+                                <th style="padding: 0.5rem;">Date</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-ecoutes-list"></tbody>
+                    </table>
                 </div>
             </div>
         </section>
     </main>
 
-    <!-- Scripts CDN & Fichiers applicatifs -->
-    <script src="https://cdn.kkiapay.me/k.js"></script>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>

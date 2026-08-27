@@ -2,168 +2,150 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
 const multer = require('multer');
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
+const cloudinary = require('cloudinary').v2;
 const path = require('path');
-const fs = require('fs');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Configuration Cloudinary
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
-// Configuration de Multer pour les photos
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadDir = path.join(__dirname, 'uploads');
-        if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-        }
-        cb(null, uploadDir);
-    },
-    filename: (req, file, cb) => {
-        cb(null, Date.now() + '-' + file.originalname);
+// Stockage direct des images sur Cloudinary via Multer
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'nonvitcha_profiles',
+        allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
     }
 });
 const upload = multer({ storage: storage });
 
-const MONGO_URI = process.env.MONGO_URI || '';
+// Configuration de la base de données MongoDB
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/nonvitcha';
+mongoose.connect(MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+}).then(() => console.log('Connecté à MongoDB avec succès'))
+  .catch(err => console.error('Erreur de connexion MongoDB :', err));
 
-if (MONGO_URI && !MONGO_URI.includes('127.0.0.1')) {
-    mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
-        .then(() => console.log('Connecté avec succès à MongoDB Atlas'))
-        .catch(err => console.log('⚠️ Échec connexion MongoDB:', err.message));
-}
-
-// Modèles Mongoose
+// Schémas Mongoose
 const userSchema = new mongoose.Schema({
-    nom: String,
-    email: { type: String, unique: true },
-    password: String,
+    nom: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
     age: Number,
     pays: String,
     ville: String,
     sexe: String,
     interets: String,
     photo: String,
-    coins: { type: Number, default: 50 },
-    isVip: { type: Boolean, default: false },
     likesCount: { type: Number, default: 0 },
-    heartsCount: { type: Number, default: 0 },
     messagesCount: { type: Number, default: 0 }
 });
-const User = mongoose.models.User || mongoose.model('User', userSchema);
+const User = mongoose.model('User', userSchema);
 
 const messageSchema = new mongoose.Schema({
     fromUserId: String,
     toUserId: String,
     fromUserName: String,
     text: String,
-    isCoupDeCoeur: { type: Boolean, default: false },
-    date: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now }
 });
-const Message = mongoose.models.Message || mongoose.model('Message', messageSchema);
+const Message = mongoose.model('Message', messageSchema);
 
 const ecouteSchema = new mongoose.Schema({
+    userId: String,
     type: String,
     message: String,
-    userId: String,
-    date: { type: Date, default: Date.now }
+    createdAt: { type: Date, default: Date.now }
 });
-const Ecoute = mongoose.models.Ecoute || mongoose.model('Ecoute', ecouteSchema);
+const Ecoute = mongoose.model('Ecoute', ecouteSchema);
 
-// --- ROUTES API ---
+// Middlewares Express
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
 
+// Routes API Auth & Membres
 app.post('/api/register', upload.single('photo'), async (req, res) => {
     try {
         const { nom, email, password, age, pays, ville, sexe, interets } = req.body;
-        const photoPath = req.file ? `/uploads/${req.file.filename}` : '';
+        const existingUser = await User.findOne({ email });
+        if (existingUser) return res.status(400).json({ error: 'Cet email est déjà utilisé.' });
 
-        let user = await User.findOne({ email });
-        if (user) {
-            user.password = password;
-            if (nom) user.nom = nom;
-            if (age) user.age = age;
-            if (pays) user.pays = pays;
-            if (ville) user.ville = ville;
-            if (sexe) user.sexe = sexe;
-            if (interets) user.interets = interets;
-            if (photoPath) user.photo = photoPath;
-            await user.save();
-            return res.json({ user: formatUser(user) });
-        }
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const photoUrl = req.file ? req.file.path : '';
 
-        user = new User({
-            nom, email, password, age, pays, ville, sexe, interets,
-            photo: photoPath,
-            coins: 50
+        const newUser = new User({
+            nom,
+            email,
+            password: hashedPassword,
+            age,
+            pays,
+            ville,
+            sexe,
+            interets,
+            photo: photoUrl
         });
-        await user.save();
-        res.json({ user: formatUser(user) });
+
+        await newUser.save();
+        res.status(201).json({ user: { id: newUser._id, nom: newUser.nom, email: newUser.email, photo: newUser.photo, likesCount: 0, messagesCount: 0 } });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        console.error("Erreur inscription:", err);
+        res.status(500).json({ error: "Erreur lors de l'inscription" });
     }
 });
 
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        const user = await User.findOne({ email, password });
-        if (!user) {
-            return res.status(400).json({ error: 'Email ou mot de passe incorrect.' });
-        }
-        res.json({ user: formatUser(user) });
+        const user = await User.findOne({ email });
+        if (!user) return res.status(400).json({ error: 'Utilisateur introuvable.' });
+
+        const isMatch = await bcrypt.compare(password, user.password);
+        if (!isMatch) return res.status(400).json({ error: 'Mot de passe incorrect.' });
+
+        res.json({ user: { id: user._id, nom: user.nom, email: user.email, photo: user.photo, likesCount: user.likesCount, messagesCount: user.messagesCount } });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Erreur lors de la connexion' });
     }
 });
 
 app.get('/api/members', async (req, res) => {
     try {
-        const users = await User.find({});
-        res.json(users.map(u => formatUser(u)));
+        const members = await User.find({}, '-password');
+        res.json(members.map(m => ({
+            id: m._id,
+            nom: m.nom,
+            age: m.age,
+            pays: m.pays,
+            ville: m.ville,
+            sexe: m.sexe,
+            interets: m.interets,
+            photo: m.photo,
+            likesCount: m.likesCount,
+            messagesCount: m.messagesCount
+        })));
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Erreur chargement membres' });
     }
 });
 
 app.post('/api/like', async (req, res) => {
     try {
         const { targetId } = req.body;
-        const target = await User.findById(targetId);
-        if (target) {
-            target.likesCount = (target.likesCount || 0) + 1;
-            await target.save();
-        }
+        await User.findByIdAndUpdate(targetId, { $inc: { likesCount: 1 } });
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/heart', async (req, res) => {
-    try {
-        const { senderId, targetId } = req.body;
-        const sender = await User.findById(senderId);
-        const target = await User.findById(targetId);
-
-        if (!sender || sender.coins < 10) {
-            return res.status(400).json({ error: 'Coins insuffisants (10 coins requis).' });
-        }
-
-        sender.coins -= 10;
-        await sender.save();
-
-        if (target) {
-            target.heartsCount = (target.heartsCount || 0) + 1;
-            await target.save();
-        }
-        res.json({ success: true, user: formatUser(sender), isMatch: Math.random() > 0.5 });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Erreur lors du like' });
     }
 });
 
@@ -175,103 +157,61 @@ app.get('/api/messages/:userId/:targetId', async (req, res) => {
                 { fromUserId: userId, toUserId: targetId },
                 { fromUserId: targetId, toUserId: userId }
             ]
-        }).sort({ date: 1 });
+        }).sort('createdAt');
         res.json(messages);
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Erreur récupération messages' });
     }
 });
 
 app.post('/api/ecoute', async (req, res) => {
     try {
-        const { type, message, userId } = req.body;
-        const newEcoute = new Ecoute({ type, message, userId });
+        const { userId, type, message } = req.body;
+        const newEcoute = new Ecoute({ userId, type, message });
         await newEcoute.save();
         res.json({ success: true });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: 'Erreur enregistrement écoute SOS' });
     }
 });
 
-app.post('/api/admin/login', async (req, res) => {
-    const { password } = req.body;
-    if (password === 'admin123' || password === 'admin') {
-        const users = await User.find({});
-        const ecoutes = await Ecoute.find({}).sort({ date: -1 });
-        res.json({ users: users.map(u => formatUser(u)), ecoutes });
-    } else {
-        res.status(401).json({ error: 'Mot de passe administrateur incorrect.' });
-    }
-});
-
-function formatUser(u) {
-    return {
-        id: u._id.toString(),
-        nom: u.nom,
-        email: u.email,
-        age: u.age,
-        pays: u.pays,
-        ville: u.ville,
-        sexe: u.sexe,
-        interets: u.interets,
-        photo: u.photo,
-        coins: u.coins,
-        isVip: u.isVip,
-        likesCount: u.likesCount || 0,
-        heartsCount: u.heartsCount || 0,
-        messagesCount: u.messagesCount || 0
-    };
-}
-
-// Socket.io - Gestion Temps Réel (Messages, Compteurs & Typing)
+// Gestion WebSockets (Socket.IO)
 io.on('connection', (socket) => {
     socket.on('user_connected', (userId) => {
         socket.userId = userId;
-        io.emit('update_online_status');
-    });
-
-    // Événement "En train d'écrire..."
-    socket.on('typing', (data) => {
-        socket.broadcast.emit('typing', data);
-    });
-
-    socket.on('stop_typing', (data) => {
-        socket.broadcast.emit('stop_typing', data);
-    });
-
-    socket.on('private_message', async (data) => {
-        const msg = new Message({
-            fromUserId: data.fromUserId,
-            toUserId: data.toUserId,
-            fromUserName: data.fromUserName,
-            text: data.text,
-            isCoupDeCoeur: data.isCoupDeCoeur,
-            date: new Date()
-        });
-        await msg.save();
-
-        // Incrémenter le compteur de messages de l'expéditeur
-        try {
-            const sender = await User.findById(data.fromUserId);
-            if (sender) {
-                sender.messagesCount = (sender.messagesCount || 0) + 1;
-                await sender.save();
-            }
-        } catch (e) {
-            console.log("Erreur MAJ compteur:", e.message);
-        }
-
-        io.emit('private_message', msg);
     });
 
     socket.on('public_message', (data) => {
         io.emit('public_message', data);
     });
 
-    socket.on('disconnect', () => {
-        io.emit('update_online_status');
+    socket.on('private_message', async (data) => {
+        try {
+            const newMsg = new Message({
+                fromUserId: data.fromUserId,
+                toUserId: data.toUserId,
+                fromUserName: data.fromUserName,
+                text: data.text
+            });
+            await newMsg.save();
+            await User.findByIdAndUpdate(data.fromUserId, { $inc: { messagesCount: 1 } });
+
+            io.emit('private_message', newMsg);
+        } catch (err) {
+            console.error('Erreur envoi message privé', err);
+        }
+    });
+
+    socket.on('typing', (data) => {
+        io.emit('typing', data);
+    });
+
+    socket.on('stop_typing', (data) => {
+        io.emit('stop_typing', data);
     });
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Serveur démarré sur le port ${PORT}`));
+server.listen(PORT, () => {
+    console.log(`Serveur démarré sur le port ${PORT}`);
+});

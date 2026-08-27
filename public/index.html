@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nonvitcha - Communauté et Rencontres</title>
+    <title>Nonvitcha - Communauté, Rencontres & VIP</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
@@ -15,26 +15,37 @@
             --white: #ffffff;
             --gray: #7f8c8d;
             --success: #2ecc71;
+            --vip-gold: #f1c40f;
         }
         body { background-color: var(--bg-color); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: var(--text-color); margin: 0; padding: 0; }
         header { background-color: var(--white); border-bottom: 3px solid var(--primary-color); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .logo-area { display: flex; align-items: center; gap: 10px; }
         .logo-area h1 { color: var(--primary-color); margin: 0; font-size: 1.5rem; }
-        .user-info-bar { font-size: 0.9rem; color: var(--gray); font-weight: bold; }
-        nav { background: var(--white); padding: 10px 20px; display: flex; gap: 15px; border-bottom: 1px solid #ddd; }
-        nav button, .btn { background-color: var(--primary-color); color: var(--white); border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .user-info-bar { font-size: 0.85rem; color: var(--gray); font-weight: bold; }
+        nav { background: var(--white); padding: 10px 20px; display: flex; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid #ddd; }
+        nav button, .btn { background-color: var(--primary-color); color: var(--white); border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
         nav button:hover, .btn:hover { background-color: var(--primary-dark); }
         nav button.active-nav { background-color: var(--primary-pressed); }
-        .container { max-width: 900px; margin: 20px auto; padding: 20px; background: var(--white); border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .container { max-width: 950px; margin: 20px auto; padding: 20px; background: var(--white); border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .section { display: none; }
         .section.active { display: block; }
         form { display: flex; flex-direction: column; gap: 12px; max-width: 400px; margin: 0 auto; }
         input, select, textarea { padding: 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 1rem; }
-        .members-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; margin-top: 20px; }
-        .member-card { background: var(--white); border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); border-left: 4px solid var(--primary-color); text-align: center; }
+        .members-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; margin-top: 20px; }
+        .member-card { background: var(--white); border: 1px solid #eee; border-radius: 8px; padding: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); text-align: center; position: relative; }
         .member-card img { width: 80px !important; height: 80px !important; object-fit: cover !important; border-radius: 50% !important; border: 2px solid var(--primary-color); margin: 0 auto 10px auto; display: block; }
-        .badge-online { background-color: var(--success); color: var(--white); padding: 2px 8px; border-radius: 10px; font-size: 0.75rem; display: inline-block; margin-top: 5px; }
+        .badge-vip { background-color: var(--vip-gold); color: #000; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold; position: absolute; top: 10px; right: 10px; }
         .auth-toggle { text-align: center; margin-top: 15px; color: var(--primary-color); cursor: pointer; font-weight: bold; }
+        .chat-container { display: flex; height: 400px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; background: #fff; }
+        .chat-sidebar { width: 30%; border-right: 1px solid #ddd; overflow-y: auto; background: #fafafa; }
+        .chat-main { width: 70%; display: flex; flex-direction: column; }
+        .chat-messages { flex: 1; padding: 15px; overflow-y: auto; background: #fdfdfd; display: flex; flex-direction: column; gap: 8px; }
+        .contact-item { padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        .contact-item:hover { background: #f0f0f0; }
+        .msg-bubble { padding: 8px 12px; border-radius: 8px; max-width: 70%; word-break: break-word; font-size: 0.9rem; }
+        .msg-sent { background: #e74c3c; color: #fff; align-self: flex-end; }
+        .msg-received { background: #ecf0f1; color: #333; align-self: flex-start; }
+        .typing-indicator { font-size: 0.8rem; color: var(--gray); font-style: italic; padding: 5px 15px; height: 15px; }
     </style>
 </head>
 <body>
@@ -49,12 +60,16 @@
     <nav id="mainNav" style="display:none;">
         <button id="btn-membersSection" onclick="switchSection('membersSection')">Membres</button>
         <button id="btn-chatSection" onclick="switchSection('chatSection')">Chat Public</button>
+        <button id="btn-privateChatSection" onclick="switchSection('privateChatSection')">Messages Privés</button>
+        <button id="btn-vipSection" onclick="switchSection('vipSection')">Espace VIP</button>
+        <button id="btn-monetizationSection" onclick="switchSection('monetizationSection')">Monétisation</button>
         <button id="btn-profileSection" onclick="switchSection('profileSection')">Mon Profil</button>
         <button id="btn-sosSection" onclick="switchSection('sosSection')">Écoute SOS</button>
         <button onclick="logout()" style="background-color: #7f8c8d;">Déconnexion</button>
     </nav>
 
     <div class="container">
+        <!-- AUTH SECTION -->
         <div id="authSection" class="section active">
             <div id="loginFormContainer">
                 <h2 style="text-align: center; color: var(--primary-color);">Connexion à Nonvitcha</h2>
@@ -81,7 +96,7 @@
                         <option value="Femme">Femme</option>
                     </select>
                     <input type="text" id="regInterets" placeholder="Centres d'intérêt">
-                    <label style="font-size: 0.9rem; color: var(--gray);">Photo de profil :</label>
+                    <label style="font-size: 0.85rem; color: var(--gray);">Photo de profil :</label>
                     <input type="file" id="regPhoto" accept="image/*" required>
                     <button type="submit">S'inscrire</button>
                 </form>
@@ -89,25 +104,67 @@
             </div>
         </div>
 
+        <!-- MEMBERS SECTION -->
         <div id="membersSection" class="section">
             <h2>Membres de la communauté</h2>
             <div id="membersGrid" class="members-grid"></div>
         </div>
 
+        <!-- PUBLIC CHAT -->
         <div id="chatSection" class="section">
-            <h2>Chat Public</h2>
-            <div id="chatBox" style="height: 300px; border: 1px solid #ddd; border-radius: 5px; padding: 10px; overflow-y: scroll; margin-bottom: 10px; background: #fafafa;"></div>
-            <form id="chatForm" style="display: flex; flex-direction: row; max-width: 100%;">
-                <input type="text" id="chatInput" placeholder="Écrivez votre message..." style="flex: 1;" required>
+            <h2>Chat Public Communautaire</h2>
+            <div id="publicChatBox" style="height: 290px; border: 1px solid #ddd; border-radius: 5px; padding: 10px; overflow-y: scroll; margin-bottom: 5px; background: #fafafa;"></div>
+            <div class="typing-indicator" id="publicTypingIndicator"></div>
+            <form id="publicChatForm" style="display: flex; flex-direction: row; max-width: 100%;">
+                <input type="text" id="publicChatInput" placeholder="Écrivez votre message..." style="flex: 1;" required>
                 <button type="submit" style="width: 100px;">Envoyer</button>
             </form>
         </div>
 
+        <!-- PRIVATE CHAT -->
+        <div id="privateChatSection" class="section">
+            <h2>Messagerie Privée</h2>
+            <div class="chat-container">
+                <div class="chat-sidebar" id="privateContactsList"></div>
+                <div class="chat-main">
+                    <div id="currentChatHeader" style="padding: 10px; background: #f0f0f0; font-weight: bold; border-bottom: 1px solid #ddd;">Sélectionnez un membre</div>
+                    <div class="chat-messages" id="privateMessagesBox"></div>
+                    <div class="typing-indicator" id="privateTypingIndicator"></div>
+                    <form id="privateChatForm" style="display: none; flex-direction: row; padding: 10px; background: #f9f9f9; border-top: 1px solid #ddd; max-width: 100%; gap: 10px;">
+                        <input type="text" id="privateChatInput" placeholder="Votre message privé..." style="flex: 1;" required>
+                        <button type="submit" style="width: 90px;">Envoyer</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIP SECTION -->
+        <div id="vipSection" class="section" style="text-align: center;">
+            <h2>✨ Espace VIP Exclusif</h2>
+            <p>Accédez à des profils illimités, mise en avant prioritaire et badge VIP or.</p>
+            <div id="vipStatusContainer" style="margin: 20px 0; font-weight: bold; font-size: 1.1rem;"></div>
+            <button class="btn" id="btnUpgradeVip" onclick="upgradeVip()" style="background: var(--vip-gold); color: #000; font-size: 1.1rem; padding: 12px 24px;">Devenir VIP (5000 FCFA)</button>
+        </div>
+
+        <!-- MONETIZATION SECTION -->
+        <div id="monetizationSection" class="section" style="text-align: center;">
+            <h2>💰 Monétisation & Solde</h2>
+            <p>Rechargez votre compte pour soutenir les créateurs ou booster vos interactions.</p>
+            <h3 style="color: var(--primary-color);">Solde actuel : <span id="userSoldeDisplay">0</span> FCFA</h3>
+            <div style="display: flex; justify-content: center; gap: 10px; margin-top: 20px;">
+                <button class="btn" onclick="rechargerSolde(1000)">+ 1 000 FCFA</button>
+                <button class="btn" onclick="rechargerSolde(5000)">+ 5 000 FCFA</button>
+                <button class="btn" onclick="rechargerSolde(10000)">+ 10 000 FCFA</button>
+            </div>
+        </div>
+
+        <!-- PROFILE SECTION -->
         <div id="profileSection" class="section">
             <h2>Mon Profil</h2>
             <div id="profileDetails" style="text-align: center;"></div>
         </div>
 
+        <!-- SOS SECTION -->
         <div id="sosSection" class="section">
             <h2>Espace Écoute SOS</h2>
             <form id="sosForm">
@@ -125,13 +182,17 @@
     <script>
         const socket = io();
         let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+        let activeReceiverId = null;
+        let typingTimeout = null;
         const defaultAvatar = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="%237f8c8d"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>';
 
         document.addEventListener('DOMContentLoaded', () => {
             checkAuth();
             if (currentUser) {
                 socket.emit('user_connected', currentUser.id);
+                socket.emit('join_room', currentUser.id);
                 loadMembers();
+                loadPrivateContacts();
             }
         });
 
@@ -140,8 +201,10 @@
                 document.getElementById('authSection').classList.remove('active');
                 switchSection('membersSection');
                 document.getElementById('mainNav').style.display = 'flex';
-                document.getElementById('userInfoBar').innerText = `${currentUser.nom} | Messages: ${currentUser.messagesCount || 0}`;
+                document.getElementById('userInfoBar').innerHTML = `${currentUser.nom} ${currentUser.isVip ? '⭐ VIP' : ''} | J'aime: ${currentUser.likesCount || 0} | Msgs: ${currentUser.messagesCount || 0}`;
                 loadProfile();
+                loadVipStatus();
+                loadMonetization();
             } else {
                 document.getElementById('authSection').classList.add('active');
                 document.getElementById('mainNav').style.display = 'none';
@@ -150,15 +213,10 @@
         }
 
         function toggleAuthMode() {
-            const loginContainer = document.getElementById('loginFormContainer');
-            const regContainer = document.getElementById('registerFormContainer');
-            if (loginContainer.style.display === 'none') {
-                loginContainer.style.display = 'block';
-                regContainer.style.display = 'none';
-            } else {
-                loginContainer.style.display = 'none';
-                regContainer.style.display = 'block';
-            }
+            const l = document.getElementById('loginFormContainer');
+            const r = document.getElementById('registerFormContainer');
+            l.style.display = l.style.display === 'none' ? 'block' : 'none';
+            r.style.display = r.style.display === 'none' ? 'block' : 'none';
         }
 
         function switchSection(sectionId) {
@@ -169,7 +227,7 @@
             if (activeBtn) activeBtn.classList.add('active-nav');
 
             if (sectionId === 'membersSection') loadMembers();
-            if (sectionId === 'profileSection') loadProfile();
+            if (sectionId === 'privateChatSection') loadPrivateContacts();
         }
 
         function compressImage(file) {
@@ -181,16 +239,14 @@
                     img.src = event.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const MAX_SIZE = 250; // Format ultra-léger et rapide
+                        const MAX_SIZE = 250;
                         let width = img.width;
                         let height = img.height;
-
                         if (width > height) {
                             if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
                         } else {
                             if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
                         }
-
                         canvas.width = width;
                         canvas.height = height;
                         const ctx = canvas.getContext('2d');
@@ -284,14 +340,19 @@
                 const grid = document.getElementById('membersGrid');
                 grid.innerHTML = '';
                 members.forEach(m => {
+                    if (m.id === currentUser.id) return;
                     const photoUrl = (m.photo && m.photo.trim() !== '') ? m.photo : defaultAvatar;
                     grid.innerHTML += `
                         <div class="member-card">
+                            ${m.isVip ? '<span class="badge-vip">⭐ VIP</span>' : ''}
                             <img src="${photoUrl}" alt="${m.nom}" onerror="this.src='${defaultAvatar}'">
                             <h3>${m.nom}</h3>
-                            <p style="color: var(--gray); font-size: 0.9rem;">${m.ville || ''}, ${m.pays || ''}</p>
-                            <p style="font-size: 0.85rem;">Intérêts : ${m.interets || 'Non renseigné'}</p>
-                            <span class="badge-online">En ligne</span>
+                            <p style="color: var(--gray); font-size: 0.85rem;">${m.ville || ''}, ${m.pays || ''}</p>
+                            <p style="font-size: 0.8rem;">Intérêts : ${m.interets || 'Non renseigné'}</p>
+                            <div style="margin-top: 10px; display: flex; justify-content: center; gap: 5px;">
+                                <button class="btn" style="padding: 5px 10px; font-size: 0.8rem;" onclick="sendLike('${m.id}')">❤️ Coup de cœur (<span id="like-count-${m.id}">${m.likesCount}</span>)</button>
+                                <button class="btn" style="padding: 5px 10px; font-size: 0.8rem; background: #3498db;" onclick="openPrivateChatWith('${m.id}', '${m.nom}')">💬 Message</button>
+                            </div>
                         </div>
                     `;
                 });
@@ -300,15 +361,217 @@
             }
         }
 
+        async function sendLike(targetId) {
+            try {
+                const res = await fetch('/api/like', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ targetUserId: targetId })
+                });
+                const data = await res.json();
+                if(data.success) {
+                    document.getElementById(`like-count-${targetId}`).innerText = data.likesCount;
+                    alert('Coup de cœur envoyé avec succès ! ❤️');
+                }
+            } catch (err) {
+                alert('Erreur lors du like');
+            }
+        }
+
+        // PUBLIC CHAT & TYPING
+        const publicInput = document.getElementById('publicChatInput');
+        publicInput.addEventListener('input', () => {
+            socket.emit('typing_public', { userName: currentUser.nom });
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('stop_typing_public');
+            }, 1500);
+        });
+
+        document.getElementById('publicChatForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if(publicInput.value.trim() !== '') {
+                socket.emit('public_message', { userId: currentUser.id, userName: currentUser.nom, text: publicInput.value });
+                socket.emit('stop_typing_public');
+                publicInput.value = '';
+                currentUser.messagesCount = (currentUser.messagesCount || 0) + 1;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                checkAuth();
+            }
+        });
+
+        socket.on('public_message', (data) => {
+            const box = document.getElementById('publicChatBox');
+            box.innerHTML += `<div><strong>${data.userName} :</strong> ${data.text}</div>`;
+            box.scrollTop = box.scrollHeight;
+        });
+
+        socket.on('display_typing_public', (data) => {
+            document.getElementById('publicTypingIndicator').innerText = `${data.userName} est en train d'écrire...`;
+        });
+
+        socket.on('hide_typing_public', () => {
+            document.getElementById('publicTypingIndicator').innerText = '';
+        });
+
+        // PRIVATE CHAT & TYPING
+        async function loadPrivateContacts() {
+            try {
+                const res = await fetch('/api/members');
+                const members = await res.json();
+                const list = document.getElementById('privateContactsList');
+                list.innerHTML = '';
+                members.forEach(m => {
+                    if (m.id === currentUser.id) return;
+                    const photoUrl = (m.photo && m.photo.trim() !== '') ? m.photo : defaultAvatar;
+                    list.innerHTML += `
+                        <div class="contact-item" onclick="openPrivateChatWith('${m.id}', '${m.nom}')">
+                            <img src="${photoUrl}" style="width: 35px; height: 35px; border-radius: 50%; object-fit: cover;" onerror="this.src='${defaultAvatar}'">
+                            <span style="font-size: 0.9rem; font-weight: bold;">${m.nom}</span>
+                        </div>
+                    `;
+                });
+            } catch (err) {
+                console.error("Erreur contacts privés");
+            }
+        }
+
+        async function openPrivateChatWith(userId, userName) {
+            activeReceiverId = userId;
+            document.getElementById('currentChatHeader').innerText = `Discussion avec ${userName}`;
+            document.getElementById('privateChatForm').style.display = 'flex';
+            document.getElementById('privateTypingIndicator').innerText = '';
+            switchSection('privateChatSection');
+
+            try {
+                const res = await fetch(`/api/messages/${currentUser.id}/${userId}`);
+                const messages = await res.json();
+                const box = document.getElementById('privateMessagesBox');
+                box.innerHTML = '';
+                messages.forEach(msg => {
+                    const isSender = msg.senderId === currentUser.id;
+                    box.innerHTML += `<div class="msg-bubble ${isSender ? 'msg-sent' : 'msg-received'}">${msg.text}</div>`;
+                });
+                box.scrollTop = box.scrollHeight;
+            } catch (err) {
+                console.error("Erreur chargement historique messages");
+            }
+        }
+
+        const privateInput = document.getElementById('privateChatInput');
+        privateInput.addEventListener('input', () => {
+            if (activeReceiverId) {
+                socket.emit('typing_private', { receiverId: activeReceiverId, senderName: currentUser.nom });
+                clearTimeout(typingTimeout);
+                typingTimeout = setTimeout(() => {
+                    socket.emit('stop_typing_private', { receiverId: activeReceiverId });
+                }, 1500);
+            }
+        });
+
+        document.getElementById('privateChatForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (privateInput.value.trim() !== '' && activeReceiverId) {
+                socket.emit('private_message', {
+                    senderId: currentUser.id,
+                    receiverId: activeReceiverId,
+                    text: privateInput.value
+                });
+                socket.emit('stop_typing_private', { receiverId: activeReceiverId });
+                privateInput.value = '';
+                currentUser.messagesCount = (currentUser.messagesCount || 0) + 1;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                checkAuth();
+            }
+        });
+
+        socket.on('private_message', (msg) => {
+            if (activeReceiverId && (msg.senderId === activeReceiverId || msg.receiverId === activeReceiverId)) {
+                const box = document.getElementById('privateMessagesBox');
+                const isSender = msg.senderId === currentUser.id;
+                box.innerHTML += `<div class="msg-bubble ${isSender ? 'msg-sent' : 'msg-received'}">${msg.text}</div>`;
+                box.scrollTop = box.scrollHeight;
+            }
+        });
+
+        socket.on('display_typing_private', (data) => {
+            if (activeReceiverId && data.senderId === activeReceiverId) {
+                document.getElementById('privateTypingIndicator').innerText = `${data.senderName} est en train d'écrire...`;
+            }
+        });
+
+        socket.on('hide_typing_private', (data) => {
+            if (activeReceiverId && data.senderId === activeReceiverId) {
+                document.getElementById('privateTypingIndicator').innerText = '';
+            }
+        });
+
+        // VIP & MONETIZATION
+        function loadVipStatus() {
+            const container = document.getElementById('vipStatusContainer');
+            const btn = document.getElementById('btnUpgradeVip');
+            if (currentUser.isVip) {
+                container.innerHTML = "✨ Vous êtes membre VIP actif ! Profitez de tous vos avantages.";
+                btn.style.display = 'none';
+            } else {
+                container.innerHTML = "Statut actuel : Membre Standard";
+                btn.style.display = 'inline-block';
+            }
+        }
+
+        async function upgradeVip() {
+            try {
+                const res = await fetch('/api/vip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: currentUser.id })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    currentUser = data.user;
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    alert('Félicitations ! Vous êtes désormais VIP ⭐');
+                    checkAuth();
+                }
+            } catch (err) {
+                alert('Erreur lors du passage VIP');
+            }
+        }
+
+        function loadMonetization() {
+            document.getElementById('userSoldeDisplay').innerText = currentUser.solde || 0;
+        }
+
+        async function rechargerSolde(amount) {
+            try {
+                const res = await fetch('/api/monetization', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId: currentUser.id, amount })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    currentUser = data.user;
+                    localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                    alert(`Rechargement de ${amount} FCFA réussi !`);
+                    checkAuth();
+                }
+            } catch (err) {
+                alert('Erreur lors du rechargement');
+            }
+        }
+
+        // PROFILE SECTION
         function loadProfile() {
             const container = document.getElementById('profileDetails');
             const photoUrl = (currentUser.photo && currentUser.photo.trim() !== '') ? currentUser.photo : defaultAvatar;
             
             container.innerHTML = `
                 <img src="${photoUrl}" style="width: 120px; height: 120px; object-fit: cover; border-radius: 50%; border: 3px solid var(--primary-color); display: block; margin: 0 auto 10px auto;" onerror="this.src='${defaultAvatar}'">
-                <h3>${currentUser.nom}</h3>
+                <h3>${currentUser.nom} ${currentUser.isVip ? '⭐ VIP' : ''}</h3>
                 <p>Email : ${currentUser.email}</p>
-                <p>J'aime reçus : ${currentUser.likesCount || 0} | Messages envoyés : ${currentUser.messagesCount || 0}</p>
+                <p>Coups de cœur reçus : ${currentUser.likesCount || 0} | Messages envoyés : ${currentUser.messagesCount || 0}</p>
+                <p>Solde : ${currentUser.solde || 0} FCFA</p>
                 
                 <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
                 
@@ -330,13 +593,11 @@
 
                 try {
                     const photoBase64 = await compressImage(fileInput.files[0]);
-                    
                     const res = await fetch('/api/update-photo', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ userId: currentUser.id, photoBase64 })
                     });
-                    
                     const data = await res.json();
                     if (res.ok && data.success) {
                         currentUser.photo = data.photo;
@@ -344,32 +605,17 @@
                         alert('Photo de profil mise à jour avec succès !');
                         loadProfile();
                     } else {
-                        alert(data.error || 'Erreur lors du changement de la photo');
+                        alert(data.error || 'Erreur');
                         submitBtn.innerText = "Mettre à jour la photo";
                         submitBtn.disabled = false;
                     }
                 } catch (err) {
-                    alert('Erreur réseau lors de la mise à jour de la photo');
+                    alert('Erreur réseau');
                     submitBtn.innerText = "Mettre à jour la photo";
                     submitBtn.disabled = false;
                 }
             });
         }
-
-        document.getElementById('chatForm').addEventListener('submit', (e) => {
-            e.preventDefault();
-            const input = document.getElementById('chatInput');
-            if(input.value.trim() !== '') {
-                socket.emit('public_message', { userName: currentUser.nom, text: input.value });
-                input.value = '';
-            }
-        });
-
-        socket.on('public_message', (data) => {
-            const chatBox = document.getElementById('chatBox');
-            chatBox.innerHTML += `<div><strong>${data.userName} :</strong> ${data.text}</div>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
-        });
 
         document.getElementById('sosForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -384,8 +630,6 @@
                 if(res.ok) {
                     alert('Votre demande a bien été transmise.');
                     document.getElementById('sosMessage').value = '';
-                } else {
-                    alert('Erreur lors de l’envoi');
                 }
             } catch(err) {
                 alert('Erreur réseau');

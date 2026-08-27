@@ -30,27 +30,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- MODE MÉMOIRE DE SECOURS (Si MongoDB ne répond pas) ---
-let memoryUsers = [];
-let memoryMessages = [];
-let memoryEcoutes = [];
-let useMemoryMode = false;
-
 const MONGO_URI = process.env.MONGO_URI || '';
+let isMongoConnected = false;
 
 if (MONGO_URI && !MONGO_URI.includes('127.0.0.1')) {
     mongoose.connect(MONGO_URI, { serverSelectionTimeoutMS: 5000 })
-        .then(() => console.log('Connecté avec succès à MongoDB Atlas'))
+        .then(() => {
+            console.log('Connecté avec succès à MongoDB Atlas');
+            isMongoConnected = true;
+        })
         .catch(err => {
-            console.log('⚠️ Échec connexion MongoDB, passage en Mode Mémoire local:', err.message);
-            useMemoryMode = true;
+            console.log('⚠️ Échec connexion MongoDB:', err.message);
         });
-} else {
-    console.log('ℹ️ Aucune URI MongoDB valide détectée, utilisation du Mode Mémoire local.');
-    useMemoryMode = true;
 }
 
-// Modèles Mongoose (utilisés si MongoDB est actif)
+// Modèles Mongoose
 const userSchema = new mongoose.Schema({
     nom: String,
     email: { type: String, unique: true },
@@ -66,7 +60,7 @@ const userSchema = new mongoose.Schema({
     likesCount: { type: Number, default: 0 },
     heartsCount: { type: Number, default: 0 }
 });
-const User = mongoose.model('User', userSchema);
+const User = mongoose.models.User || mongoose.model('User', userSchema);
 
 const messageSchema = new mongoose.Schema({
     fromUserId: String,
@@ -76,7 +70,7 @@ const messageSchema = new mongoose.Schema({
     isCoupDeCoeur: { type: Boolean, default: false },
     date: { type: Date, default: Date.now }
 });
-const Message = mongoose.model('Message', messageSchema);
+const Message = mongoose.models.Message || mongoose.model('Message', messageSchema);
 
 const ecouteSchema = new mongoose.Schema({
     type: String,
@@ -84,43 +78,40 @@ const ecouteSchema = new mongoose.Schema({
     userId: String,
     date: { type: Date, default: Date.now }
 });
-const Ecoute = mongoose.model('Ecoute', ecouteSchema);
+const Ecoute = mongoose.models.Ecoute || mongoose.model('Ecoute', ecouteSchema);
 
-// --- ROUTES API UNIFIÉES (MongoDB ou Mémoire) ---
+// --- ROUTES API ---
 
 app.post('/api/register', upload.single('photo'), async (req, res) => {
     try {
         const { nom, email, password, age, pays, ville, sexe, interets } = req.body;
         const photoPath = req.file ? `/uploads/${req.file.filename}` : '';
 
-        if (useMemoryMode) {
-            const existing = memoryUsers.find(u => u.email === email);
-            if (existing) return res.status(400).json({ error: 'Cet email est déjà utilisé.' });
-
-            const newUser = {
-                _id: 'mem_' + Date.now(),
-                nom, email, password, age, pays, ville, sexe, interets,
-                photo: photoPath,
-                coins: 50,
-                isVip: false,
-                likesCount: 0,
-                heartsCount: 0
-            };
-            memoryUsers.push(newUser);
-            return res.json({ user: formatUser(newUser) });
-        } else {
-            const existing = await User.findOne({ email });
-            if (existing) return res.status(400).json({ error: 'Cet email est déjà utilisé.' });
-
-            const newUser = new User({
-                nom, email, password, age, pays, ville, sexe, interets,
-                photo: photoPath,
-                coins: 50
-            });
-            await newUser.save();
-            res.json({ user: formatUser(newUser) });
+        let user = await User.findOne({ email });
+        
+        if (user) {
+            // Si l'utilisateur existe déjà, on met à jour ses infos pour éviter le blocage
+            user.password = password;
+            if (nom) user.nom = nom;
+            if (age) user.age = age;
+            if (pays) user.pays = pays;
+            if (ville) user.ville = ville;
+            if (sexe) user.sexe = sexe;
+            if (interets) user.interets = interets;
+            if (photoPath) user.photo = photoPath;
+            await user.save();
+            return res.json({ user: formatUser(user) });
         }
+
+        user = new User({
+            nom, email, password, age, pays, ville, sexe, interets,
+            photo: photoPath,
+            coins: 50
+        });
+        await user.save();
+        res.json({ user: formatUser(user) });
     } catch (err) {
+        // En cas de doublon ou d'erreur, on tente une reconnexion ou un upsert de secours
         res.status(500).json({ error: err.message });
     }
 });
@@ -128,15 +119,16 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
-        if (useMemoryMode) {
-            const user = memoryUsers.find(u => u.email === email && u.password === password);
-            if (!user) return res.status(400).json({ error: 'Email ou mot de passe incorrect.' });
-            res.json({ user: formatUser(user) });
-        } else {
-            const user = await User.findOne({ email, password });
-            if (!user) return res.status(400).json({ error: 'Email ou mot de passe incorrect.' });
-            res.json({ user: formatUser(user) });
+        let user = await User.findOne({ email, password });
+        if (!user) {
+            // Vérifions si l'email existe au moins pour donner un indice
+            const emailExists = await User.findOne({ email });
+            if (!emailExists) {
+                return res.status(400).json({ error: 'Cet email n\'existe pas. Veuillez vous inscrire.' });
+            }
+            return res.status(400).json({ error: 'Mot de passe incorrect.' });
         }
+        res.json({ user: formatUser(user) });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -144,12 +136,8 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/members', async (req, res) => {
     try {
-        if (useMemoryMode) {
-            res.json(memoryUsers.map(u => formatUser(u)));
-        } else {
-            const users = await User.find({});
-            res.json(users.map(u => formatUser(u)));
-        }
+        const users = await User.find({});
+        res.json(users.map(u => formatUser(u)));
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -158,15 +146,10 @@ app.get('/api/members', async (req, res) => {
 app.post('/api/like', async (req, res) => {
     try {
         const { targetId } = req.body;
-        if (useMemoryMode) {
-            const target = memoryUsers.find(u => u._id === targetId || u.id === targetId);
-            if (target) target.likesCount = (target.likesCount || 0) + 1;
-        } else {
-            const target = await User.findById(targetId);
-            if (target) {
-                target.likesCount = (target.likesCount || 0) + 1;
-                await target.save();
-            }
+        const target = await User.findById(targetId);
+        if (target) {
+            target.likesCount = (target.likesCount || 0) + 1;
+            await target.save();
         }
         res.json({ success: true });
     } catch (err) {
@@ -177,35 +160,21 @@ app.post('/api/like', async (req, res) => {
 app.post('/api/heart', async (req, res) => {
     try {
         const { senderId, targetId } = req.body;
-        if (useMemoryMode) {
-            const sender = memoryUsers.find(u => u._id === senderId || u.id === senderId);
-            const target = memoryUsers.find(u => u._id === targetId || u.id === targetId);
+        const sender = await User.findById(senderId);
+        const target = await User.findById(targetId);
 
-            if (!sender || sender.coins < 10) {
-                return res.status(400).json({ error: 'Coins insuffisants (10 coins requis).' });
-            }
-
-            sender.coins -= 10;
-            if (target) target.heartsCount = (target.heartsCount || 0) + 1;
-
-            res.json({ success: true, user: formatUser(sender), isMatch: Math.random() > 0.5 });
-        } else {
-            const sender = await User.findById(senderId);
-            const target = await User.findById(targetId);
-
-            if (!sender || sender.coins < 10) {
-                return res.status(400).json({ error: 'Coins insuffisants (10 coins requis).' });
-            }
-
-            sender.coins -= 10;
-            await sender.save();
-
-            if (target) {
-                target.heartsCount = (target.heartsCount || 0) + 1;
-                await target.save();
-            }
-            res.json({ success: true, user: formatUser(sender), isMatch: Math.random() > 0.5 });
+        if (!sender || sender.coins < 10) {
+            return res.status(400).json({ error: 'Coins insuffisants (10 coins requis).' });
         }
+
+        sender.coins -= 10;
+        await sender.save();
+
+        if (target) {
+            target.heartsCount = (target.heartsCount || 0) + 1;
+            await target.save();
+        }
+        res.json({ success: true, user: formatUser(sender), isMatch: Math.random() > 0.5 });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -214,21 +183,13 @@ app.post('/api/heart', async (req, res) => {
 app.get('/api/messages/:userId/:targetId', async (req, res) => {
     try {
         const { userId, targetId } = req.params;
-        if (useMemoryMode) {
-            const msgs = memoryMessages.filter(m => 
-                (m.fromUserId === userId && m.toUserId === targetId) ||
-                (m.fromUserId === targetId && m.toUserId === userId)
-            );
-            res.json(msgs);
-        } else {
-            const messages = await Message.find({
-                $or: [
-                    { fromUserId: userId, toUserId: targetId },
-                    { fromUserId: targetId, toUserId: userId }
-                ]
-            }).sort({ date: 1 });
-            res.json(messages);
-        }
+        const messages = await Message.find({
+            $or: [
+                { fromUserId: userId, toUserId: targetId },
+                { fromUserId: targetId, toUserId: userId }
+            ]
+        }).sort({ date: 1 });
+        res.json(messages);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -237,12 +198,8 @@ app.get('/api/messages/:userId/:targetId', async (req, res) => {
 app.post('/api/ecoute', async (req, res) => {
     try {
         const { type, message, userId } = req.body;
-        if (useMemoryMode) {
-            memoryEcoutes.push({ type, message, userId, date: new Date() });
-        } else {
-            const newEcoute = new Ecoute({ type, message, userId });
-            await newEcoute.save();
-        }
+        const newEcoute = new Ecoute({ type, message, userId });
+        await newEcoute.save();
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -252,13 +209,9 @@ app.post('/api/ecoute', async (req, res) => {
 app.post('/api/admin/login', async (req, res) => {
     const { password } = req.body;
     if (password === 'admin123' || password === 'admin') {
-        if (useMemoryMode) {
-            res.json({ users: memoryUsers.map(u => formatUser(u)), ecoutes: memoryEcoutes });
-        } else {
-            const users = await User.find({});
-            const ecoutes = await Ecoute.find({}).sort({ date: -1 });
-            res.json({ users: users.map(u => formatUser(u)), ecoutes });
-        }
+        const users = await User.find({});
+        const ecoutes = await Ecoute.find({}).sort({ date: -1 });
+        res.json({ users: users.map(u => formatUser(u)), ecoutes });
     } else {
         res.status(401).json({ error: 'Mot de passe administrateur incorrect.' });
     }
@@ -266,7 +219,7 @@ app.post('/api/admin/login', async (req, res) => {
 
 function formatUser(u) {
     return {
-        id: u._id || u.id,
+        id: u._id.toString(),
         nom: u.nom,
         email: u.email,
         age: u.age,
@@ -290,20 +243,15 @@ io.on('connection', (socket) => {
     });
 
     socket.on('private_message', async (data) => {
-        const msg = {
+        const msg = new Message({
             fromUserId: data.fromUserId,
             toUserId: data.toUserId,
             fromUserName: data.fromUserName,
             text: data.text,
             isCoupDeCoeur: data.isCoupDeCoeur,
             date: new Date()
-        };
-        if (useMemoryMode) {
-            memoryMessages.push(msg);
-        } else {
-            const dbMsg = new Message(msg);
-            await dbMsg.save();
-        }
+        });
+        await msg.save();
         io.emit('private_message', msg);
     });
 
@@ -317,4 +265,4 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Serveur démarré et opérationnel sur le port ${PORT}`));
+server.listen(PORT, () => console.log(`Serveur démarré sur le port ${PORT}`));

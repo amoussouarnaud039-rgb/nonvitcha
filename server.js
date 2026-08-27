@@ -12,11 +12,11 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Augmentation des limites de taille pour éviter les erreurs réseau lors de l'envoi d'images
+// Augmentation des limites de taille pour les uploads d'images
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Configuration Cloudinary
+// Configuration Cloudinary (Vérifie les variables d'environnement)
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -33,12 +33,10 @@ const storage = new CloudinaryStorage({
 });
 const upload = multer({ storage: storage });
 
-// Configuration de la base de données MongoDB
+// Connexion MongoDB corrigée (sans options obsolètes)
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/nonvitcha';
-mongoose.connect(MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true
-}).then(() => console.log('Connecté à MongoDB avec succès'))
+mongoose.connect(MONGO_URI)
+  .then(() => console.log('Connecté à MongoDB avec succès'))
   .catch(err => console.error('Erreur de connexion MongoDB :', err));
 
 // Schémas Mongoose
@@ -118,6 +116,7 @@ app.post('/api/login', async (req, res) => {
 
         res.json({ user: { id: user._id, nom: user.nom, email: user.email, photo: user.photo, likesCount: user.likesCount, messagesCount: user.messagesCount } });
     } catch (err) {
+        console.error("Erreur connexion:", err);
         res.status(500).json({ error: 'Erreur lors de la connexion' });
     }
 });

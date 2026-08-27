@@ -3,192 +3,497 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nonvitcha</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <title>Nonvitcha - Rencontres & Communauté</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root {
+            --primary: #e63946;
+            --primary-dark: #c52233;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #212529;
+            --gray: #6c757d;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 50px; }
+        
+        header { background: var(--card-bg); box-shadow: 0 2px 5px rgba(0,0,0,0.05); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .logo { font-size: 24px; font-weight: bold; color: var(--primary); display: flex; align-items: center; gap: 8px; }
+        
+        .container { max-width: 1200px; margin: 20px auto; padding: 0 15px; }
+        
+        /* Navigation & Barre d'outils */
+        .nav-bar { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; background: white; padding: 10px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); }
+        .nav-btn { background: #f1f3f5; border: none; padding: 10px 15px; border-radius: 6px; cursor: pointer; font-weight: 600; color: var(--text); transition: 0.2s; }
+        .nav-btn.active, .nav-btn:hover { background: var(--primary); color: white; }
+
+        /* Écrans */
+        .screen { display: none; }
+        .screen.active { display: block; }
+
+        /* Grille des membres */
+        .members-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; }
+        .member-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.04); text-align: center; padding-bottom: 15px; position: relative; }
+        .member-img-container { width: 100%; height: 220px; background: #e9ecef; position: relative; display: flex; align-items: center; justify-content: center; font-size: 40px; color: var(--gray); }
+        .member-img-container img { width: 100%; height: 100%; object-fit: cover; }
+        .online-badge { position: absolute; top: 10px; right: 10px; background: #2b8a3e; color: white; font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: bold; }
+        
+        .member-info { padding: 15px; }
+        .member-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
+        .member-details { font-size: 13px; color: var(--gray); margin-bottom: 10px; }
+        .member-stats { display: flex; justify-content: space-around; font-size: 12px; background: #f8f9fa; padding: 8px; border-radius: 6px; margin-bottom: 12px; color: var(--gray); }
+        
+        .action-btns { display: flex; gap: 8px; padding: 0 15px; }
+        .btn { flex: 1; padding: 8px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px; transition: 0.2s; }
+        .btn-like { background: #ffe3e3; color: var(--primary); }
+        .btn-like:hover { background: var(--primary); color: white; }
+        .btn-msg { background: #e7f5ff; color: #1c7ed6; }
+        .btn-msg:hover { background: #1c7ed6; color: white; }
+
+        /* Authentification / Formulaires */
+        .auth-container { max-width: 450px; margin: 40px auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: 600; font-size: 13px; }
+        .form-control { width: 100%; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px; }
+        .btn-submit { width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 15px; }
+        .btn-submit:hover { background: var(--primary-dark); }
+
+        /* Chat Modal / Fenêtre de Discussion */
+        .chat-box { background: white; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); display: flex; flex-direction: column; height: 500px; max-width: 700px; margin: 0 auto; overflow: hidden; }
+        .chat-header { background: var(--primary); color: white; padding: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; }
+        .chat-messages { flex: 1; padding: 15px; overflow-y: auto; background: #f8f9fa; display: flex; flex-direction: column; gap: 10px; }
+        .message { max-width: 70%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.4; }
+        .message.received { background: white; align-self: flex-start; border: 1px solid #dee2e6; }
+        .message.sent { background: var(--primary); color: white; align-self: flex-end; }
+        .chat-input-area { display: flex; padding: 10px; background: white; border-top: 1px solid #dee2e6; gap: 10px; }
+        .typing-indicator { font-size: 12px; color: var(--gray); font-style: italic; padding: 0 15px 5px 15px; display: none; }
+
+        /* Espace personnel / Profil */
+        .profile-card { background: white; padding: 25px; border-radius: 12px; max-width: 500px; margin: 0 auto; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .profile-avatar { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; margin: 0 auto 15px auto; border: 3px solid var(--primary); }
+    </style>
 </head>
 <body>
 
     <header>
-        <!-- L'en-tête (titre Nonvitcha + photo de profil dans l'angle + menu) est généré dynamiquement par app.js -->
+        <div class="logo">❤️ Nonvitcha</div>
+        <div id="user-header-info" style="display: none; align-items: center; gap: 15px;">
+            <span id="header-user-name" style="font-weight: 600; font-size: 14px;"></span>
+            <span style="font-size: 12px; background: #f1f3f5; padding: 5px 10px; border-radius: 20px;">Messages : <strong id="user-messages">0</strong></span>
+            <button onclick="logout()" style="background: none; border: 1px solid #e63946; color: #e63946; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px;">Déconnexion</button>
+        </div>
     </header>
 
-    <main>
-        <!-- SECTION AUTH (Connexion / Inscription) -->
-        <section id="auth-section" class="page-section" style="display: none;">
-            <div style="display: flex; gap: 2rem; flex-wrap: wrap; justify-content: center;">
-                <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); flex: 1; min-width: 280px; max-width: 400px;">
-                    <h3>Connexion</h3>
-                    <form id="login-form">
-                        <div style="margin-bottom: 1rem;">
-                            <label>Email</label>
-                            <input type="email" id="login-email" required style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;">
-                        </div>
-                        <div style="margin-bottom: 1rem;">
-                            <label>Mot de passe</label>
-                            <input type="password" id="login-password" required style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;">
-                        </div>
-                        <button type="submit" class="btn btn-primary" style="width: 100%;">Se connecter</button>
-                    </form>
-                </div>
+    <div class="container">
+        
+        <!-- Navigation principale -->
+        <div id="main-nav" class="nav-bar" style="display: none;">
+            <button class="nav-btn active" onclick="switchScreen('members-screen')">Membres</button>
+            <button class="nav-btn" onclick="switchScreen('chat-screen')">Chat Public</button>
+            <button class="nav-btn" onclick="switchScreen('profile-screen')">Mon Profil</button>
+            <button class="nav-btn" onclick="switchScreen('ecoute-screen')">🌿 Écoute SOS</button>
+        </div>
 
-                <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); flex: 1; min-width: 280px; max-width: 400px;">
-                    <h3>Inscription</h3>
-                    <form id="register-form" enctype="multipart/form-data">
-                        <div style="margin-bottom: 0.8rem;"><label>Nom</label><input type="text" name="nom" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
-                        <div style="margin-bottom: 0.8rem;"><label>Email</label><input type="email" name="email" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
-                        <div style="margin-bottom: 0.8rem;"><label>Mot de passe</label><input type="password" name="password" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
-                        <div style="margin-bottom: 0.8rem;"><label>Âge</label><input type="number" name="age" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
-                        <div style="margin-bottom: 0.8rem;"><label>Pays</label><input type="text" name="pays" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
-                        <div style="margin-bottom: 0.8rem;"><label>Ville</label><input type="text" name="ville" required style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
-                        <div style="margin-bottom: 0.8rem;">
+        <!-- 1. AUTH SCREEN -->
+        <div id="auth-screen" class="screen active">
+            <div class="auth-container">
+                <h2 id="auth-title" style="margin-bottom: 20px; text-align: center; color: var(--primary);">Connexion à Nonvitcha</h2>
+                <form id="auth-form" onsubmit="handleAuth(event)">
+                    <div id="register-fields" style="display: none;">
+                        <div class="form-group">
+                            <label>Nom complet</label>
+                            <input type="text" id="nom" class="form-control" placeholder="Votre nom">
+                        </div>
+                        <div class="form-group">
+                            <label>Âge</label>
+                            <input type="number" id="age" class="form-control" placeholder="Votre âge">
+                        </div>
+                        <div class="form-group">
+                            <label>Pays / Ville</label>
+                            <div style="display: flex; gap: 10px;">
+                                <input type="text" id="pays" class="form-control" placeholder="Pays">
+                                <input type="text" id="ville" class="form-control" placeholder="Ville">
+                            </div>
+                        </div>
+                        <div class="form-group">
                             <label>Sexe</label>
-                            <select name="sexe" style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                            <select id="sexe" class="form-control">
                                 <option value="Homme">Homme</option>
                                 <option value="Femme">Femme</option>
                             </select>
                         </div>
-                        <div style="margin-bottom: 0.8rem;"><label>Centres d'intérêt</label><input type="text" name="interets" placeholder="ex: Musique, Sport..." style="width: 100%; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;"></div>
-                        <div style="margin-bottom: 1rem;"><label>Photo de profil</label><input type="file" name="photo" accept="image/*" style="width: 100%;"></div>
-                        <button type="submit" class="btn btn-primary" style="width: 100%;">S'inscrire</button>
-                    </form>
-                </div>
-            </div>
-        </section>
-
-        <!-- SECTION MEMBRES -->
-        <section id="members-section" class="page-section">
-            <div style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border-color); margin-bottom: 2rem;">
-                <h3 style="margin-top: 0; color: var(--primary-color);"><i class="fa-solid fa-filter"></i> Recherche & Filtres</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
-                    <input type="text" id="search-name" placeholder="Nom..." oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
-                    <input type="text" id="search-country" placeholder="Pays..." oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
-                    <input type="text" id="search-city" placeholder="Ville..." oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
-                    <input type="number" id="search-age" placeholder="Âge max" oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
-                    <select id="search-sex" onchange="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
-                        <option value="">Tous les sexes</option>
-                        <option value="Homme">Homme</option>
-                        <option value="Femme">Femme</option>
-                    </select>
-                    <input type="text" id="search-interest" placeholder="Intérêt..." oninput="filterUsers()" style="padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 6px;">
-                </div>
-                <button class="btn btn-secondary" onclick="resetFilters()"><i class="fa-solid fa-rotate-right"></i> Réinitialiser</button>
-            </div>
-
-            <div id="members-container" class="members-grid"></div>
-        </section>
-
-        <!-- SECTION CHAT PRIVÉ -->
-        <section id="private-chat-section" class="page-section" style="display: none;">
-            <div class="chat-container">
-                <div style="padding: 1rem; background: #fdf2f8; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-                    <h3 id="chat-target-name" style="margin: 0;">Discussion</h3>
-                    <div>
-                        <button class="btn btn-warning" onclick="sendCoupDeCoeur()"><i class="fa-solid fa-heart"></i> Coup de Cœur (10 Coins)</button>
-                    </div>
-                </div>
-                <div id="private-messages-viewport" class="chat-viewport"></div>
-                <div id="typing-indicator" style="padding: 0 1rem; font-size: 0.8rem; color: var(--text-muted); height: 1.2rem;"></div>
-                <form id="private-chat-form" class="chat-input-bar">
-                    <input type="text" id="private-message-input" placeholder="Écrivez votre message..." autocomplete="off">
-                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                </form>
-            </div>
-        </section>
-
-        <!-- SECTION CHAT PUBLIC -->
-        <section id="public-chat-section" class="page-section" style="display: none;">
-            <div class="chat-container">
-                <div style="padding: 1rem; background: #f5f3ff; border-bottom: 1px solid var(--border-color);">
-                    <h3 style="margin: 0;"><i class="fa-solid fa-comments"></i> Chat Public Global</h3>
-                </div>
-                <div id="public-messages-viewport" class="chat-viewport"></div>
-                <form id="public-chat-form" class="chat-input-bar">
-                    <input type="text" id="public-message-input" placeholder="Discutez avec tout le monde..." autocomplete="off">
-                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i></button>
-                </form>
-            </div>
-        </section>
-
-        <!-- SECTION RECHARGE COINS -->
-        <section id="recharge-section" class="page-section" style="display: none;">
-            <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 500px; margin: 0 auto; text-align: center;">
-                <h3><i class="fa-solid fa-coins" style="color: #d97706;"></i> Gestion des Coins & VIP</h3>
-                <p>Vous possédez actuellement <strong id="current-coins-display" style="color: #d97706; font-size: 1.2rem;">0</strong> Coins.</p>
-                <hr style="border: 0; border-top: 1px solid var(--border-color); margin: 1.5rem 0;">
-                <h4>Passer au statut VIP 👑</h4>
-                <p style="color: var(--text-muted); font-size: 0.9rem;">Bénéficiez d'avantages exclusifs sur Nonvitcha.</p>
-                <button class="btn btn-warning" onclick="buyVIP()" style="padding: 0.8rem 1.5rem; font-size: 1rem;"><i class="fa-solid fa-crown"></i> Activer VIP</button>
-            </div>
-        </section>
-
-        <!-- SECTION ECOUTE SOS -->
-        <section id="ecoutes-section" class="page-section" style="display: none;">
-            <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 600px; margin: 0 auto;">
-                <h3 style="color: #16a34a;"><i class="fa-solid fa-hand-holding-heart"></i> Écoute SOS / Support Confidentiel</h3>
-                <p style="color: var(--text-muted); font-size: 0.9rem;">Besoin d'une écoute bienveillante ou d'un soutien ? Envoyez votre message en toute discrétion.</p>
-                <form id="ecoute-form">
-                    <div style="margin-bottom: 1rem;">
-                        <label>Type de demande</label>
-                        <select id="ecoute-type" style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;">
-                            <option value="SOS Soutien Moral">SOS Soutien Moral</option>
-                            <option value="Conseil Relationnel">Conseil Relationnel</option>
-                            <option value="Autre Demande Confidentielle">Autre Demande Confidentielle</option>
-                        </select>
-                    </div>
-                    <div style="margin-bottom: 1rem;">
-                        <label>Votre message</label>
-                        <textarea id="ecoute-message" rows="5" required placeholder="Exprimez-vous librement..." style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary" style="background-color: #16a34a; width: 100%;">Envoyer en toute confidentialité</button>
-                </form>
-            </div>
-        </section>
-
-        <!-- SECTION ADMIN -->
-        <section id="admin-section" class="page-section" style="display: none;">
-            <div style="background: white; padding: 2rem; border-radius: 12px; border: 1px solid var(--border-color); max-width: 800px; margin: 0 auto;">
-                <h3><i class="fa-solid fa-shield-halved"></i> Espace Administrateur</h3>
-                <div id="admin-login-box" style="margin-top: 1rem;">
-                    <form id="admin-login-form">
-                        <div style="margin-bottom: 1rem;">
-                            <label>Mot de passe administrateur</label>
-                            <input type="password" id="admin-password" required style="width: 100%; padding: 0.6rem; border: 1px solid var(--border-color); border-radius: 6px;">
+                        <div class="form-group">
+                            <label>Centres d'intérêt</label>
+                            <input type="text" id="interets" class="form-control" placeholder="Ex: Musique, Sport, Voyage">
                         </div>
-                        <button type="submit" class="btn btn-primary">Connexion Admin</button>
-                    </form>
-                </div>
-                <div id="admin-dashboard" style="display: none; margin-top: 1.5rem;">
-                    <h4>Utilisateurs inscrits</h4>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 2rem; font-size: 0.9rem;">
-                        <thead>
-                            <tr style="background: #f3f4f6; text-align: left;">
-                                <th style="padding: 0.5rem;">Nom</th>
-                                <th style="padding: 0.5rem;">Email</th>
-                                <th style="padding: 0.5rem;">Coins</th>
-                                <th style="padding: 0.5rem;">VIP</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-users-list"></tbody>
-                    </table>
+                        <div class="form-group">
+                            <label>Photo de profil</label>
+                            <input type="file" id="photo" class="form-control" accept="image/*">
+                        </div>
+                    </div>
 
-                    <h4>Messages d'Écoute SOS reçus</h4>
-                    <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
-                        <thead>
-                            <tr style="background: #f3f4f6; text-align: left;">
-                                <th style="padding: 0.5rem;">Type</th>
-                                <th style="padding: 0.5rem;">Message</th>
-                                <th style="padding: 0.5rem;">Date</th>
-                            </tr>
-                        </thead>
-                        <tbody id="admin-ecoutes-list"></tbody>
-                    </table>
+                    <div class="form-group">
+                        <label>Email</label>
+                        <input type="email" id="email" class="form-control" required placeholder="votre@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label>Mot de passe</label>
+                        <input type="password" id="password" class="form-control" required placeholder="••••••••">
+                    </div>
+
+                    <button type="submit" id="auth-submit-btn" class="btn-submit">Se connecter</button>
+                    
+                    <p style="text-align: center; margin-top: 15px; font-size: 13px;">
+                        <span id="auth-switch-text">Pas encore de compte ?</span> 
+                        <a href="#" onclick="toggleAuthMode()" style="color: var(--primary); font-weight: bold; text-decoration: none;" id="auth-switch-link">S'inscrire</a>
+                    </p>
+                </form>
+            </div>
+        </div>
+
+        <!-- 2. MEMBERS SCREEN -->
+        <div id="members-screen" class="screen">
+            <h2 style="margin-bottom: 20px;">Membres de la communauté</h2>
+            <div id="members-grid" class="members-grid"></div>
+        </div>
+
+        <!-- 3. PRIVATE CHAT SCREEN -->
+        <div id="private-chat-screen" class="screen">
+            <div class="chat-box">
+                <div class="chat-header">
+                    <span id="chat-with-name">Discussion</span>
+                    <button onclick="switchScreen('members-screen')" style="background:none; border:none; color:white; cursor:pointer; font-size:14px;">Retour</button>
+                </div>
+                <div id="private-messages" class="chat-messages"></div>
+                <div id="typing-indicator" class="typing-indicator">... est en train d'écrire</div>
+                <div class="chat-input-area">
+                    <input type="text" id="private-input" class="form-control" placeholder="Écrivez votre message..." oninput="emitTyping()">
+                    <button onclick="sendPrivateMessage()" class="btn btn-like" style="width: 80px;">Envoyer</button>
                 </div>
             </div>
-        </section>
-    </main>
+        </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="app.js"></script>
+        <!-- 4. CHAT PUBLIC SCREEN -->
+        <div id="chat-screen" class="screen">
+            <div class="chat-box" style="max-width: 100%;">
+                <div class="chat-header">Salon Public Nonvitcha</div>
+                <div id="public-messages" class="chat-messages"></div>
+                <div class="chat-input-area">
+                    <input type="text" id="public-input" class="form-control" placeholder="Discutez avec tout le monde...">
+                    <button onclick="sendPublicMessage()" class="btn btn-like" style="width: 80px;">Envoyer</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. PROFILE SCREEN -->
+        <div id="profile-screen" class="screen">
+            <div class="profile-card">
+                <img id="my-profile-avatar" src="" class="profile-avatar" alt="Avatar">
+                <h2 id="my-profile-name">Nom</h2>
+                <p id="my-profile-email" style="color: var(--gray); font-size: 13px; margin-bottom: 15px;"></p>
+                
+                <div style="display: flex; justify-content: space-around; background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                    <div>
+                        <div style="font-size: 18px; font-weight: bold; color: var(--primary);" id="my-likes-count">0</div>
+                        <div style="font-size: 12px; color: var(--gray);">Likes reçus</div>
+                    </div>
+                    <div>
+                        <div style="font-size: 18px; font-weight: bold; color: #1c7ed6;" id="my-messages-count">0</div>
+                        <div style="font-size: 12px; color: var(--gray);">Messages envoyés</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. ÉCOUTE SOS SCREEN -->
+        <div id="ecoute-screen" class="screen">
+            <div class="auth-container">
+                <h2>Cellule d'Écoute SOS / SSR</h2>
+                <p style="font-size: 13px; color: var(--gray); margin-bottom: 15px;">Besoin d'aide ou d'une écoute confidentielle ? Envoyez votre message en toute sécurité.</p>
+                <textarea id="ecoute-msg" class="form-control" rows="5" placeholder="Exprimez-vous ici..."></textarea>
+                <button onclick="sendEcoute()" class="btn-submit" style="margin-top: 15px;">Envoyer au modérateur</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        const socket = io();
+        let currentUser = JSON.parse(localStorage.getItem('nonvitcha_user')) || null;
+        let isRegisterMode = false;
+        let currentTargetId = null;
+        let typingTimeout = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (currentUser) {
+                initApp();
+            }
+        });
+
+        function toggleAuthMode() {
+            isRegisterMode = !isRegisterMode;
+            const regFields = document.getElementById('register-fields');
+            const submitBtn = document.getElementById('auth-submit-btn');
+            const switchLink = document.getElementById('auth-switch-link');
+            const switchText = document.getElementById('auth-switch-text');
+            const title = document.getElementById('auth-title');
+
+            if (isRegisterMode) {
+                regFields.style.display = 'block';
+                submitBtn.innerText = "S'inscrire";
+                switchText.innerText = "Déjà un compte ?";
+                switchLink.innerText = "Se connecter";
+                title.innerText = "Inscription à Nonvitcha";
+            } else {
+                regFields.style.display = 'none';
+                submitBtn.innerText = "Se connecter";
+                switchText.innerText = "Pas encore de compte ?";
+                switchLink.innerText = "S'inscrire";
+                title.innerText = "Connexion à Nonvitcha";
+            }
+        }
+
+        async function handleAuth(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (isRegisterMode) {
+                const formData = new FormData();
+                formData.append('nom', document.getElementById('nom').value);
+                formData.append('email', email);
+                formData.append('password', password);
+                formData.append('age', document.getElementById('age').value);
+                formData.append('pays', document.getElementById('pays').value);
+                formData.append('ville', document.getElementById('ville').value);
+                formData.append('sexe', document.getElementById('sexe').value);
+                formData.append('interets', document.getElementById('interets').value);
+                const photoFile = document.getElementById('photo').files[0];
+                if (photoFile) formData.append('photo', photoFile);
+
+                try {
+                    const res = await fetch('/api/register', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (res.ok) {
+                        loginUser(data.user);
+                    } else {
+                        alert(data.error || "Erreur lors de l'inscription");
+                    }
+                } catch (err) { alert("Erreur réseau"); }
+            } else {
+                try {
+                    const res = await fetch('/api/login', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email, password })
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        loginUser(data.user);
+                    } else {
+                        alert(data.error || "Identifiants incorrects");
+                    }
+                } catch (err) { alert("Erreur réseau"); }
+            }
+        }
+
+        function loginUser(user) {
+            currentUser = user;
+            localStorage.setItem('nonvitcha_user', JSON.stringify(user));
+            initApp();
+        }
+
+        function logout() {
+            localStorage.removeItem('nonvitcha_user');
+            currentUser = null;
+            document.getElementById('user-header-info').style.display = 'none';
+            document.getElementById('main-nav').style.display = 'none';
+            switchScreen('auth-screen');
+        }
+
+        function initApp() {
+            document.getElementById('user-header-info').style.display = 'flex';
+            document.getElementById('header-user-name').innerText = currentUser.nom;
+            document.getElementById('main-nav').style.display = 'flex';
+            
+            // Intégration du comptage des messages mise à jour
+            document.getElementById('user-messages').innerText = currentUser.messagesCount || 0;
+
+            // MAJ Données Profil
+            document.getElementById('my-profile-name').innerText = currentUser.nom;
+            document.getElementById('my-profile-email').innerText = currentUser.email;
+            document.getElementById('my-profile-avatar').src = currentUser.photo || '';
+            document.getElementById('my-likes-count').innerText = currentUser.likesCount || 0;
+            document.getElementById('my-messages-count').innerText = currentUser.messagesCount || 0;
+
+            socket.emit('user_connected', currentUser.id);
+            switchScreen('members-screen');
+            loadMembers();
+        }
+
+        function switchScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+            
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            
+            if (screenId === 'members-screen') loadMembers();
+        }
+
+        async function loadMembers() {
+            try {
+                const res = await fetch('/api/members');
+                const members = await res.json();
+                const grid = document.getElementById('members-grid');
+                grid.innerHTML = '';
+
+                members.forEach(m => {
+                    if (currentUser && m.id === currentUser.id) return;
+                    
+                    const initials = m.nom ? m.nom.substring(0, 2).toUpperCase() : 'AA';
+                    const photoHtml = m.photo ? `<img src="${m.photo}" alt="${m.nom}">` : `<span>${initials}</span>`;
+
+                    const card = document.createElement('div');
+                    card.className = 'member-card';
+                    card.innerHTML = `
+                        <div class="member-img-container">
+                            ${photoHtml}
+                            <span class="online-badge">En ligne</span>
+                        </div>
+                        <div class="member-info">
+                            <div class="member-name">${m.nom}, ${m.age || '?'}</div>
+                            <div class="member-details">${m.ville || ''}, ${m.pays || ''}</div>
+                            <div class="member-stats">
+                                <span>❤️ ${m.likesCount || 0} likes</span>
+                                <span>💌 ${m.messagesCount || 0} msgs</span>
+                            </div>
+                        </div>
+                        <div class="action-btns">
+                            <button class="btn btn-like" onclick="sendLike('${m.id}')">❤️ Like</button>
+                            <button class="btn btn-msg" onclick="openPrivateChat('${m.id}', '${m.nom}')">💬 Message</button>
+                        </div>
+                    `;
+                    grid.appendChild(card);
+                });
+            } catch (err) { console.error("Erreur chargement membres", err); }
+        }
+
+        async function sendLike(targetId) {
+            await fetch('/api/like', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetId })
+            });
+            alert('Like envoyé ! ❤️');
+            loadMembers();
+        }
+
+        async function openPrivateChat(targetId, targetName) {
+            currentTargetId = targetId;
+            document.getElementById('chat-with-name').innerText = `Discussion avec ${targetName}`;
+            switchScreen('private-chat-screen');
+
+            const res = await fetch(`/api/messages/${currentUser.id}/${targetId}`);
+            const messages = await res.json();
+            const container = document.getElementById('private-messages');
+            container.innerHTML = '';
+            messages.forEach(msg => {
+                appendMessage(msg, container);
+            });
+        }
+
+        function appendMessage(msg, container) {
+            const div = document.createElement('div');
+            div.className = `message ${msg.fromUserId === currentUser.id ? 'sent' : 'received'}`;
+            div.innerText = msg.text;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function emitTyping() {
+            socket.emit('typing', { fromUserName: currentUser.nom, toUserId: currentTargetId });
+            clearTimeout(typingTimeout);
+            typingTimeout = setTimeout(() => {
+                socket.emit('stop_typing', { toUserId: currentTargetId });
+            }, 1500);
+        }
+
+        socket.on('typing', (data) => {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) {
+                indicator.innerText = `${data.fromUserName} est en train d'écrire...`;
+                indicator.style.display = 'block';
+            }
+        });
+
+        socket.on('stop_typing', () => {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) indicator.style.display = 'none';
+        });
+
+        function sendPrivateMessage() {
+            const input = document.getElementById('private-input');
+            const text = input.value.trim();
+            if (!text || !currentTargetId) return;
+
+            const msgData = {
+                fromUserId: currentUser.id,
+                toUserId: currentTargetId,
+                fromUserName: currentUser.nom,
+                text: text
+            };
+
+            socket.emit('private_message', msgData);
+            input.value = '';
+            
+            // Mise à jour locale immédiate des compteurs
+            currentUser.messagesCount = (currentUser.messagesCount || 0) + 1;
+            document.getElementById('user-messages').innerText = currentUser.messagesCount;
+            document.getElementById('my-messages-count').innerText = currentUser.messagesCount;
+            localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+        }
+
+        socket.on('private_message', (msg) => {
+            if ((msg.fromUserId === currentUser.id && msg.toUserId === currentTargetId) ||
+                (msg.fromUserId === currentTargetId && msg.toUserId === currentUser.id)) {
+                const container = document.getElementById('private-messages');
+                appendMessage(msg, container);
+            }
+        });
+
+        function sendPublicMessage() {
+            const input = document.getElementById('public-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            socket.emit('public_message', { name: currentUser.nom, text });
+            input.value = '';
+        }
+
+        socket.on('public_message', (data) => {
+            const container = document.getElementById('public-messages');
+            const div = document.createElement('div');
+            div.className = 'message received';
+            div.innerHTML = `<strong>${data.name}:</strong> ${data.text}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+        });
+
+        async function sendEcoute() {
+            const msg = document.getElementById('ecoute-msg').value;
+            if (!msg) return;
+
+            const res = await fetch('/api/ecoute', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ type: 'SOS', message: msg, userId: currentUser.id })
+            });
+            if (res.ok) {
+                alert('Votre message a été transmis en toute confidentialité.');
+                document.getElementById('ecoute-msg').value = '';
+                switchScreen('members-screen');
+            }
+        }
+    </script>
 </body>
 </html>

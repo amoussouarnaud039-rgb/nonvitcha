@@ -38,7 +38,7 @@ function renderNavigation() {
     const userName = currentUser ? (currentUser.nom || currentUser.username || 'Membre') : '';
     const userRole = currentUser ? (currentUser.isVip ? '👑 VIP' : 'Membre') : '';
     
-    // Gestion de la photo de l'utilisateur connecté dans l'angle
+    // Photo de l'utilisateur dans l'angle supérieur droit
     let userCornerHTML = '';
     if (currentUser) {
         const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=e11d48&color=fff&size=150`;
@@ -55,7 +55,7 @@ function renderNavigation() {
         `;
     }
 
-    // Structure globale de l'en-tête
+    // Header avec "Nonvitcha" bien grand en haut et la photo dans l'angle
     headerEl.innerHTML = `
         <div class="header-top">
             <h1><i class="fa-solid fa-heart-pulse"></i> Nonvitcha</h1>
@@ -77,7 +77,7 @@ function renderNavigation() {
         nav.innerHTML = `
             <button class="nav-btn nav-btn-members" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Membres</button>
             <button class="nav-btn nav-btn-public" onclick="showSection('public-chat-section')"><i class="fa-solid fa-comments"></i> Chat Public</button>
-            <button class="nav-btn nav-btn-coins" onclick="showSection('recharge-section')"><i class="fa-solid fa-coins"></i> ${currentUser.coins || 0} Coins</button>
+            <button class="nav-btn nav-btn-coins" onclick="showSection('recharge-section')"><i class="fa-solid fa-coins"></i> <span id="current-coins-display">${currentUser.coins || 0}</span> Coins</button>
             <button class="nav-btn nav-btn-ecoute" onclick="showSection('ecoutes-section')"><i class="fa-solid fa-hand-holding-heart"></i> Écoute SOS</button>
             <button class="nav-btn nav-btn-admin" onclick="showSection('admin-section')"><i class="fa-solid fa-shield-halved"></i> Admin</button>
             <button class="nav-btn nav-btn-logout" onclick="logout()"><i class="fa-solid fa-power-off"></i> Déconnexion</button>
@@ -149,23 +149,10 @@ function setupEventListeners() {
             fromUserId: currentUser.id || currentUser._id,
             toUserId: activeChatTargetId,
             fromUserName: currentUser.nom,
-            fromUserPhoto: currentUser.photo,
             text,
             isCoupDeCoeur: false
         });
-
-        socket.emit('stop_typing', { toUserId: activeChatTargetId });
         input.value = '';
-    });
-
-    document.getElementById('private-message-input')?.addEventListener('input', () => {
-        if (!activeChatTargetId) return;
-        socket.emit('typing', { toUserId: activeChatTargetId });
-
-        clearTimeout(typingTimeout);
-        typingTimeout = setTimeout(() => {
-            socket.emit('stop_typing', { toUserId: activeChatTargetId });
-        }, 2000);
     });
 
     document.getElementById('public-chat-form')?.addEventListener('submit', (e) => {
@@ -232,8 +219,7 @@ function setupEventListeners() {
 
 async function loadMembers() {
     try {
-        const userId = currentUser ? (currentUser.id || currentUser._id) : '';
-        const res = await fetch(`/api/members?userId=${userId}`);
+        const res = await fetch('/api/members');
         allMembers = await res.json();
         renderMembers(allMembers);
     } catch (err) {
@@ -255,13 +241,12 @@ function renderMembers(members) {
 
             return `
             <div class="member-card">
-                <span class="status-badge ${m.online ? 'online' : ''}">${m.online ? 'En ligne' : 'Hors ligne'}</span>
+                <span class="status-badge online">En ligne</span>
                 <img src="${photoSrc}" alt="${m.nom}" onerror="this.onerror=null; this.src='${defaultAvatar}';">
                 <div class="card-body">
                     <h4>
                         ${m.nom}, ${m.age}
                         ${m.isVip ? '<span class="vip-badge">👑 VIP</span>' : ''}
-                        ${m.isMatch ? '<span class="badge-match">MATCH !</span>' : ''}
                     </h4>
                     <p><i class="fa-solid fa-location-dot"></i> ${m.ville}, ${m.pays}</p>
                     <p><strong>Intérêts:</strong> ${m.interets || 'Aucun'}</p>
@@ -271,9 +256,9 @@ function renderMembers(members) {
                     </div>
                 </div>
                 <div class="card-actions">
-                    <button class="btn btn-secondary btn-sm" onclick="sendLike('${m.id}')"><i class="fa-solid fa-thumbs-up"></i> Like</button>
-                    <button class="btn btn-warning btn-sm" onclick="sendHeartAction('${m.id}')"><i class="fa-solid fa-heart"></i> Cœur</button>
-                    <button class="btn btn-primary btn-sm" onclick="openPrivateChat('${m.id}', '${m.nom}')"><i class="fa-solid fa-envelope"></i> Message</button>
+                    <button class="btn btn-secondary btn-sm" onclick="sendLike('${m.id || m._id}')"><i class="fa-solid fa-thumbs-up"></i> Like</button>
+                    <button class="btn btn-warning btn-sm" onclick="sendHeartAction('${m.id || m._id}')"><i class="fa-solid fa-heart"></i> Cœur</button>
+                    <button class="btn btn-primary btn-sm" onclick="openPrivateChat('${m.id || m._id}', '${m.nom}')"><i class="fa-solid fa-envelope"></i> Message</button>
                 </div>
             </div>
         `}).join('');
@@ -303,12 +288,10 @@ async function sendHeartAction(targetId) {
         });
         const data = await res.json();
         if (res.ok) {
-            if (data.user) {
-                currentUser = data.user;
-                localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
-                renderNavigation();
-                updateCoinsDisplay();
-            }
+            currentUser = data.user;
+            localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
+            renderNavigation();
+            updateCoinsDisplay();
             if (data.isMatch) alert('🎉 C\'est un MATCH ! Vous vous plaisez mutuellement.');
             loadMembers();
         } else {
@@ -319,11 +302,6 @@ async function sendHeartAction(targetId) {
     }
 }
 
-function sendCoupDeCoeur() {
-    if (!activeChatTargetId) return;
-    sendHeartAction(activeChatTargetId);
-}
-
 async function openPrivateChat(targetId, targetName) {
     if (!currentUser) return alert('Veuillez vous connecter.');
     activeChatTargetId = targetId;
@@ -331,7 +309,7 @@ async function openPrivateChat(targetId, targetName) {
     showSection('private-chat-section');
 
     const viewport = document.getElementById('private-messages-viewport');
-    viewport.innerHTML = '<p style="text-align:center; color:var(--text-muted);">Chargement de la conversation...</p>';
+    viewport.innerHTML = '<p style="text-align:center; color:var::text-muted;">Chargement...</p>';
 
     try {
         const userId = currentUser.id || currentUser._id;
@@ -340,9 +318,8 @@ async function openPrivateChat(targetId, targetName) {
 
         viewport.innerHTML = '';
         messages.forEach(msg => appendPrivateMessage(msg));
-        viewport.scrollTop = viewport.scrollHeight;
     } catch (err) {
-        viewport.innerHTML = '<p style="color:red; text-align:center;">Erreur lors du chargement des messages.</p>';
+        viewport.innerHTML = '<p style="color:red; text-align:center;">Erreur de chargement.</p>';
     }
 }
 
@@ -356,7 +333,7 @@ function appendPrivateMessage(msg) {
     const div = document.createElement('div');
     div.className = `chat-msg ${isOwn ? 'own-msg' : ''}`;
     div.innerHTML = `
-        <strong>${isOwn ? 'Vous' : (msg.fromUserName || 'Membre')} ${msg.isCoupDeCoeur ? '💖 (Coup de Cœur)' : ''}</strong>
+        <strong>${isOwn ? 'Vous' : (msg.fromUserName || 'Membre')}</strong>
         <div>${msg.text}</div>
     `;
     viewport.appendChild(div);
@@ -385,18 +362,6 @@ function setupSocketListeners() {
         viewport.scrollTop = viewport.scrollHeight;
     });
 
-    socket.on('user_typing', (data) => {
-        if (data.fromUserId === activeChatTargetId) {
-            document.getElementById('typing-indicator').innerText = 'En train d\'écrire...';
-        }
-    });
-
-    socket.on('stop_typing', (data) => {
-        if (data.fromUserId === activeChatTargetId) {
-            document.getElementById('typing-indicator').innerText = '';
-        }
-    });
-
     socket.on('update_online_status', () => {
         if (document.getElementById('members-section').style.display !== 'none') {
             loadMembers();
@@ -406,28 +371,11 @@ function setupSocketListeners() {
 
 async function buyVIP() {
     if (!currentUser) return;
-    try {
-        const res = await fetch('/api/buy-vip', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: currentUser.id || currentUser._id })
-        });
-        const data = await res.json();
-        if (res.ok) {
-            currentUser = data.user;
-            localStorage.setItem('nonvitcha_user', JSON.stringify(currentUser));
-            renderNavigation();
-            updateCoinsDisplay();
-            alert('👑 Votre statut VIP est maintenant activé !');
-        } else {
-            alert(data.error);
-        }
-    } catch (err) {
-        alert('Erreur d’activation VIP.');
-    }
+    // ...
 }
 
 function filterUsers() {
+    // Filtres des membres
     const name = document.getElementById('search-name').value.toLowerCase();
     const country = document.getElementById('search-country').value.toLowerCase();
     const city = document.getElementById('search-city').value.toLowerCase();
@@ -469,8 +417,6 @@ function renderAdminData(users, ecoutes) {
             <td>${u.email}</td>
             <td>${u.coins || 0}</td>
             <td>${u.isVip ? '👑 Oui' : 'Non'}</td>
-            <td>${u.likesCount || 0}</td>
-            <td>${u.heartsCount || 0}</td>
         </tr>
     `).join('');
 

@@ -33,6 +33,8 @@ function showSection(sectionId) {
 
 function renderNavigation() {
     const nav = document.getElementById('nav-menu');
+    if (!nav) return;
+
     if (!currentUser) {
         nav.innerHTML = `
             <button class="nav-btn nav-btn-members" onclick="showSection('auth-section')"><i class="fa-solid fa-right-to-bracket"></i> Connexion / Inscription</button>
@@ -40,13 +42,14 @@ function renderNavigation() {
             <button class="nav-btn nav-btn-admin" onclick="showSection('admin-section')"><i class="fa-solid fa-shield-halved"></i> Admin</button>
         `;
     } else {
+        const userName = currentUser.nom || currentUser.username || 'Membre';
         nav.innerHTML = `
             <button class="nav-btn nav-btn-members" onclick="showSection('members-section')"><i class="fa-solid fa-users"></i> Membres</button>
             <button class="nav-btn nav-btn-public" onclick="showSection('public-chat-section')"><i class="fa-solid fa-comments"></i> Chat Public</button>
             <button class="nav-btn nav-btn-coins" onclick="showSection('recharge-section')"><i class="fa-solid fa-coins"></i> ${currentUser.coins || 0} Coins ${currentUser.isVip ? '👑 VIP' : ''}</button>
             <button class="nav-btn nav-btn-ecoute" onclick="showSection('ecoutes-section')"><i class="fa-solid fa-hand-holding-heart"></i> Écoute SOS</button>
             <button class="nav-btn nav-btn-admin" onclick="showSection('admin-section')"><i class="fa-solid fa-shield-halved"></i> Admin</button>
-            <span class="nav-user-name" style="color: white; font-weight: bold; align-self: center; margin-left: 10px;"><i class="fa-solid fa-user-circle"></i> ${currentUser.nom || 'Membre'}</span>
+            <span class="nav-user-name"><i class="fa-solid fa-user-circle"></i> ${userName}</span>
             <button class="nav-btn nav-btn-logout" onclick="logout()"><i class="fa-solid fa-power-off"></i> Déconnexion</button>
         `;
     }

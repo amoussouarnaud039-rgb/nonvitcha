@@ -313,7 +313,6 @@
             if (sectionId === 'profileSection') loadProfile();
         }
 
-        // Fonction de compression automatique de l'image (redimensionne et réduit le poids)
         function compressImage(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -323,8 +322,8 @@
                     img.src = event.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 600;
-                        const MAX_HEIGHT = 600;
+                        const MAX_WIDTH = 500;
+                        const MAX_HEIGHT = 500;
                         let width = img.width;
                         let height = img.height;
 
@@ -345,8 +344,7 @@
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
 
-                        // Compression JPEG à 70% de qualité (léger et ultra-rapide)
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
                         resolve(dataUrl);
                     };
                     img.onerror = (error) => reject(error);
@@ -358,7 +356,7 @@
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const submitBtn = e.target.querySelector('button[type="submit"]');
-            submitBtn.innerText = "Compression et envoi...";
+            submitBtn.innerText = "Compression...";
             submitBtn.disabled = true;
 
             try {
@@ -480,28 +478,13 @@
                 if (fileInput.files.length === 0) return;
 
                 const submitBtn = e.target.querySelector('button[type="submit"]');
-                submitBtn.innerText = "Compression...";
+                submitBtn.innerText = "Envoi via WebSocket...";
                 submitBtn.disabled = true;
 
                 try {
                     const photoBase64 = await compressImage(fileInput.files[0]);
-
-                    const res = await fetch('/api/update-photo', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: currentUser.id, photoBase64 })
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                        currentUser.photo = data.photo;
-                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
-                        alert('Photo de profil mise à jour avec succès !');
-                        loadProfile();
-                    } else {
-                        alert(data.error || 'Erreur lors de la mise à jour');
-                        submitBtn.innerText = "Mettre à jour la photo";
-                        submitBtn.disabled = false;
-                    }
+                    // Envoi via WebSocket pour éviter tout blocage de requête HTTP sur Render
+                    socket.emit('update_photo', { userId: currentUser.id, photoBase64 });
                 } catch (err) {
                     alert('Erreur lors du traitement de l’image');
                     submitBtn.innerText = "Mettre à jour la photo";
@@ -509,6 +492,23 @@
                 }
             });
         }
+
+        // Écoute de la réponse du serveur via WebSocket pour la photo
+        socket.on('photo_updated', (data) => {
+            const submitBtn = document.querySelector('#updatePhotoForm button[type="submit"]');
+            if (data.success) {
+                currentUser.photo = data.photo;
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                alert('Photo de profil mise à jour avec succès !');
+                loadProfile();
+            } else {
+                alert(data.error || 'Erreur lors du changement de la photo');
+                if (submitBtn) {
+                    submitBtn.innerText = "Mettre à jour la photo";
+                    submitBtn.disabled = false;
+                }
+            }
+        });
 
         document.getElementById('chatForm').addEventListener('submit', (e) => {
             e.preventDefault();

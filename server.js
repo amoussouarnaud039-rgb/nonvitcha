@@ -7,7 +7,9 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    maxHttpBufferSize: 1e8 // Autorise les gros paquets via Socket.io (100 Mo)
+});
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -113,37 +115,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-app.post('/api/update-photo', async (req, res) => {
-    try {
-        const { userId, photoBase64 } = req.body;
-        if (!photoBase64) return res.status(400).json({ error: 'Aucune photo fournie.' });
-
-        const updatedUser = await User.findByIdAndUpdate(
-            userId, 
-            { photo: photoBase64 }, 
-            { new: true }
-        );
-
-        if (!updatedUser) return res.status(404).json({ error: 'Utilisateur introuvable.' });
-
-        res.json({
-            success: true,
-            photo: updatedUser.photo,
-            user: {
-                id: updatedUser._id,
-                nom: updatedUser.nom,
-                email: updatedUser.email,
-                photo: updatedUser.photo,
-                likesCount: updatedUser.likesCount,
-                messagesCount: updatedUser.messagesCount
-            }
-        });
-    } catch (err) {
-        console.error("Erreur mise à jour photo:", err);
-        res.status(500).json({ error: 'Erreur lors du changement de la photo' });
-    }
-});
-
 app.get('/api/members', async (req, res) => {
     try {
         const members = await User.find({}, '-password');
@@ -182,6 +153,43 @@ io.on('connection', (socket) => {
 
     socket.on('public_message', (data) => {
         io.emit('public_message', data);
+    });
+
+    // Mise à jour de la photo via WebSocket pour contourner les blocages HTTP
+    socket.on('update_photo', async ({ userId, photoBase64 }) => {
+        try {
+            if (!photoBase64) {
+                socket.emit('photo_updated', { success: false, error: 'Aucune photo fournie.' });
+                return;
+            }
+
+            const updatedUser = await User.findByIdAndUpdate(
+                userId, 
+                { photo: photoBase64 }, 
+                { new: true }
+            );
+
+            if (!updatedUser) {
+                socket.emit('photo_updated', { success: false, error: 'Utilisateur introuvable.' });
+                return;
+            }
+
+            socket.emit('photo_updated', {
+                success: true,
+                photo: updatedUser.photo,
+                user: {
+                    id: updatedUser._id,
+                    nom: updatedUser.nom,
+                    email: updatedUser.email,
+                    photo: updatedUser.photo,
+                    likesCount: updatedUser.likesCount,
+                    messagesCount: updatedUser.messagesCount
+                }
+            });
+        } catch (err) {
+            console.error("Erreur mise à jour photo socket:", err);
+            socket.emit('photo_updated', { success: false, error: 'Erreur lors du changement de la photo' });
+        }
     });
 });
 

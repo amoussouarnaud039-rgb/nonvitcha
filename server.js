@@ -113,7 +113,19 @@ app.post('/api/login', async (req, res) => {
         const user = await User.findOne({ email });
         if (!user) return res.status(400).json({ error: 'Utilisateur introuvable.' });
 
-        const isMatch = await bcrypt.compare(password, user.password);
+        // Vérification compatible bcrypt ou texte brut (pour anciens comptes)
+        let isMatch = false;
+        if (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) {
+            isMatch = await bcrypt.compare(password, user.password);
+        } else {
+            isMatch = (password === user.password);
+            // Mise à jour automatique vers bcrypt si l'ancien mot de passe était en clair
+            if (isMatch) {
+                user.password = await bcrypt.hash(password, 10);
+                await user.save();
+            }
+        }
+
         if (!isMatch) return res.status(400).json({ error: 'Mot de passe incorrect.' });
 
         res.json({ 

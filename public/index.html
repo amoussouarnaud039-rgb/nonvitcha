@@ -328,6 +328,7 @@
             if (activeBtn) activeBtn.classList.add('active-nav');
 
             if (sectionId === 'membersSection') loadMembers();
+            if (sectionId === 'profileSection') loadProfile();
         }
 
         document.getElementById('registerForm').addEventListener('submit', async (e) => {
@@ -411,7 +412,44 @@
                 <h3>${currentUser.nom}</h3>
                 <p>Email : ${currentUser.email}</p>
                 <p>J'aime reçus : ${currentUser.likesCount || 0} | Messages envoyés : ${currentUser.messagesCount || 0}</p>
+                
+                <hr style="margin: 20px 0; border: none; border-top: 1px solid #ddd;">
+                
+                <h4>Changer ma photo de profil</h4>
+                <form id="updatePhotoForm" style="align-items: center;">
+                    <input type="file" id="newPhotoFile" accept="image/*" required style="width: 100%; max-width: 300px;">
+                    <button type="submit" class="btn" style="margin-top: 10px;">Mettre à jour la photo</button>
+                </form>
             `;
+
+            // Écouteur pour le formulaire de changement de photo
+            document.getElementById('updatePhotoForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const fileInput = document.getElementById('newPhotoFile');
+                if (fileInput.files.length === 0) return;
+
+                const formData = new FormData();
+                formData.append('photo', fileInput.files[0]);
+                formData.append('userId', currentUser.id);
+
+                try {
+                    const res = await fetch('/api/update-photo', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                        currentUser.photo = data.photo;
+                        localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                        alert('Photo de profil mise à jour avec succès !');
+                        loadProfile();
+                    } else {
+                        alert(data.error || 'Erreur lors de la mise à jour');
+                    }
+                } catch (err) {
+                    alert('Erreur réseau');
+                }
+            });
         }
 
         document.getElementById('chatForm').addEventListener('submit', (e) => {

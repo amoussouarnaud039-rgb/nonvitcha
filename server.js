@@ -113,13 +113,11 @@ app.post('/api/login', async (req, res) => {
         const user = await User.findOne({ email });
         if (!user) return res.status(400).json({ error: 'Utilisateur introuvable.' });
 
-        // Vérification compatible bcrypt ou texte brut (pour anciens comptes)
         let isMatch = false;
         if (user.password.startsWith('$2a$') || user.password.startsWith('$2b$')) {
             isMatch = await bcrypt.compare(password, user.password);
         } else {
             isMatch = (password === user.password);
-            // Mise à jour automatique vers bcrypt si l'ancien mot de passe était en clair
             if (isMatch) {
                 user.password = await bcrypt.hash(password, 10);
                 await user.save();
@@ -141,6 +139,38 @@ app.post('/api/login', async (req, res) => {
     } catch (err) {
         console.error("Erreur connexion:", err);
         res.status(500).json({ error: 'Erreur lors de la connexion' });
+    }
+});
+
+// Nouvelle route pour mettre à jour la photo de profil
+app.post('/api/update-photo', upload.single('photo'), async (req, res) => {
+    try {
+        const { userId } = req.body;
+        if (!req.file) return res.status(400).json({ error: 'Aucune photo fournnie.' });
+
+        const updatedUser = await User.findByIdAndUpdate(
+            userId, 
+            { photo: req.file.path }, 
+            { new: true }
+        );
+
+        if (!updatedUser) return res.status(404).json({ error: 'Utilisateur introuvable.' });
+
+        res.json({
+            success: true,
+            photo: updatedUser.photo,
+            user: {
+                id: updatedUser._id,
+                nom: updatedUser.nom,
+                email: updatedUser.email,
+                photo: updatedUser.photo,
+                likesCount: updatedUser.likesCount,
+                messagesCount: updatedUser.messagesCount
+            }
+        });
+    } catch (err) {
+        console.error("Erreur mise à jour photo:", err);
+        res.status(500).json({ error: 'Erreur lors du changement de la photo' });
     }
 });
 

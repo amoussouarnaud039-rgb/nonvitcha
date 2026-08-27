@@ -4,8 +4,9 @@ const { Server } = require('socket.io');
 const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const bcrypt = require('bcryptjs');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
 const app = express();
 const server = http.createServer(app);
@@ -31,7 +32,7 @@ const userSchema = new mongoose.Schema({
     pays: { type: String, default: 'Bénin' },
     ville: { type: String, default: 'Cotonou' },
     interets: { type: String, default: '' },
-    photo: { type: String, default: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300' },
+    photo: { type: String, default: '' },
     coins: { type: Number, default: 50 },
     isVip: { type: Boolean, default: false },
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
@@ -63,22 +64,27 @@ const User = mongoose.model('User', userSchema);
 const Message = mongoose.model('Message', messageSchema);
 const Ecoute = mongoose.model('Ecoute', ecouteSchema);
 
-// --- MIDDLEWARES & DOSSIER UPLOADS ---
+// --- CONFIGURATION CLOUDINARY & MULTER ---
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'scp7oawl',
+    api_key: process.env.CLOUDINARY_API_KEY || '186831271449591',
+    api_secret: process.env.CLOUDINARY_API_SECRET || 'hlUjoEm52hsL5Eh4FkjYNVk0k7M'
+});
+
+const storage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+        folder: 'nonvitcha_uploads',
+        allowed_formats: ['jpg', 'png', 'jpeg', 'webp']
+    }
+});
+
+const upload = multer({ storage: storage });
+
+// --- MIDDLEWARES ---
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, 'uploads/'),
-    filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
-});
-const upload = multer({ storage });
 
 // --- API ROUTES ---
 
@@ -97,7 +103,8 @@ app.post('/api/register', upload.single('photo'), async (req, res) => {
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
-        const photoUrl = req.file ? `/uploads/${req.file.filename}` : 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300';
+        // Stockage direct de l'URL HTTPS retournée par Cloudinary
+        const photoUrl = req.file ? req.file.path : '';
 
         const newUser = new User({
             nom: nom.trim(),

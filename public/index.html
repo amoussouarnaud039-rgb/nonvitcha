@@ -224,8 +224,12 @@
             <span style="font-size: 1.5rem;">❤️</span>
             <h1>Nonvitcha</h1>
         </div>
-        <div class="user-header-info" id="userInfoBar">
-            <span>Non connecté</span>
+        <div style="display: flex; align-items: center; gap: 15px;">
+            <div class="user-header-info" id="userInfoBar">
+                <span>Non connecté</span>
+            </div>
+            <!-- Accès Admin direct et discret -->
+            <button onclick="openAdminModal()" style="background: none; border: none; color: #7f8c8d; cursor: pointer; font-size: 0.8rem; font-weight: bold;" title="Accès Administrateur">🔒 Admin</button>
         </div>
     </header>
 
@@ -363,10 +367,21 @@
             </div>
             <div id="adminDashboard" style="display: none;">
                 <p style="color: var(--success); font-weight: bold;">Accès administrateur autorisé ✅</p>
-                <div style="margin-top: 20px;">
-                    <h3>Statistiques de la plateforme</h3>
-                    <p>Total membres inscrits : <span id="adminTotalMembers">-</span></p>
-                    <button class="btn" onclick="loadMembers()">Actualiser les données</button>
+                
+                <div style="margin-top: 20px; display: flex; gap: 15px; flex-wrap: wrap;">
+                    <div style="background: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #ddd; flex: 1; min-width: 200px;">
+                        <h3>Statistiques</h3>
+                        <p>Total membres inscrits : <span id="adminTotalMembers">-</span></p>
+                        <p>Total SOS reçus : <span id="adminTotalSosCount">-</span></p>
+                        <button class="btn" onclick="loadAdminData()" style="padding: 5px 10px; font-size: 0.8rem;">Actualiser</button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <h3>📢 Messages d'Écoute SOS (Direct)</h3>
+                    <div id="adminSosContainer" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; margin-top: 10px;">
+                        <p style="color: var(--gray); font-style: italic;">Chargement des messages SOS...</p>
+                    </div>
                 </div>
             </div>
         </div>
@@ -447,6 +462,7 @@
 
             if (sectionId === 'membersSection') loadMembers();
             if (sectionId === 'privateChatSection') loadPrivateContacts();
+            if (sectionId === 'adminSection') loadAdminData();
         }
 
         function logout() {
@@ -571,7 +587,6 @@
                         grid.appendChild(card);
                     });
 
-                    // Mise à jour admin si connecté
                     const totalElem = document.getElementById('adminTotalMembers');
                     if(totalElem) totalElem.innerText = members.length;
                 }
@@ -607,17 +622,100 @@
             selectContact(userId);
         }
 
-        // --- ADMIN AUTH ---
-        function checkAdminPassword(e) {
+        // --- GESTION ADMIN DISCRÈTE ---
+        function openAdminModal() {
+            const pwd = prompt("Entrez le mot de passe administrateur :");
+            if (!pwd) return;
+
+            fetch('/api/admin/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password: pwd })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    localStorage.setItem('adminToken', data.token);
+                    switchSection('adminSection');
+                    document.getElementById('adminLoginContainer').style.display = 'none';
+                    document.getElementById('adminDashboard').style.display = 'block';
+                    loadAdminData();
+                } else {
+                    alert(data.error || 'Mot de passe incorrect');
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Erreur de connexion au serveur');
+            });
+        }
+
+        async function checkAdminPassword(e) {
             e.preventDefault();
             const pwd = document.getElementById('adminPasswordInput').value;
-            // Mot de passe admin par défaut sécurisé (à ajuster selon votre backend si besoin)
-            if (pwd === "admin123" || pwd === "nonvitcha2026") {
-                document.getElementById('adminLoginContainer').style.display = 'none';
-                document.getElementById('adminDashboard').style.display = 'block';
-                loadMembers();
-            } else {
-                alert("Mot de passe administrateur incorrect !");
+            try {
+                const res = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pwd })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    localStorage.setItem('adminToken', data.token);
+                    document.getElementById('adminLoginContainer').style.display = 'none';
+                    document.getElementById('adminDashboard').style.display = 'block';
+                    loadAdminData();
+                } else {
+                    alert(data.error || "Mot de passe administrateur incorrect !");
+                }
+            } catch (err) {
+                console.error(err);
+            }
+        }
+
+        async function loadAdminData() {
+            const adminToken = localStorage.getItem('adminToken');
+            if (!adminToken) return;
+
+            try {
+                const statsRes = await fetch('/api/admin/stats', {
+                    headers: { 'Authorization': `Bearer ${adminToken}` }
+                });
+                const statsData = await statsRes.json();
+                if (statsRes.ok) {
+                    document.getElementById('adminTotalMembers').innerText = statsData.stats.totalUsers;
+                    document.getElementById('adminTotalSosCount').innerText = statsData.stats.totalSos;
+                }
+
+                const sosRes = await fetch('/api/admin/sos', {
+                    headers: { 'Authorization': `Bearer ${adminToken}` }
+                });
+                const sosData = await sosRes.json();
+                if (sosRes.ok) {
+                    const container = document.getElementById('adminSosContainer');
+                    container.innerHTML = '';
+                    
+                    if (sosData.sosList.length === 0) {
+                        container.innerHTML = '<p style="color: var(--gray);">Aucune demande SOS pour le moment.</p>';
+                        return;
+                    }
+
+                    sosData.sosList.forEach(sos => {
+                        const div = document.createElement('div');
+                        div.style.cssText = "background: #fff; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary-color); box-shadow: 0 2px 4px rgba(0,0,0,0.05);";
+                        div.innerHTML = `
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px;">
+                                <strong style="color: var(--primary-color); font-size: 0.95rem;">🚨 Type : ${escapeHtml(sos.type)}</strong>
+                                <span style="font-size: 0.75rem; color: var(--gray);">${new Date(sos.createdAt).toLocaleString()}</span>
+                            </div>
+                            <p style="margin: 8px 0; color: #444; font-size: 0.9rem; background: #fafafa; padding: 10px; border-radius: 5px;">"${escapeHtml(sos.message)}"</p>
+                            <div style="font-size: 0.8rem; color: #666; text-align: right;">Statut : <b>${sos.status}</b></div>
+                        `;
+                        container.appendChild(div);
+                    });
+                }
+            } catch (err) {
+                console.error('Erreur chargement admin:', err);
             }
         }
 

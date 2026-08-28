@@ -237,14 +237,13 @@
         <button id="btn-monetizationSection" onclick="switchSection('monetizationSection')">Monétisation</button>
         <button id="btn-profileSection" onclick="switchSection('profileSection')">Mon Profil</button>
         <button id="btn-sosSection" onclick="switchSection('sosSection')">Écoute SOS</button>
+        <button id="btn-adminSection" onclick="switchSection('adminSection')" style="background-color: #2c3e50;">Admin</button>
         <button onclick="logout()" style="background-color: #7f8c8d;">Déconnexion</button>
     </nav>
 
     <div class="container">
-        <!-- ESPACE PUBLICITE -->
         <div class="ads-banner">📢 Espace publicitaire : Boostez vos profils ou découvrez nos offres VIP exclusives !</div>
 
-        <!-- AUTH SECTION -->
         <div id="authSection" class="section active">
             <div id="loginFormContainer">
                 <h2 style="text-align: center; color: var(--primary-color);">Connexion à Nonvitcha</h2>
@@ -279,7 +278,6 @@
             </div>
         </div>
 
-        <!-- MEMBERS SECTION -->
         <div id="membersSection" class="section">
             <h2>Membres de la communauté</h2>
             <div class="filter-bar">
@@ -292,7 +290,6 @@
             <div id="membersGrid" class="members-grid"></div>
         </div>
 
-        <!-- PUBLIC CHAT -->
         <div id="chatSection" class="section">
             <h2>Chat Public Communautaire</h2>
             <div id="publicChatBox" style="height: 290px; border: 1px solid #ddd; border-radius: 5px; padding: 10px; overflow-y: scroll; margin-bottom: 5px; background: #fafafa;"></div>
@@ -303,7 +300,6 @@
             </form>
         </div>
 
-        <!-- PRIVATE CHAT -->
         <div id="privateChatSection" class="section">
             <h2>Messagerie Privée</h2>
             <div class="chat-container">
@@ -320,7 +316,6 @@
             </div>
         </div>
 
-        <!-- VIP SECTION -->
         <div id="vipSection" class="section" style="text-align: center;">
             <h2>✨ Espace VIP Exclusif</h2>
             <p>Accédez à des profils illimités, mise en avant prioritaire et badge VIP or.</p>
@@ -328,7 +323,6 @@
             <button class="btn" id="btnUpgradeVip" onclick="upgradeVip()" style="background: var(--vip-gold); color: #000; font-size: 1.1rem; padding: 12px 24px;">Devenir VIP (5000 FCFA)</button>
         </div>
 
-        <!-- MONETIZATION SECTION -->
         <div id="monetizationSection" class="section" style="text-align: center;">
             <h2>💰 Monétisation & Solde</h2>
             <p>Rechargez votre compte pour soutenir les créateurs ou booster vos interactions.</p>
@@ -340,13 +334,11 @@
             </div>
         </div>
 
-        <!-- PROFILE SECTION -->
         <div id="profileSection" class="section">
             <h2>Mon Profil</h2>
             <div id="profileDetails" style="text-align: center;"></div>
         </div>
 
-        <!-- SOS SECTION -->
         <div id="sosSection" class="section">
             <h2>Espace Écoute SOS</h2>
             <form id="sosForm">
@@ -358,6 +350,25 @@
                 <textarea id="sosMessage" placeholder="Décrivez votre situation..." rows="4" required></textarea>
                 <button type="submit">Envoyer la demande</button>
             </form>
+        </div>
+
+        <div id="adminSection" class="section">
+            <h2>Panneau d'Administration</h2>
+            <div id="adminLoginContainer">
+                <p>Veuillez entrer le mot de passe administrateur pour accéder aux outils de gestion :</p>
+                <form id="adminLoginForm" onsubmit="checkAdminPassword(event)">
+                    <input type="password" id="adminPasswordInput" placeholder="Mot de passe admin..." required>
+                    <button type="submit" class="btn" style="background-color: #2c3e50;">Se connecter</button>
+                </form>
+            </div>
+            <div id="adminDashboard" style="display: none;">
+                <p style="color: var(--success); font-weight: bold;">Accès administrateur autorisé ✅</p>
+                <div style="margin-top: 20px;">
+                    <h3>Statistiques de la plateforme</h3>
+                    <p>Total membres inscrits : <span id="adminTotalMembers">-</span></p>
+                    <button class="btn" onclick="loadMembers()">Actualiser les données</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -559,6 +570,10 @@
                         `;
                         grid.appendChild(card);
                     });
+
+                    // Mise à jour admin si connecté
+                    const totalElem = document.getElementById('adminTotalMembers');
+                    if(totalElem) totalElem.innerText = members.length;
                 }
             } catch (err) {
                 console.error('Erreur chargement membres:', err);
@@ -584,13 +599,26 @@
         }
 
         function sendHeart(targetUserId) {
-            // Vous pouvez lier ici une action spécifique pour le coup de cœur si gérée par le backend
             alert("Coup de cœur envoyé !");
         }
 
         function openChatWith(userId) {
             switchSection('privateChatSection');
             selectContact(userId);
+        }
+
+        // --- ADMIN AUTH ---
+        function checkAdminPassword(e) {
+            e.preventDefault();
+            const pwd = document.getElementById('adminPasswordInput').value;
+            // Mot de passe admin par défaut sécurisé (à ajuster selon votre backend si besoin)
+            if (pwd === "admin123" || pwd === "nonvitcha2026") {
+                document.getElementById('adminLoginContainer').style.display = 'none';
+                document.getElementById('adminDashboard').style.display = 'block';
+                loadMembers();
+            } else {
+                alert("Mot de passe administrateur incorrect !");
+            }
         }
 
         // --- CHAT PUBLIC ---

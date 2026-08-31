@@ -92,7 +92,7 @@ const sosSchema = new mongoose.Schema({
   userId: { type: String, required: true },
   type: { type: String, required: true },
   message: { type: String, required: true, trim: true },
-  status: { type: String, default: 'pending' },
+  status: { type: String, default: 'En attente' },
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -245,6 +245,7 @@ app.post('/api/update-photo', authenticateToken, async (req, res) => {
   }
 });
 
+// --- GESTION DES LIKES, COUPS DE COEUR ET MATCHS ---
 app.post('/api/like', authenticateToken, async (req, res) => {
   try {
     const { targetUserId } = req.body;
@@ -254,11 +255,41 @@ app.post('/api/like', authenticateToken, async (req, res) => {
     const existingLike = await Like.findOne({ fromUserId, toUserId: targetUserId });
     if (existingLike) return res.status(400).json({ error: 'Vous avez déjà envoyé un coup de cœur à ce profil' });
 
+    // Enregistrer le like
     await new Like({ fromUserId, toUserId: targetUserId }).save();
     const targetUser = await User.findByIdAndUpdate(targetUserId, { $inc: { likesCount: 1 } }, { new: true });
+    const senderUser = await User.findById(fromUserId);
 
-    res.json({ success: true, likesCount: targetUser.likesCount, message: 'Coup de cœur (Like) envoyé avec succès !' });
+    // Vérifier s'il y a un match mutuel (l'autre utilisateur a aussi liké le user courant)
+    const reverseLike = await Like.findOne({ fromUserId: targetUserId, toUserId: fromUserId });
+    let isMatch = false;
+
+    if (reverseLike) {
+      isMatch = true;
+    }
+
+    // Émettre les alertes en temps réel via WebSockets si l'utilisateur cible est connecté
+    const targetSocketId = activeUsers.get(targetUserId);
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('notification', {
+        type: isMatch ? 'match' : 'like',
+        title: isMatch ? '💘 Nouveau Match Mutuel !' : '❤️ Nouveau Coup de Cœur',
+        message: isMatch 
+          ? `Vous avez un match mutuel avec ${senderUser.nom} ! Vous pouvez désormais discuter en privé.`
+          : `${senderUser.nom} a envoyé un coup de cœur à votre profil !`,
+        senderId: fromUserId,
+        senderName: senderUser.nom
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      isMatch, 
+      likesCount: targetUser.likesCount, 
+      message: isMatch ? 'Coup de cœur mutuel (Match) établi !' : 'Coup de cœur envoyé avec succès !' 
+    });
   } catch (err) {
+    console.error('Erreur like:', err);
     res.status(500).json({ error: 'Erreur interne du serveur' });
   }
 });
@@ -372,6 +403,7 @@ app.post('/api/ecoute', authenticateToken, async (req, res) => {
   }
 });
 
+// --- ROUTES ADMINISTRATEUR ---
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body;
   if (password === 'NONVITCHA 2026') {
@@ -425,6 +457,23 @@ app.get('/api/admin/sos', authenticateAdmin, async (req, res) => {
   }
 });
 
+app.put('/api/admin/sos/:id', authenticateAdmin, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const updatedSos = await SOSRequest.findByIdAndUpdate(
+      req.params.id,
+      { status: status || 'Résolu' },
+      { new: true }
+    );
+    if (!updatedSos) {
+      return res.status(404).json({ error: 'Demande SOS introuvable' });
+    }
+    res.json({ success: true, sos: updatedSos, message: 'Statut SOS mis à jour' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erreur serveur lors de la mise à jour du SOS' });
+  }
+});
+
 function sanitizeUser(u) {
   return {
     id: u._id,
@@ -443,7 +492,7 @@ function sanitizeUser(u) {
   };
 }
 
-// --- WEBSOCKETS ---
+// --- WEBSOCKETS AVEC GESTION DES COMPTEURS & ALERTES EN TEMPS RÉEL ---
 const activeUsers = new Map();
 
 io.on('connection', (socket) => {
@@ -454,6 +503,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Gestion des messages publics avec incrémentation du compteur
   socket.on('public_message', async (data) => {
     if (data && data.text) {
       if (data.senderId) {
@@ -468,6 +518,7 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Gestion des messages privés, comptage et alerte de notification en temps réel
   socket.on('private_message', async (data) => {
     try {
       const { senderId, receiverId, text } = data;
@@ -475,11 +526,22 @@ io.on('connection', (socket) => {
 
       const message = new Message({ senderId, receiverId, text: text.trim() });
       await message.save();
+      
+      // Incrémenter le compteur de messages de l'expéditeur
       await User.findByIdAndUpdate(senderId, { $inc: { messagesCount: 1 } });
+      const senderUser = await User.findById(senderId);
 
       const receiverSocketId = activeUsers.get(receiverId);
       if (receiverSocketId) {
+        // Envoi du message au destinataire
         io.to(receiverSocketId).emit('private_message', message);
+        // Envoi d'une alerte de notification toast en temps réel
+        io.to(receiverSocketId).emit('notification', {
+          type: 'message',
+          title: `💬 Nouveau message de ${senderUser.nom}`,
+          message: text.length > 50 ? text.substring(0, 50) + '...' : text,
+          senderId: senderId
+        });
       }
       socket.emit('private_message', message);
     } catch (err) {
